@@ -1,44 +1,68 @@
 "use client";
-import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Moon, Sun, Download, Upload, FileSpreadsheet, FileText, RefreshCw, Globe, Database } from "lucide-react";
+import { Moon, Sun, Download, Upload, FileSpreadsheet, RefreshCw, Globe, Database, LogOut } from "lucide-react";
 import { useAppStore } from "@/stores/useAppStore";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
-import { syncAllToSupabase } from "@/lib/sync-supabase";
+import { runManualSync, runRetryNow, useSyncStore } from "@/lib/sync";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { db } from "@/lib/db";
-import { Modal } from "@/components/ui/Modal";
-import { CategoryForm } from "@/features/categories/components/CategoryForm";
-import { Input } from "@/components/ui/Input";
 import toast from "react-hot-toast";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { Expense, Category, Type } from "@/types";
-import type { CategoryFormData } from "@/features/categories/schemas/categorySchema";
 
 export default function SettingsPage() {
-  const { theme, setTheme, language, setLanguage, viewMode, setViewMode, online } = useAppStore();
+  const { theme, setTheme, language, setLanguage, online } = useAppStore();
+  const { signOut } = useAuth();
   const { t: _ } = useTranslation();
-  const [syncing, setSyncing] = useState(false);
+  const sync = useSyncStore();
   const backend = "Supabase";
+  const configured = isSupabaseConfigured();
+
+  const handleLogout = async () => {
+    if (!window.confirm(_("settings.logoutConfirm"))) return;
+    try {
+      await signOut();
+    } catch {
+      toast.error("Error al cerrar sesión");
+    }
+  };
 
   const handleSync = async () => {
-    setSyncing(true);
     try {
-      await syncAllToSupabase();
-      toast.success("Sincronizado correctamente");
+      await runManualSync();
+      const { failedCount, conflictCount, pendingCount } = useSyncStore.getState();
+      if (failedCount > 0 || conflictCount > 0) {
+        toast.error(`${failedCount + conflictCount} registro(s) con error al sincronizar`);
+      } else if (pendingCount > 0) {
+        toast.success("Pendientes enviados");
+      } else {
+        toast.success("Sincronizado correctamente");
+      }
     } catch {
       toast.error("Error al sincronizar");
-    } finally {
-      setSyncing(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    try {
+      await runRetryNow();
+      const { failedCount, conflictCount } = useSyncStore.getState();
+      if (failedCount > 0 || conflictCount > 0) {
+        toast.error("Algunos registros siguen con error");
+      } else {
+        toast.success("Errores resueltos");
+      }
+    } catch {
+      toast.error("Error al reintentar");
     }
   };
 
   const handleExportCSV = async () => {
     const all = await db.expenses.where({ deleted: false }).toArray();
     if (!all.length) { toast.error("No hay datos para exportar"); return; }
-    const headers = "Código,Nombre,Descripción,Monto,Categoría,Tipo,Método Pago,Estado,Fecha,Hora,Notas";
+    const headers = "Código,Descripción,Monto,Categoría,Método Pago,Estado,Fecha,Hora,Notas";
     const rows = all.map((e) =>
-      `"${e.code}","${e.name}","${e.description}","${e.amount}","${e.categoryId}","${e.typeId}","${e.paymentMethod}","${e.status}","${e.date}","${e.time}","${e.notes}"`
+      `"${e.code}","${e.description}","${e.amount}","${e.categoryId}","${e.paymentMethod}","${e.status}","${e.date}","${e.time}","${e.notes}"`
     ).join("\n");
     const blob = new Blob([`${headers}\n${rows}`], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -158,6 +182,74 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800/60 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium">Sincronización</h2>
+          {!configured && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-500">
+              sin backend
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className={`px-2.5 py-1 rounded-full ${
+            sync.online ? "bg-emerald-600/15 text-emerald-400" : "bg-red-600/15 text-red-400"
+          }`}>
+            {sync.online ? "En línea" : "Sin conexión"}
+          </span>
+          {sync.status === "syncing" && (
+            <span className="px-2.5 py-1 rounded-full bg-sky-600/15 text-sky-400">Sincronizando…</span>
+          )}
+          {sync.pendingCount > 0 && (
+            <span className="px-2.5 py-1 rounded-full bg-amber-600/15 text-amber-400">
+              {sync.pendingCount} pendiente(s)
+            </span>
+          )}
+          {sync.failedCount > 0 && (
+            <span className="px-2.5 py-1 rounded-full bg-red-600/15 text-red-400">
+              {sync.failedCount} con error
+            </span>
+          )}
+          {sync.conflictCount > 0 && (
+            <span className="px-2.5 py-1 rounded-full bg-orange-600/15 text-orange-400">
+              {sync.conflictCount} conflicto(s)
+            </span>
+          )}
+          {sync.failedCount === 0 && sync.conflictCount === 0 && sync.pendingCount === 0 && (
+            <span className="px-2.5 py-1 rounded-full bg-emerald-600/15 text-emerald-400">
+              Sincronizado
+            </span>
+          )}
+        </div>
+
+        {sync.lastSyncedAt && (
+          <p className="text-[11px] text-zinc-500">
+            Última sincronización: {new Date(sync.lastSyncedAt).toLocaleString("es-EC")}
+          </p>
+        )}
+        {sync.lastError && (
+          <p className="text-[11px] text-red-400/80">{sync.lastError}</p>
+        )}
+
+        <div className="flex gap-2">
+          <Button
+            variant="primary"
+            className="flex-1"
+            disabled={sync.status === "syncing" || !configured}
+            onClick={() => void handleSync()}
+          >
+            <RefreshCw size={16} className={sync.status === "syncing" ? "animate-spin" : ""} />
+            Sincronizar ahora
+          </Button>
+          {(sync.failedCount > 0 || sync.conflictCount > 0) && (
+            <Button variant="secondary" className="flex-1" onClick={() => void handleRetry()}>
+              Reintentar
+            </Button>
+          )}
+        </div>
+      </div>
+
       {sections.map((section) => (
         <div key={section.title}>
           <h2 className="text-sm font-medium text-zinc-500 mb-2 px-1">{section.title}</h2>
@@ -177,6 +269,12 @@ export default function SettingsPage() {
 
       <div className="text-center text-xs text-zinc-700 pt-4">
         {_("settings.version")}
+      </div>
+
+      <div className="pb-6">
+        <Button variant="danger" className="w-full" onClick={() => void handleLogout()}>
+          <LogOut size={16} /> {_("settings.logout")}
+        </Button>
       </div>
     </motion.div>
   );

@@ -1,56 +1,58 @@
 import { db } from "@/lib/db";
 import { generateExpenseCode } from "@/utils/code";
-import type { Expense, ExpenseDetail } from "@/types";
+import { buildExpense, canEditExpense } from "../domain/expenseRules";
+import type { Expense } from "@/types";
 import type { ExpenseFormData } from "../schemas/expenseSchema";
 
 export async function createExpense(
   data: ExpenseFormData,
   code?: string
 ): Promise<Expense> {
-  const expenseId = crypto.randomUUID();
-  const now = new Date().toISOString();
   const finalCode = code || (await generateExpenseCode());
-  const totalAmount = data.hasDetails
-    ? (data.details || []).reduce((s, d) => s + d.subtotal, 0)
-    : data.amount || 0;
+  const now = new Date().toISOString();
+  const expense = buildExpense({ data, code: finalCode, now });
+  await db.expenses.add(expense);
+  return expense;
+}
 
-  const expense: Expense = {
-    id: expenseId,
-    code: finalCode,
-    name: data.name,
-    description: data.description || "",
-    amount: totalAmount,
+export async function updateExpense(id: string, data: ExpenseFormData): Promise<void> {
+  const existing = await db.expenses.get(id);
+  if (!existing) throw new Error("Gasto no encontrado");
+  if (!canEditExpense(existing.status)) {
+    throw new Error("Un gasto anulado no puede editarse");
+  }
+
+  await db.expenses.update(id, {
+    description: data.description.trim(),
+    amount: data.amount,
     categoryId: data.categoryId,
-    typeId: data.typeId,
     paymentMethod: data.paymentMethod,
     status: data.status,
     date: data.date,
     time: data.time,
     notes: data.notes || "",
-    invoicePhoto: data.invoicePhoto,
-    hasDetails: data.hasDetails,
-    totalAmount,
-    itemsCount: data.hasDetails ? (data.details || []).length : 0,
-    createdAt: now,
-    updatedAt: now,
-    deleted: false,
-    syncStatus: "pending",
-  };
-  await db.expenses.add(expense);
+    receiptPhoto: data.receiptPhoto,
+    updatedAt: new Date().toISOString(),
+    syncStatus: "pending" as const,
+  });
+}
 
-  if (data.hasDetails && data.details) {
-    const expenseDetails: ExpenseDetail[] = data.details.map((d) => ({
-      id: d.id,
-      expenseId,
-      productName: d.productName,
-      quantity: d.quantity,
-      unitPrice: d.unitPrice,
-      subtotal: d.subtotal,
-      createdAt: now,
-      syncStatus: "pending" as const,
-    }));
-    await db.expenseDetails.bulkAdd(expenseDetails);
-  }
+export async function voidExpense(id: string): Promise<void> {
+  const existing = await db.expenses.get(id);
+  if (!existing) throw new Error("Gasto no encontrado");
+  if (existing.status === "anulado") throw new Error("El gasto ya está anulado");
 
-  return expense;
+  await db.expenses.update(id, {
+    status: "anulado" as const,
+    voidedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    syncStatus: "pending" as const,
+  });
+}
+
+export async function deleteExpense(id: string): Promise<void> {
+  await db.expenses.update(id, {
+    deleted: true,
+    syncStatus: "pending" as const,
+  });
 }

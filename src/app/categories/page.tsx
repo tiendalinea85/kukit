@@ -19,7 +19,7 @@ export default function CategoriesPage() {
   const load = () => db.categories.toArray().then(setCategories);
   useEffect(() => { load(); }, []);
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: CategoryFormData) => {
     setLoading(true);
     try {
       if (editing) {
@@ -30,7 +30,7 @@ export default function CategoriesPage() {
           id: crypto.randomUUID(),
           ...data,
           createdAt: new Date().toISOString(),
-          syncStatus: "local",
+          syncStatus: "pending",
         });
         toast.success("Categoría creada");
       }

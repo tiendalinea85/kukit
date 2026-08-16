@@ -98,13 +98,13 @@ export async function queryExpensesReport(options: {
     if (cat) filtered = filtered.filter((ex) => ex.categoryId === cat.id);
   }
 
-  const totalAmount = filtered.reduce((s, e) => s + (e.totalAmount || e.amount), 0);
+  const totalAmount = filtered.reduce((s, e) => s + e.amount, 0);
   const count = filtered.length;
   const average = count ? totalAmount / count : 0;
 
   const byCategory = Object.entries(
     filtered.reduce<Record<string, number>>((map, e) => {
-      map[e.categoryId] = (map[e.categoryId] || 0) + (e.totalAmount || e.amount);
+      map[e.categoryId] = (map[e.categoryId] || 0) + e.amount;
       return map;
     }, {})
   )
@@ -117,7 +117,7 @@ export async function queryExpensesReport(options: {
 
   const byDate = Object.entries(
     filtered.reduce<Record<string, number>>((map, e) => {
-      map[e.date] = (map[e.date] || 0) + (e.totalAmount || e.amount);
+      map[e.date] = (map[e.date] || 0) + e.amount;
       return map;
     }, {})
   )

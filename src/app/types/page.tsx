@@ -27,7 +27,7 @@ export default function TypesPage() {
         await db.types.update(editing.id, { name: name.trim(), syncStatus: "pending" });
         toast.success("Tipo actualizado");
       } else {
-        await db.types.add({ id: crypto.randomUUID(), name: name.trim(), createdAt: new Date().toISOString(), syncStatus: "local" });
+        await db.types.add({ id: crypto.randomUUID(), name: name.trim(), createdAt: new Date().toISOString(), syncStatus: "pending" });
         toast.success("Tipo creado");
       }
       setModalOpen(false);

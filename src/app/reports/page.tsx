@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { BarChart3, PieChart, TrendingUp, Calendar, Printer, FileSpreadsheet, Share2 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart as RPieChart, Pie, Cell, LineChart, Line, Legend,
+  PieChart as RPieChart, Pie, Cell, LineChart, Line,
 } from "recharts";
 import { db } from "@/lib/db";
 import { useExpenses } from "@/features/expenses/hooks/useExpenses";
@@ -12,14 +12,13 @@ import { PERIODS as periods, getDateRange } from "@/features/reports/services/re
 import { formatCurrency } from "@/utils/format";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
-import type { Category, PeriodFilter, Expense, ExpenseDetail } from "@/types";
+import type { Category, PeriodFilter, Expense } from "@/types";
 
 const CHART_COLORS = ["#a855f7","#ec4899","#f97316","#eab308","#22c55e","#06b6d4","#3b82f6","#78716c"];
 
 export default function ReportsPage() {
   const { expenses } = useExpenses();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [detailsMap, setDetailsMap] = useState<Record<string, ExpenseDetail[]>>({});
   const [period, setPeriod] = useState<PeriodFilter>("month");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -49,25 +48,13 @@ export default function ReportsPage() {
     });
   }, [expenses, period, customStart, customEnd]);
 
-  useEffect(() => {
-    const ids = filtered.map((e) => e.id);
-    if (!ids.length) { setDetailsMap({}); return; }
-    db.expenseDetails.where("expenseId").anyOf(ids).toArray().then((list) => {
-      const map: Record<string, ExpenseDetail[]> = {};
-      list.forEach((d) => {
-        (map[d.expenseId] = map[d.expenseId] || []).push(d);
-      });
-      setDetailsMap(map);
-    });
-  }, [filtered]);
-
-  const totalAmount = filtered.reduce((s, e) => s + (e.totalAmount || e.amount), 0);
+  const totalAmount = filtered.reduce((s, e) => s + e.amount, 0);
   const count = filtered.length;
   const avg = count ? totalAmount / count : 0;
 
   const byCategory = useMemo(() => {
     const map: Record<string, number> = {};
-    filtered.forEach((e) => { map[e.categoryId] = (map[e.categoryId] || 0) + (e.totalAmount || e.amount); });
+    filtered.forEach((e) => { map[e.categoryId] = (map[e.categoryId] || 0) + e.amount; });
     return Object.entries(map)
       .map(([id, amount]) => ({
         name: categories.find((c) => c.id === id)?.name || "Sin categoría",
@@ -80,8 +67,7 @@ export default function ReportsPage() {
   const byDate = useMemo(() => {
     const map: Record<string, number> = {};
     filtered.forEach((e) => {
-      const d = e.date;
-      map[d] = (map[d] || 0) + (e.totalAmount || e.amount);
+      map[e.date] = (map[e.date] || 0) + e.amount;
     });
     return Object.entries(map)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -103,33 +89,15 @@ export default function ReportsPage() {
   const buildRows = () => {
     const rows: Record<string, string | number>[] = [];
     filtered.forEach((ex) => {
-      const details = detailsMap[ex.id] || [];
-      const amount = ex.totalAmount || ex.amount;
-      if (details.length) {
-        details.forEach((d) => {
-          rows.push({
-            Fecha: ex.date,
-            Código: ex.code,
-            Gasto: ex.name,
-            Categoría: categoryName(ex.categoryId),
-            Concepto: d.productName,
-            Cantidad: d.quantity,
-            "Precio Unitario": d.unitPrice,
-            Subtotal: d.subtotal,
-          });
-        });
-      } else {
-        rows.push({
-          Fecha: ex.date,
-          Código: ex.code,
-          Gasto: ex.name,
-          Categoría: categoryName(ex.categoryId),
-          Concepto: "",
-          Cantidad: "",
-          "Precio Unitario": "",
-          Subtotal: amount,
-        });
-      }
+      rows.push({
+        Fecha: ex.date,
+        Código: ex.code,
+        Descripción: ex.description,
+        Categoría: categoryName(ex.categoryId),
+        "Método de Pago": ex.paymentMethod,
+        Estado: ex.status,
+        Monto: ex.amount,
+      });
     });
     return rows;
   };
@@ -140,15 +108,8 @@ export default function ReportsPage() {
     lines.push(`Total: ${formatCurrency(totalAmount)} | Registros: ${count}`);
     lines.push("--------------------------------");
     filtered.forEach((ex) => {
-      const details = detailsMap[ex.id] || [];
-      lines.push(`${ex.date} ${ex.code} - ${ex.name} (${categoryName(ex.categoryId)})`);
-      if (details.length) {
-        details.forEach((d) => {
-          lines.push(`   ${d.quantity} x ${formatCurrency(d.unitPrice)} - ${d.productName}: ${formatCurrency(d.subtotal)}`);
-        });
-      } else {
-        lines.push(`   ${formatCurrency(ex.totalAmount || ex.amount)}`);
-      }
+      lines.push(`${ex.date} ${ex.code} - ${ex.description} (${categoryName(ex.categoryId)})`);
+      lines.push(`   ${formatCurrency(ex.amount)}`);
     });
     lines.push("--------------------------------");
     lines.push(`TOTAL: ${formatCurrency(totalAmount)}`);
@@ -359,37 +320,25 @@ export default function ReportsPage() {
             <p className="text-sm text-zinc-500 text-center py-6">No hay gastos en este período</p>
           ) : (
             <div className="space-y-4">
-              {filtered.map((ex: Expense) => {
-                const details = detailsMap[ex.id] || [];
-                const amount = ex.totalAmount || ex.amount;
-                return (
-                  <div key={ex.id} className="rounded-xl bg-zinc-800/30 border border-zinc-700/50 overflow-hidden">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-700/50">
-                      <div>
-                        <p className="text-sm font-semibold text-zinc-100">{ex.name}</p>
-                        <p className="text-xs text-zinc-500">{ex.code} • {ex.date} • {categoryName(ex.categoryId)}</p>
-                      </div>
-                      <p className="text-sm font-bold text-purple-400">{formatCurrency(amount)}</p>
+              {filtered.map((ex: Expense) => (
+                <div key={ex.id} className="rounded-xl bg-zinc-800/30 border border-zinc-700/50 overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-700/50">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-100">{ex.description}</p>
+                      <p className="text-xs text-zinc-500">{ex.code} • {ex.date} • {categoryName(ex.categoryId)}</p>
                     </div>
-                    {details.length > 0 ? (
-                      <div className="divide-y divide-zinc-800">
-                        {details.map((d) => (
-                          <div key={d.id} className="flex items-center justify-between px-3 py-2">
-                            <p className="text-xs text-zinc-300">{d.productName}</p>
-                            <p className="text-xs text-zinc-500">{d.quantity} x {formatCurrency(d.unitPrice)}</p>
-                            <p className="text-xs font-mono text-zinc-100">{formatCurrency(d.subtotal)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between px-3 py-2">
-                        <p className="text-xs text-zinc-500">Gasto sin detalle</p>
-                        <p className="text-xs font-mono text-zinc-100">{formatCurrency(amount)}</p>
-                      </div>
-                    )}
+                    <p className="text-sm font-bold text-purple-400">{formatCurrency(ex.amount)}</p>
                   </div>
-                );
-              })}
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <p className="text-xs text-zinc-500 capitalize">{ex.paymentMethod.replace("_", " ")}</p>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                      ex.status === "pagado" ? "bg-emerald-600/20 text-emerald-400" :
+                      ex.status === "pendiente" ? "bg-amber-600/20 text-amber-400" :
+                      "bg-red-600/20 text-red-400"
+                    }`}>{ex.status}</span>
+                  </div>
+                </div>
+              ))}
               <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-purple-600/10 border border-purple-600/30">
                 <p className="text-sm font-semibold text-zinc-100">Total del período</p>
                 <p className="text-base font-bold text-purple-400">{formatCurrency(totalAmount)}</p>

@@ -1,5 +1,5 @@
 "use client";
-import { motion } from "framer-motion";
+import { motion, type HTMLMotionProps } from "framer-motion";
 
 interface Props extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "ghost" | "danger";
@@ -32,7 +32,7 @@ export function Button({
     <motion.button
       whileTap={{ scale: 0.97 }}
       className={`${base} ${variants[variant]} ${sizes[size]} ${className}`}
-      {...(props as any)}
+      {...(props as unknown as HTMLMotionProps<"button">)}
     >
       {loading && (
         <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">

@@ -24,7 +24,7 @@ export default function NewExpensePage() {
       await createExpense(data, code);
       toast.success("Gasto registrado exitosamente");
       router.push("/expenses");
-    } catch (err) {
+    } catch {
       toast.error("Error al registrar gasto");
     } finally {
       setLoading(false);

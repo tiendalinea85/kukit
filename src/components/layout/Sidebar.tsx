@@ -2,13 +2,20 @@
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X, Home, PlusCircle, List, Tag, Type, BarChart3, Settings, RefreshCw, Trash2 } from "lucide-react";
+import { X, Home, PlusCircle, List, Briefcase, Tag, Type, BarChart3, Settings, Trash2, ReceiptText, Users, Package, ShoppingBag, Truck } from "lucide-react";
 import { useAppStore } from "@/stores/useAppStore";
 
 const links = [
   { href: "/", label: "Inicio", icon: Home },
+  { href: "/sales/new", label: "Registrar Venta", icon: ShoppingBag },
+  { href: "/sales", label: "Ventas", icon: ReceiptText },
+  { href: "/customers", label: "Clientes", icon: Users },
+  { href: "/products", label: "Productos e Inventario", icon: Package },
   { href: "/expenses/new", label: "Registrar Gasto", icon: PlusCircle },
   { href: "/expenses", label: "Lista de Gastos", icon: List },
+  { href: "/purchases", label: "Compras", icon: Truck },
+  { href: "/investments/new", label: "Registrar Inversión", icon: PlusCircle },
+  { href: "/investments", label: "Inversiones", icon: Briefcase },
   { href: "/categories", label: "Categorías", icon: Tag },
   { href: "/types", label: "Tipos", icon: Type },
   { href: "/reports", label: "Reportes", icon: BarChart3 },

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Search, Scan, Menu, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppStore } from "@/stores/useAppStore";
+import { SyncIndicator } from "@/components/sync/SyncIndicator";
 
 export function TopBar() {
   const router = useRouter();
@@ -70,6 +71,10 @@ export function TopBar() {
             className="hidden sm:flex p-1.5 rounded-xl bg-purple-600/20 text-purple-400 hover:bg-purple-600/30"
           >
             <Plus size={20} />
+          </button>
+
+          <button className="p-1.5 rounded-xl hover:bg-zinc-800 text-zinc-400" title="Estado de sincronización">
+            <SyncIndicator />
           </button>
 
           <div className="relative">
