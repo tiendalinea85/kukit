@@ -1,0 +1,39 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.catoledger.com",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://TU-PROYECTO.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "tu-anon-key"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./service-account.json"
+      }
+    }
+  }
+}
