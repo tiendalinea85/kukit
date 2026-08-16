@@ -1,65 +1,106 @@
-# Zane
+# CatoLedger (Zane)
 
-Aplicación moderna para el registro y control de gastos. PWA offline-first con sincronización a Supabase y entrada por voz asistida por Gemini.
+Aplicación de control de gastos **offline-first** para negocios: gastos, ventas,
+compras, inventario, inversiones y clientes. Monorepo con tres piezas:
 
-## Stack
+| Pieza | Tecnología | Ruta |
+|-------|------------|------|
+| **PWA** | Next.js 15 (App Router) + React 19 + Dexie (IndexedDB) + Supabase | `.` |
+| **App móvil** | Expo SDK 57 + expo-sqlite | `apps/mobile` |
+| **API de sync** | FastAPI + asyncpg (usada por la app móvil) | `apps/api` |
 
-- **Next.js 15** (App Router) + React 19 + TypeScript
-- **Tailwind CSS 4** + framer-motion
-- **Dexie** (IndexedDB) como almacenamiento local offline-first
-- **Supabase** para autenticación y sincronización
-- **Gemini** (opcional) para el parseo de gastos por voz
-- **Zustand**, **react-hook-form**, **zod**, **recharts**
+## Stack (PWA)
+
+- Next.js 15, React 19, TypeScript, Tailwind CSS 4, framer-motion
+- Dexie (IndexedDB) como fuente de verdad local — funciona sin conexión
+- Supabase: autenticación + sync por RLS + revisiones (LWW)
+- Gemini (opcional): parseo de gastos por voz (`/api/voice/parse`)
+- Motor de sync propio en `src/lib/sync/` (outbox, backoff, conflictos,
+  watermarks) — ver `docs/architecture.md`
 
 ## Requisitos
 
-- Node.js 18.18 o superior
-- Una cuenta de Supabase (solo necesaria para auth y sync online)
+- Node.js 24+ (usa `node --test` con type-stripping para los tests)
+- Python 3.13 (solo para `apps/api`)
+- Cuenta de Supabase (solo para auth y sync online; sin configurar la app
+  funciona 100 % local con datos de demostración)
 
-## Instalación
+## Instalación (PWA)
 
 ```bash
 npm install
 cp .env.local.example .env.local
 ```
 
-Completa `.env.local` con tus credenciales de Supabase:
+Completa `.env.local`:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+GEMINI_API_KEY=            # opcional, asistente de voz
 ```
-
-`GEMINI_API_KEY` es opcional y solo se usa para el asistente de voz.
 
 ### Base de datos (Supabase)
 
-Aplica las migraciones ubicadas en `supabase/migrations/`:
+Aplica las migraciones de `supabase/migrations/` **en orden** (00001 a 00008):
 
-- `00001_init.sql` — tablas base
-- `00002_add_expense_details.sql` — detalle de gastos
+| Migración | Contenido |
+|-----------|-----------|
+| `00001` | Tablas base, RLS |
+| `00002` | Detalle de gastos |
+| `00003` | Códigos únicos por usuario |
+| `00004` | Módulo de gastos |
+| `00005` | Inversiones |
+| `00006` | Ventas + inventario |
+| `00007` | Motor de sync (revisiones, compras, sync_log) |
+| `00008` | Hardening RLS (WITH CHECK, índices, sales único) |
+
+> ⚠️ `00001` tiene un bug de orden (políticas antes que la columna `user_id`).
+> **`00008` autocura esa situación**, pero si aún no aplicaste nada, aplica
+> `00008` de inmediato o corrige `00001`. Ver `docs/audit.md` §6.
 
 ## Scripts
 
-| Comando           | Descripción                          |
-| ----------------- | ------------------------------------ |
-| `npm run dev`     | Inicia el servidor de desarrollo     |
-| `npm run build`   | Compila el proyecto para producción  |
-| `npm run start`   | Sirve el build de producción         |
-| `npm run lint`    | Ejecuta ESLint                       |
+| Comando | Descripción |
+|---------|-------------|
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Build de producción (output standalone) |
+| `npm run start` | Sirve el build |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Tests (node --test, 190 en verde) |
+| `npm run test:ci` | Tests con reporter compacto (CI) |
+| `npm run clean` | Limpia `.next` y caches |
+
+## Despliegue
+
+- **Vercel/Netlify:** el proyecto raíz es una app Next estándar. En Vercel, no
+  hace falta el output standalone.
+- **Docker:** `docker build -t catoledger .` → sirve en `:3000`
+  (multi-stage, standalone). Los headers de seguridad (CSP, HSTS, etc.) se
+  aplican desde `next.config.ts`.
+- **App móvil:** `apps/mobile/eas.json` con perfiles `development`,
+  `preview` y `production` (AAB). Entorno: `apps/mobile/.env.example`.
+- **API:** `docker build -t catoledger-api apps/api` → sirve en `:8000`
+  (uvicorn, 2 workers). Variables en `apps/api/.env.example`.
+
+Backups, monitorización y checklist de rollout: **`docs/ops.md`**.
+Informe completo de la auditoría de seguridad/QA/DevOps: **`docs/audit.md`**.
 
 ## Estructura
 
 ```
 src/
-  app/          Páginas y rutas (App Router)
-  components/   Componentes de UI, layout y voz
-  features/     Lógica por dominio (expenses, categories, reports...)
-  hooks/        Hooks compartidos
-  lib/          Dexie, Supabase, seed, sincronización y voz
-  stores/       Estado global (Zustand)
-  types/        Tipos de dominio
-  utils/        Utilidades (formato, texto, códigos)
+  app/          Rutas (App Router) + API routes (/api/voice/parse)
+  components/   UI, layout, auth, voz
+  features/     Dominios: expenses, sales, purchases, investments, reports...
+  lib/          db.ts (Dexie), supabase.ts, seed, sync/, voice/
+  types/        Tipos de dominio y de sync
+apps/
+  mobile/       App Expo (SQLite, syncManager)
+  api/          FastAPI (sync del móvil)
 supabase/
-  migrations/   Migraciones SQL
+  migrations/   SQL versionado
+scripts/        backup-supabase.ps1
+docs/           architecture.md, audit.md, ops.md
 ```
