@@ -81,50 +81,27 @@ async function handleAddExpense(
   intent: AddExpenseIntent,
   language: "es" | "en"
 ): Promise<VoiceActionResult> {
-  const [categories, types] = await Promise.all([
-    db.categories.toArray(),
-    db.types.toArray(),
-  ]);
+  const categories = await db.categories.toArray();
 
   const categoryName = intent.category;
   const category = categoryName
     ? categories.find((c) => normalizeText(c.name) === normalizeText(categoryName))
     : undefined;
 
-  const typeName = intent.type;
-  const type = typeName
-    ? types.find((x) => normalizeText(x.name) === normalizeText(typeName))
-    : undefined;
-
-  const details = (intent.details || []).map((d) => ({
-    id: crypto.randomUUID(),
-    productName: d.productName,
-    quantity: d.quantity,
-    unitPrice: d.unitPrice,
-    subtotal: Math.round(d.quantity * d.unitPrice * 100) / 100,
-  }));
-
-  const hasDetails = details.length > 0;
-  const detailsTotal = details.reduce((s, d) => s + d.subtotal, 0);
-
   const today = new Date().toISOString().split("T")[0];
   const nowTime = new Date().toTimeString().slice(0, 5);
 
   const expenseData: ExpenseFormData = {
-    name:
+    description:
       intent.description ||
       (intent.category ? `Gasto en ${intent.category}` : "Gasto por voz"),
-    description: intent.description || "",
-    amount: hasDetails ? detailsTotal : intent.amount,
+    amount: intent.amount,
     categoryId: category?.id || "",
-    typeId: type?.id || types[0]?.id || "",
     paymentMethod: "efectivo",
-    status: "activo",
+    status: "pagado",
     date: intent.date || today,
     time: nowTime,
     notes: "",
-    hasDetails,
-    details,
   };
 
   return { type: "show_confirmation", expenseData, intent };
@@ -155,7 +132,7 @@ async function handleDeleteExpense(
   const needle = normalizeText(intent.reference);
 
   const candidates = active.filter((e) => {
-    const haystack = normalizeText(`${e.code} ${e.name} ${e.description}`);
+    const haystack = normalizeText(`${e.code} ${e.description}`);
     return haystack.includes(needle);
   });
 

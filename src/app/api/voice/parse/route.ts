@@ -1,7 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { voiceIntentSchema } from "@/lib/voice/schemas";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const MAX_TRANSCRIPT_CHARS = 1500;
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+const rateLimit = new Map<string, { count: number; resetAt: number }>();
+
+function clientIp(req: NextRequest): string {
+  const fwd = req.headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0].trim();
+  return req.headers.get("x-real-ip") ?? "unknown";
+}
+
+function rateLimited(req: NextRequest): boolean {
+  const key = clientIp(req);
+  const now = Date.now();
+  const entry = rateLimit.get(key);
+  if (!entry || entry.resetAt <= now) {
+    rateLimit.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  entry.count++;
+  return entry.count > RATE_LIMIT_MAX;
+}
+
+async function isAuthenticatedRequest(req: NextRequest): Promise<boolean> {
+  if (!isSupabaseConfigured()) return true;
+  const auth = req.headers.get("authorization") ?? "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token) return false;
+  const sb = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+  const { data } = await sb.auth.getUser(token);
+  return !!data.user;
+}
 
 const FALLBACK_CATEGORIES = [
   "Alimentación",
@@ -107,6 +146,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ intent: "unclear", reason: "empty_transcript" });
   }
 
+  if (transcript.length > MAX_TRANSCRIPT_CHARS) {
+    return NextResponse.json({ intent: "unclear", reason: "transcript_too_long" }, { status: 413 });
+  }
+
+  if (rateLimited(req)) {
+    return NextResponse.json({ intent: "unclear", reason: "rate_limited" }, { status: 429 });
+  }
+
+  if (!(await isAuthenticatedRequest(req))) {
+    return NextResponse.json({ intent: "unclear", reason: "unauthorized" }, { status: 401 });
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ intent: "unclear", reason: "missing_api_key" });
@@ -117,10 +168,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
         body: JSON.stringify({
           systemInstruction: {
             parts: [{ text: system }],
@@ -135,7 +189,8 @@ export async function POST(req: NextRequest) {
     );
 
     if (!res.ok) {
-      console.error("Gemini error", res.status, await res.text());
+      const bodyText = (await res.text()).slice(0, 500);
+      console.error("Gemini error", res.status, bodyText);
       return NextResponse.json({ intent: "unclear", reason: "parse_error" });
     }
 

@@ -9,9 +9,10 @@ export async function parseVoiceTranscript(
   online: boolean,
   types: string[] = []
 ): Promise<VoiceIntent> {
+  const local = offlineParse(transcript, locale, categories);
+  if (local) return local;
+
   if (!online) {
-    const parsed = offlineParse(transcript, locale, categories);
-    if (parsed) return parsed;
     return { intent: "unclear", reason: "offline" };
   }
 

@@ -195,7 +195,7 @@ export function VoiceAssistant() {
           result.candidates.length === 1
             ? _("voice.confirmDelete").replace(
                 "{name}",
-                result.candidates[0].name
+                result.candidates[0].description
               )
             : _("voice.confirmDeleteMany").replace(
                 "{count}",
@@ -372,7 +372,6 @@ export function VoiceAssistant() {
           <Modal open onClose={handleModalClose} title={_("voice.addTitle")}>
             <ExpenseForm
               defaultValues={action.expenseData}
-              defaultDetails={action.expenseData.details || []}
               onSubmit={handleFormSave}
               loading={saving}
             />
@@ -444,14 +443,14 @@ export function VoiceAssistant() {
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-zinc-100 truncate">
-                      {c.name}
+                      {c.description}
                     </p>
                     <p className="text-xs text-zinc-500">
                       {c.code} • {c.date}
                     </p>
                   </div>
                   <p className="text-sm font-semibold text-purple-400 ml-2">
-                    {formatCurrency(c.totalAmount || c.amount)}
+                    {formatCurrency(c.amount)}
                   </p>
                 </div>
               ))}
