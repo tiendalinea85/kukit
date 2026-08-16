@@ -1,10 +1,10 @@
 "use client";
-import { useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import { TopBar } from "./TopBar";
 import { BottomNav } from "./BottomNav";
 import { Sidebar } from "./Sidebar";
 import { useAppStore } from "@/stores/useAppStore";
-import { syncAllToSupabase, pullFromSupabase } from "@/lib/sync-supabase";
+import { startSyncEngine, stopSyncEngine, useSyncStore } from "@/lib/sync";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { seedIfEmpty } from "@/lib/seed";
 import { Toaster } from "react-hot-toast";
@@ -15,28 +15,27 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   const { setOnline, theme } = useAppStore();
   const { loading } = useAuth();
 
-  const syncWithBackend = useCallback(async () => {
-    if (isSupabaseConfigured()) {
-      await syncAllToSupabase();
-      await pullFromSupabase();
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      seedIfEmpty();
+      return;
+    }
+    startSyncEngine();
+    return () => stopSyncEngine();
+  }, []);
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        /* sin SW el offline parcial sigue funcionando vía cache HTTP */
+      });
     }
   }, []);
 
   useEffect(() => {
-    seedIfEmpty();
-    const updateOnline = () => setOnline(navigator.onLine);
-    window.addEventListener("online", updateOnline);
-    window.addEventListener("offline", updateOnline);
-    if (navigator.onLine) syncWithBackend();
-    const interval = setInterval(() => {
-      if (navigator.onLine) syncWithBackend();
-    }, 30000);
-    return () => {
-      window.removeEventListener("online", updateOnline);
-      window.removeEventListener("offline", updateOnline);
-      clearInterval(interval);
-    };
-  }, [setOnline, syncWithBackend]);
+    const unsub = useSyncStore.subscribe((state) => setOnline(state.online));
+    return unsub;
+  }, [setOnline]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");

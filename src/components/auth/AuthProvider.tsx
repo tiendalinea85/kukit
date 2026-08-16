@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import { usePathname, useRouter } from "next/navigation";
 import { User } from "@supabase/supabase-js";
 import { onAuthStateChange, getCurrentUser, signOut as supabaseSignOut } from "@/lib/supabase";
+import { clearLocalData } from "@/lib/db";
 
 interface AuthContextValue {
   user: User | null;
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     await supabaseSignOut();
+    await clearLocalData();
     localStorage.removeItem("zane-auth");
     localStorage.removeItem("zane-user");
     router.replace("/auth");

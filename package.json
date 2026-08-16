@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"src/features/expenses/**/*.test.ts\" \"src/features/investments/**/*.test.ts\" \"src/features/sales/**/*.test.ts\" \"src/features/purchases/**/*.test.ts\" \"src/lib/sync/**/*.test.ts\"",
+    "test:ci": "node --test --test-reporter=dot \"src/features/expenses/**/*.test.ts\" \"src/features/investments/**/*.test.ts\" \"src/features/sales/**/*.test.ts\" \"src/features/purchases/**/*.test.ts\" \"src/lib/sync/**/*.test.ts\"",
+    "clean": "node -e \"const {rmSync}=require('fs');['.next','.tsbuildinfo'].forEach(p=>rmSync(p,{recursive:true,force:true}))\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.0",
@@ -16,7 +20,7 @@
     "dexie": "^4.0.0",
     "framer-motion": "^12.6.0",
     "lucide-react": "^0.483.0",
-    "next": "^15.3.1",
+    "next": "^15.5.23",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-hook-form": "^7.54.0",
@@ -37,7 +41,8 @@
     "@types/react-dom": "^19.1.0",
     "@types/uuid": "^10.0.0",
     "eslint": "^9.25.0",
-    "eslint-config-next": "^15.3.1",
+    "eslint-config-next": "^15.5.23",
+    "fake-indexeddb": "^6.2.5",
     "postcss": "^8.5.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.8.0"

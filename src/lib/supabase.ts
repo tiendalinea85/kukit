@@ -68,6 +68,14 @@ export async function signInWithEmail(email: string, password: string) {
   return data;
 }
 
+export async function signUpWithEmail(email: string, password: string) {
+  const sb = getSupabase();
+  if (!sb) throw new Error("Supabase no configurado");
+  const { data, error } = await sb.auth.signUp({ email, password });
+  if (error) throw error;
+  return data;
+}
+
 export async function signOut() {
   const sb = getSupabase();
   if (!sb) return;
