@@ -42,6 +42,11 @@ CREATE INDEX idx_expenses_type_id ON expenses(type_id);
 CREATE INDEX idx_expenses_deleted ON expenses(deleted);
 CREATE INDEX idx_expenses_status ON expenses(status);
 
+-- Add user_id column BEFORE policies (las políticas la referencian)
+ALTER TABLE expenses ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE categories ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE types ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+
 -- Row Level Security
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
@@ -97,8 +102,3 @@ CREATE POLICY "Users can update own types"
 CREATE POLICY "Users can delete own types"
   ON types FOR DELETE
   USING (auth.uid() = user_id);
-
--- Add user_id column after creation
-ALTER TABLE expenses ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
-ALTER TABLE categories ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
-ALTER TABLE types ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;

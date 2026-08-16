@@ -7,7 +7,9 @@
 -- puede leer/escribir los datos de todos los usuarios).
 --
 -- Esta migración es IDEMPOTENTE y autocura esa situación:
---   1. Asegura que `user_id` exista en TODAS las tablas de negocio.
+--   1. Asegura que `user_id` exista en TODAS las tablas de negocio vigentes.
+--      NOTA: `expense_details` se excluye porque `00004` la eliminó (los
+--      gastos ya no tienen líneas).
 --   2. Asegura RLS habilitado en todas.
 --   3. Recrea las políticas con `WITH CHECK` también en UPDATE (antes solo
 --      tenían `USING`), evitando que un usuario reasigne filas a otro
@@ -102,6 +104,13 @@ BEGIN
   EXECUTE format('DROP POLICY IF EXISTS "Users can insert own %I" ON %I', t, t);
   EXECUTE format('DROP POLICY IF EXISTS "Users can update own %I" ON %I', t, t);
   EXECUTE format('DROP POLICY IF EXISTS "Users can delete own %I" ON %I', t, t);
+
+  -- 00006 nombró las políticas con espacios; se derriban ambas variantes
+  -- para no dejar políticas duplicadas al re-ejecutar.
+  EXECUTE 'DROP POLICY IF EXISTS "Users can read own inventory movements" ON inventory_movements';
+  EXECUTE 'DROP POLICY IF EXISTS "Users can insert own inventory movements" ON inventory_movements';
+  EXECUTE 'DROP POLICY IF EXISTS "Users can update own inventory movements" ON inventory_movements';
+  EXECUTE 'DROP POLICY IF EXISTS "Users can delete own inventory movements" ON inventory_movements';
 
   EXECUTE format('CREATE POLICY "Users can read own %I" ON %I FOR SELECT USING (auth.uid() = user_id)', t, t);
   EXECUTE format('CREATE POLICY "Users can insert own %I" ON %I FOR INSERT WITH CHECK (auth.uid() = user_id)', t, t);

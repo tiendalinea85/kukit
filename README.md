@@ -46,7 +46,7 @@ Aplica las migraciones de `supabase/migrations/` **en orden** (00001 a 00008):
 
 | Migración | Contenido |
 |-----------|-----------|
-| `00001` | Tablas base, RLS |
+| `00001` | Tablas base + user_id + RLS |
 | `00002` | Detalle de gastos |
 | `00003` | Códigos únicos por usuario |
 | `00004` | Módulo de gastos |
@@ -54,10 +54,13 @@ Aplica las migraciones de `supabase/migrations/` **en orden** (00001 a 00008):
 | `00006` | Ventas + inventario |
 | `00007` | Motor de sync (revisiones, compras, sync_log) |
 | `00008` | Hardening RLS (WITH CHECK, índices, sales único) |
+| `00009` | Seed de datos de prueba (dev; requiere un usuario creado) |
 
-> ⚠️ `00001` tiene un bug de orden (políticas antes que la columna `user_id`).
-> **`00008` autocura esa situación**, pero si aún no aplicaste nada, aplica
-> `00008` de inmediato o corrige `00001`. Ver `docs/audit.md` §6.
+> ℹ️ `00001` ya incluye `user_id` antes de las políticas (bug de orden
+> corregido) y `00008` excluye `expense_details` (la eliminó `00004`), por lo
+> que la secuencia `00001`→`00008` corre limpia de corrida en una base nueva.
+> `00008` es idempotente y protege también a proyectos que aplicaron la
+> versión anterior con el fallo. Ver `docs/audit.md` §6.
 
 ## Scripts
 
