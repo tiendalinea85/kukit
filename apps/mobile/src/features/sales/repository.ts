@@ -3,13 +3,16 @@ import { nextCodeFor, softDelete, upsert, writeTx, type DbLike } from '../../cor
 import type { Sale, SaleItem } from '../../core/domain/types';
 import { newId, nowIso } from '../../core/utils/id';
 import { applyStockMovement } from '../inventory/repository';
+import { requireActiveWorkspaceId } from '../../core/workspace/isolation';
 
 export async function listSales(): Promise<Sale[]> {
   const db = await getDb();
+  const wsId = await requireActiveWorkspaceId();
   return db.getAllAsync<Sale>(
     `SELECT s.*, c.name as client_name
      FROM sales s LEFT JOIN clients c ON c.id = s.client_id
-     WHERE s.deleted = 0 ORDER BY s.date DESC, s.created_at DESC`
+     WHERE s.deleted = 0 AND s.workspace_id = ? ORDER BY s.date DESC, s.created_at DESC`,
+    wsId
   );
 }
 
@@ -35,6 +38,7 @@ export interface SaleForm {
 
 export async function saveSale(form: SaleForm): Promise<Sale> {
   const db = await getDb();
+  const wsId = await requireActiveWorkspaceId();
   const existing = form.id ? await getSale(form.id) : null;
 
   const items: SaleItem[] = form.items.map((i, idx) => ({
@@ -72,6 +76,7 @@ export async function saveSale(form: SaleForm): Promise<Sale> {
     items_count: items.length,
     payment_method: form.payment_method,
     notes: form.notes,
+    workspace_id: wsId,
     created_at: existing?.created_at ?? now,
     updated_at: now,
   };
@@ -106,6 +111,7 @@ export async function saveSale(form: SaleForm): Promise<Sale> {
                 reference_type: 'sale',
                 reference_id: id,
                 notes: `Venta ${row.code}`,
+                workspace_id: wsId,
               },
               now
             );

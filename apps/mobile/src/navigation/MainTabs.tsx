@@ -1,5 +1,6 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect } from 'react';
 import { HomeNavigator } from './stacks/HomeStack';
 import { CatalogNavigator } from './stacks/CatalogStack';
 import { SalesNavigator } from './stacks/SalesStack';
@@ -7,10 +8,11 @@ import { OpsNavigator } from './stacks/OpsStack';
 import { ReportsNavigator } from './stacks/ReportsStack';
 import type { MainTabParamList } from './types';
 import { colors } from '../components/ui/theme';
+import { useModuleStore, visibleTabs } from '../core/workspace/moduleRegistry';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-const ICONS: Record<keyof MainTabParamList, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
+const ICONS: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
   Inicio: ['home', 'home-outline'],
   Catalogo: ['cube', 'cube-outline'],
   Ventas: ['cart', 'cart-outline'],
@@ -18,7 +20,23 @@ const ICONS: Record<keyof MainTabParamList, [keyof typeof Ionicons.glyphMap, key
   Reportes: ['bar-chart', 'bar-chart-outline'],
 };
 
+const TAB_COMPONENTS: Record<string, React.ComponentType> = {
+  Inicio: HomeNavigator,
+  Catalogo: CatalogNavigator,
+  Ventas: SalesNavigator,
+  Operaciones: OpsNavigator,
+  Reportes: ReportsNavigator,
+};
+
 export function MainTabs() {
+  const { enabled, load } = useModuleStore();
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const visible = visibleTabs(enabled);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -30,16 +48,24 @@ export function MainTabs() {
           borderTopColor: colors.border,
         },
         tabBarIcon: ({ focused, color, size }) => {
-          const [active, inactive] = ICONS[route.name];
+          const icons = ICONS[route.name];
+          if (!icons) return null;
+          const [active, inactive] = icons;
           return <Ionicons name={focused ? active : inactive} size={size} color={color} />;
         },
       })}
     >
-      <Tab.Screen name="Inicio" component={HomeNavigator} />
-      <Tab.Screen name="Catalogo" component={CatalogNavigator} />
-      <Tab.Screen name="Ventas" component={SalesNavigator} />
-      <Tab.Screen name="Operaciones" component={OpsNavigator} />
-      <Tab.Screen name="Reportes" component={ReportsNavigator} />
+      {visible.map((tabName) => {
+        const Component = TAB_COMPONENTS[tabName];
+        if (!Component) return null;
+        return (
+          <Tab.Screen
+            key={tabName}
+            name={tabName as keyof MainTabParamList}
+            component={Component}
+          />
+        );
+      })}
     </Tab.Navigator>
   );
 }

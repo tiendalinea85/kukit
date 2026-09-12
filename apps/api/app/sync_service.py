@@ -16,6 +16,8 @@ TABLES: dict[str, str] = {
     "client": "clients",
     "sale": "sales",
     "sale_item": "sale_items",
+    "workspace": "workspaces",
+    "workspace_module": "workspace_modules",
 }
 
 # Lista blanca de columnas por tabla: los nombres de columna del payload del
@@ -23,55 +25,73 @@ TABLES: dict[str, str] = {
 # (mitiga inyección SQL por nombres de columna y columnas no previstas).
 COLUMNS: dict[str, frozenset[str]] = {
     "categories": frozenset(
-        {"id", "name", "deleted", "created_at", "updated_at", "sync_status"}
+        {"id", "name", "color", "icon", "deleted", "created_at", "updated_at",
+         "sync_status", "workspace_id"}
     ),
     "products": frozenset(
         {
-            "id", "code", "name", "description", "category_id", "brand", "unit",
-            "price_cents", "purchase_price_cents", "stock", "min_stock",
-            "deleted", "created_at", "updated_at", "sync_status",
+            "id", "code", "name", "description", "sku", "category_id", "unit",
+            "cost_price", "sale_price", "tax_rate", "stock", "min_stock",
+            "active", "deleted", "created_at", "updated_at", "sync_status",
+            "workspace_id",
         }
     ),
     "purchases": frozenset(
-        {"id", "code", "date", "supplier", "total_cents", "notes", "deleted",
-         "created_at", "updated_at", "sync_status"}
+        {"id", "code", "supplier", "date", "time", "status", "total_amount",
+         "items_count", "notes", "deleted", "created_at", "updated_at",
+         "sync_status", "workspace_id"}
     ),
     "purchase_items": frozenset(
-        {"id", "purchase_id", "product_id", "name", "quantity", "unit_price_cents",
-         "total_cents", "created_at", "updated_at"}
+        {"id", "purchase_id", "product_id", "product_name", "quantity",
+         "unit_price", "subtotal", "created_at", "updated_at"}
     ),
     "expenses": frozenset(
-        {"id", "code", "date", "description", "amount_cents", "status",
-         "payment_method", "paid_date", "notes", "deleted", "created_at",
-         "updated_at", "sync_status"}
+        {"id", "code", "name", "description", "amount", "total_amount",
+         "items_count", "has_details", "category_id", "type_id",
+         "payment_method", "status", "date", "time", "notes", "deleted",
+         "voided_at", "receipt_url", "receipt_thumb_url",
+         "created_at", "updated_at", "sync_status", "workspace_id"}
     ),
     "expense_details": frozenset(
-        {"id", "expense_id", "expense_type_id", "description", "amount_cents",
-         "created_at", "updated_at"}
+        {"id", "expense_id", "product_name", "quantity", "unit_price",
+         "subtotal", "created_at", "updated_at"}
     ),
     "expense_types": frozenset(
-        {"id", "name", "created_at", "updated_at", "sync_status"}
+        {"id", "name", "created_at", "updated_at", "sync_status",
+         "workspace_id"}
     ),
     "investments": frozenset(
-        {"id", "name", "kind", "amount_cents", "current_value_cents", "date",
-         "notes", "deleted", "created_at", "updated_at", "sync_status"}
+        {"id", "code", "asset_name", "asset_type", "amount",
+         "current_value", "return_rate", "date", "notes", "deleted",
+         "created_at", "updated_at", "sync_status", "workspace_id"}
     ),
     "stock_movements": frozenset(
         {"id", "product_id", "movement_type", "quantity", "reference_type",
-         "reference_id", "date", "notes", "created_at", "updated_at", "sync_status"}
+         "reference_id", "date", "notes", "created_at", "sync_status",
+         "workspace_id"}
     ),
     "clients": frozenset(
-        {"id", "code", "name", "phone", "email", "address", "debt_cents",
-         "deleted", "created_at", "updated_at", "sync_status"}
+        {"id", "code", "name", "phone", "email", "address", "notes",
+         "deleted", "created_at", "updated_at", "sync_status",
+         "workspace_id"}
     ),
     "sales": frozenset(
-        {"id", "code", "date", "client_id", "subtotal_cents", "discount_cents",
-         "total_cents", "payment_method", "notes", "deleted", "created_at",
-         "updated_at", "sync_status"}
+        {"id", "code", "client_id", "date", "time", "status", "subtotal",
+         "discount", "tax", "total_amount", "items_count", "payment_method",
+         "notes", "deleted", "created_at", "updated_at", "sync_status",
+         "workspace_id"}
     ),
     "sale_items": frozenset(
-        {"id", "sale_id", "product_id", "name", "quantity", "unit_price_cents",
-         "total_cents", "created_at", "updated_at"}
+        {"id", "sale_id", "product_id", "product_name", "quantity",
+         "unit_price", "discount", "subtotal", "created_at", "updated_at"}
+    ),
+    "workspaces": frozenset(
+        {"id", "name", "type", "parent_id", "model_key", "description",
+         "role", "status", "created_at", "updated_at", "deleted",
+         "sync_status"}
+    ),
+    "workspace_modules": frozenset(
+        {"workspace_id", "module_key", "status", "created_at"}
     ),
 }
 
@@ -79,10 +99,11 @@ CHILD_REF: dict[str, dict[str, str]] = {
     "purchase": {"table": "purchase_items", "fk": "purchase_id"},
     "sale": {"table": "sale_items", "fk": "sale_id"},
     "expense": {"table": "expense_details", "fk": "expense_id"},
+    "workspace": {"table": "workspace_modules", "fk": "workspace_id"},
 }
 
 # Entity types that carry embedded children in the pull payload.
-PARENT_TYPES = {"purchase", "sale", "expense"}
+PARENT_TYPES = {"purchase", "sale", "expense", "workspace"}
 
 # Timestamps must be coerced to Python datetime to match Postgres timestamptz.
 TS_FIELDS = {"created_at", "updated_at"}
@@ -183,6 +204,10 @@ async def apply_outbox(
     return applied
 
 
+# Tablas hijas que se embeben en el padre durante pull (no se consultan solas).
+_CHILD_TABLES = {"purchase_items", "sale_items", "expense_details", "workspace_modules"}
+
+
 async def pull_changes(
     conn: asyncpg.Connection, user_id: str, cursors: dict[str, str]
 ) -> tuple[list[dict], str]:
@@ -190,7 +215,7 @@ async def pull_changes(
     server_time = now_iso()
 
     for entity_type, table in TABLES.items():
-        if table in ("purchase_items", "sale_items", "expense_details"):
+        if table in _CHILD_TABLES:
             continue  # embedded in parents
         cursor = cursors.get(entity_type)
         if cursor:

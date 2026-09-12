@@ -22,6 +22,7 @@ export interface NewInvestmentInput {
   status: InvestmentStatus;
   date: string;
   notes?: string;
+  workspaceId?: string;
 }
 
 export function canEditInvestment(status: InvestmentStatus): boolean {
@@ -54,6 +55,7 @@ export function buildInvestment(input: {
     status: data.status,
     date: data.date,
     notes: data.notes || "",
+    workspaceId: data.workspaceId ?? "default",
     voidedAt: null,
     createdAt: now,
     updatedAt: now,

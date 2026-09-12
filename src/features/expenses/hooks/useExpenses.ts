@@ -1,18 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
 import { liveQuery } from "dexie";
 import { db } from "@/lib/db";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { voidExpense } from "../services/expenseService";
 import type { Expense } from "@/types";
 
 export function useExpenses() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   useEffect(() => {
+    if (!activeWorkspaceId) return;
     const observable = liveQuery(async () => {
       const data = await db.expenses
-        .orderBy("createdAt")
-        .reverse()
+        .where("workspaceId")
+        .equals(activeWorkspaceId)
         .toArray();
 
       return data.filter((expense) => expense.deleted !== true);
@@ -30,7 +33,7 @@ export function useExpenses() {
     });
 
     return () => sub.unsubscribe();
-  }, []);
+  }, [activeWorkspaceId]);
 
   const remove = useCallback(async (id: string) => {
     await db.expenses.update(id, { deleted: true, syncStatus: "pending" });

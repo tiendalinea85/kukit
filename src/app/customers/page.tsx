@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus, Pencil, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import { CustomerForm } from "@/features/sales/components/CustomerForm";
 import { createCustomer, updateCustomer, deleteCustomer } from "@/features/sales/services/customerService";
 import { useCustomers } from "@/features/sales/hooks/useCustomers";
@@ -11,11 +12,19 @@ import toast from "react-hot-toast";
 import type { CustomerFormData } from "@/features/sales/schemas/customerSchema";
 import type { Customer } from "@/types";
 
+const PAGE_SIZE = 25;
+
 export default function CustomersPage() {
   const { customers } = useCustomers();
+  const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const paged = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return customers.slice(start, start + PAGE_SIZE);
+  }, [customers, page]);
 
   const handleSubmit = async (data: CustomerFormData) => {
     setLoading(true);
@@ -51,7 +60,7 @@ export default function CustomersPage() {
       </div>
 
       <div className="space-y-2">
-        {customers.map((c, i) => (
+        {paged.map((c, i) => (
           <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
             className="flex items-center justify-between rounded-2xl bg-zinc-900/60 border border-zinc-800/60 p-4"
           >
@@ -84,6 +93,7 @@ export default function CustomersPage() {
           </div>
         )}
       </div>
+      <Pagination page={page} totalItems={customers.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
 
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} title={editing ? "Editar Cliente" : "Nuevo Cliente"}>
         <CustomerForm

@@ -89,6 +89,8 @@ Aplica las migraciones de `supabase/migrations/` **en orden** (00001 a 00008):
 
 Backups, monitorización y checklist de rollout: **`docs/ops.md`**.
 Informe completo de la auditoría de seguridad/QA/DevOps: **`docs/audit.md`**.
+Arquitectura multi-workspace (workspaces, modelos de negocio, módulos): **`docs/workspaces-architecture.md`**.
+Fundación técnica de la app móvil (conectividad, migraciones, workspace_id): **`docs/foundation.md`**.
 
 ## Estructura
 
@@ -100,10 +102,12 @@ src/
   lib/          db.ts (Dexie), supabase.ts, seed, sync/, voice/
   types/        Tipos de dominio y de sync
 apps/
-  mobile/       App Expo (SQLite, syncManager)
+  mobile/       App Expo (SQLite v3 con workspaces, syncManager)
+    npm run typecheck   # tsc --noEmit
+    npm test            # node --test (lógica pura)
   api/          FastAPI (sync del móvil)
 supabase/
   migrations/   SQL versionado
-scripts/        backup-supabase.ps1
-docs/           architecture.md, audit.md, ops.md
+scripts/        backup-supabase.ps1, validate-mobile-migration.cjs
+docs/           architecture.md, workspaces-architecture.md, foundation.md, audit.md, ops.md
 ```

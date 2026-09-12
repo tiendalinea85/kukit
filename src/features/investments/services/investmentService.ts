@@ -1,11 +1,17 @@
 import { db } from "@/lib/db";
 import { buildInvestment, canEditInvestment } from "../domain/investmentRules";
 import type { Investment } from "@/types";
-import type { InvestmentFormData } from "../schemas/investmentSchema";
+import { investmentSchema, type InvestmentFormData } from "../schemas/investmentSchema";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
+
+function getWorkspaceId(): string {
+  return useWorkspaceStore.getState().activeWorkspaceId ?? "default";
+}
 
 export async function createInvestment(data: InvestmentFormData): Promise<Investment> {
+  const parsed = investmentSchema.parse(data);
   const now = new Date().toISOString();
-  const investment = buildInvestment({ data, now });
+  const investment = buildInvestment({ data: { ...parsed, workspaceId: getWorkspaceId() }, now });
   await db.investments.add(investment);
   return investment;
 }

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus, Pencil, Trash2, Package, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -12,11 +12,15 @@ import { db } from "@/lib/db";
 import toast from "react-hot-toast";
 import type { ProductWithStockFormData } from "@/features/sales/schemas/productSchema";
 import type { ProductWithStock } from "@/features/sales/services/productService";
+import { Pagination } from "@/components/ui/Pagination";
 import type { Category } from "@/types";
+
+const PAGE_SIZE = 25;
 
 export default function ProductsPage() {
   const { products } = useProducts();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ProductWithStock | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,6 +33,11 @@ export default function ProductsPage() {
   useEffect(() => {
     db.categories.toArray().then(setCategories);
   }, []);
+
+  const paged = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return products.slice(start, start + PAGE_SIZE);
+  }, [products, page]);
 
   const handleSubmit = async (data: ProductWithStockFormData) => {
     setLoading(true);
@@ -88,7 +97,7 @@ export default function ProductsPage() {
       </div>
 
       <div className="space-y-2">
-        {products.map((p, i) => {
+        {paged.map((p, i) => {
           const cat = categories.find((c) => c.id === p.categoryId);
           return (
             <motion.div key={p.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
@@ -133,6 +142,7 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
+      <Pagination page={page} totalItems={products.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
 
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} title={editing ? "Editar Producto" : "Nuevo Producto"}>
         <ProductForm

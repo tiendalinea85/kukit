@@ -12,17 +12,22 @@ interface SelectProps {
   options: Option[];
   value: string | null;
   onChange: (value: string) => void;
+  editable?: boolean;
 }
 
-export function Select({ label, options, value, onChange }: SelectProps) {
+export function Select({ label, options, value, onChange, editable = true }: SelectProps) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
 
   return (
     <View style={styles.wrap}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-      <Pressable style={styles.field} onPress={() => setOpen(true)}>
-        <Text style={[styles.value, !selected && styles.placeholder]}>
+      <Pressable
+        style={[styles.field, !editable && styles.fieldDisabled]}
+        onPress={() => editable && setOpen(true)}
+        disabled={!editable}
+      >
+        <Text style={[styles.value, !selected && styles.placeholder, !editable && styles.valueDisabled]}>
           {selected?.label ?? 'Seleccionar…'}
         </Text>
         <Text style={styles.caret}>▾</Text>
@@ -81,6 +86,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   placeholder: {
+    color: colors.textMuted,
+  },
+  fieldDisabled: {
+    backgroundColor: colors.cardAlt,
+    opacity: 0.6,
+  },
+  valueDisabled: {
     color: colors.textMuted,
   },
   caret: {

@@ -14,10 +14,35 @@ import type {
   PurchaseDetail,
 } from "../types/index.ts";
 import type {
+  Garment,
+  Size,
+  Color,
+  Material,
+  ProductionOrder,
+  ProductionMaterial,
+  Crop,
+  FarmLot,
+  AgroInput,
+  Application,
+  Labor,
+  Harvest,
+  VehicleBrand,
+  VehicleModel,
+  AutoPart,
+  PartCompatibility,
+  Species,
+  Animal,
+  BreedingLot,
+  Feeding,
+  Reproduction,
+  LivestockProduction,
+} from "../types/modules.ts";
+import type {
   OutboxOperation,
   SyncLogEntry,
   SyncStateRecord,
 } from "../types/sync.ts";
+import type { InvoiceDraft } from "../features/invoice/domain/types.ts";
 
 class ZaneDB extends Dexie {
   expenses!: Table<Expense, string>;
@@ -35,6 +60,39 @@ class ZaneDB extends Dexie {
   syncOutbox!: Table<OutboxOperation, string>;
   syncLog!: Table<SyncLogEntry, string>;
   syncState!: Table<SyncStateRecord, string>;
+
+  // Taller de confección
+  garments!: Table<Garment, string>;
+  sizes!: Table<Size, string>;
+  garmentColors!: Table<Color, string>;
+  materials!: Table<Material, string>;
+  productionOrders!: Table<ProductionOrder, string>;
+  productionMaterials!: Table<ProductionMaterial, string>;
+
+  // Agricultura
+  crops!: Table<Crop, string>;
+  farmLots!: Table<FarmLot, string>;
+  agroInputs!: Table<AgroInput, string>;
+  applications!: Table<Application, string>;
+  labors!: Table<Labor, string>;
+  harvests!: Table<Harvest, string>;
+
+  // Repuestos automotrices
+  vehicleBrands!: Table<VehicleBrand, string>;
+  vehicleModels!: Table<VehicleModel, string>;
+  autoParts!: Table<AutoPart, string>;
+  partCompatibilities!: Table<PartCompatibility, string>;
+
+  // Crianza
+  species!: Table<Species, string>;
+  animals!: Table<Animal, string>;
+  breedingLots!: Table<BreedingLot, string>;
+  feedings!: Table<Feeding, string>;
+  reproductions!: Table<Reproduction, string>;
+  livestockProductions!: Table<LivestockProduction, string>;
+
+  // Borradores de facturas (OCR)
+  invoiceDrafts!: Table<InvoiceDraft, string>;
 
   constructor() {
     super("zane-db");
@@ -157,11 +215,122 @@ class ZaneDB extends Dexie {
     // metadatos (watermarks de pull incremental, última sincronización).
     this.version(8).stores({
       syncOutbox:
-        "id, [entity+entityId], entity, entityId, state, retryAt, createdAt, updatedAt, attempts",
+        "id, [entity+entityId], entity, entityId, workspaceId, state, retryAt, createdAt, updatedAt, attempts",
       syncLog:
         "id, ts, level, event, entity, errorType",
       syncState:
         "key, updatedAt",
+    });
+
+    // MÓDULOS ESPECIALIZADOS: talleres, agricultura, repuestos, crianza.
+    // Cada tabla incluye workspaceId para aislamiento por workspace.
+    this.version(9).stores({
+      garments:
+        "id, code, name, categoryId, workspaceId, deleted, syncStatus",
+      sizes:
+        "id, name, workspaceId, deleted, syncStatus",
+      garmentColors:
+        "id, name, workspaceId, deleted, syncStatus",
+      materials:
+        "id, code, name, workspaceId, deleted, syncStatus",
+      productionOrders:
+        "id, code, garmentId, sizeId, colorId, status, workspaceId, deleted, syncStatus",
+      productionMaterials:
+        "id, productionOrderId, materialId, workspaceId, syncStatus",
+      crops:
+        "id, code, name, status, workspaceId, deleted, syncStatus",
+      farmLots:
+        "id, code, name, workspaceId, deleted, syncStatus",
+      agroInputs:
+        "id, code, name, type, workspaceId, deleted, syncStatus",
+      applications:
+        "id, code, cropId, lotId, inputId, workspaceId, deleted, syncStatus",
+      labors:
+        "id, code, cropId, lotId, type, workspaceId, deleted, syncStatus",
+      harvests:
+        "id, code, cropId, lotId, workspaceId, deleted, syncStatus",
+      vehicleBrands:
+        "id, name, workspaceId, deleted, syncStatus",
+      vehicleModels:
+        "id, brandId, name, workspaceId, deleted, syncStatus",
+      autoParts:
+        "id, code, name, partNumber, category, workspaceId, deleted, syncStatus",
+      partCompatibilities:
+        "id, partId, modelId, workspaceId, deleted, syncStatus",
+      species:
+        "id, name, workspaceId, deleted, syncStatus",
+      animals:
+        "id, code, name, speciesId, lotId, gender, status, workspaceId, deleted, syncStatus",
+      breedingLots:
+        "id, code, name, speciesId, workspaceId, deleted, syncStatus",
+      feedings:
+        "id, code, lotId, feedType, workspaceId, deleted, syncStatus",
+      reproductions:
+        "id, code, animalId, event, workspaceId, deleted, syncStatus",
+      livestockProductions:
+        "id, code, lotId, type, workspaceId, deleted, syncStatus",
+    });
+
+    // FIX: agregar updatedAt a catálogos simples para que sync pull
+    // detecte updates remotos (orderColumn = updated_at por defecto).
+    this.version(10).stores({
+      sizes:
+        "id, name, updatedAt, workspaceId, deleted, syncStatus",
+      garmentColors:
+        "id, name, updatedAt, workspaceId, deleted, syncStatus",
+      vehicleBrands:
+        "id, name, updatedAt, workspaceId, deleted, syncStatus",
+      species:
+        "id, name, updatedAt, workspaceId, deleted, syncStatus",
+    });
+
+    // BORRADORES DE FACTURAS: capturas OCR locales (no se sincronizan).
+    this.version(11).stores({
+      invoiceDrafts:
+        "id, status, createdAt, updatedAt",
+    });
+
+    // WORKSPACE ISOLATION: agregar workspaceId como indice en todas las
+    // tablas core para filtrado por workspace activo. Los registros
+    // existentes reciben workspaceId "default" en la migracion.
+    this.version(12).stores({
+      expenses:
+        "id, workspaceId, code, description, categoryId, date, createdAt, updatedAt, status, amount, deleted, syncStatus",
+      categories:
+        "id, workspaceId, name, syncStatus",
+      types:
+        "id, workspaceId, name, syncStatus",
+      investments:
+        "id, workspaceId, name, categoryId, date, status, value, createdAt, updatedAt, deleted, syncStatus",
+      investmentCategories:
+        "id, workspaceId, name, syncStatus",
+      customers:
+        "id, workspaceId, name, phone, createdAt, updatedAt, deleted, syncStatus",
+      products:
+        "id, workspaceId, code, name, categoryId, createdAt, updatedAt, deleted, syncStatus",
+      inventoryMovements:
+        "id, workspaceId, productId, type, referenceType, referenceId, createdAt, syncStatus",
+      sales:
+        "id, workspaceId, code, customerId, date, paymentMethod, status, total, createdAt, updatedAt, deleted, syncStatus",
+      saleDetails:
+        "id, workspaceId, saleId, productId, createdAt, syncStatus",
+      purchases:
+        "id, workspaceId, code, supplier, date, paymentMethod, status, total, createdAt, updatedAt, deleted, syncStatus",
+      purchaseDetails:
+        "id, workspaceId, purchaseId, productId, createdAt, syncStatus",
+    }).upgrade(async (tx) => {
+      const tables = [
+        "expenses", "categories", "types", "investments", "investmentCategories",
+        "customers", "products", "inventoryMovements", "sales", "saleDetails",
+        "purchases", "purchaseDetails",
+      ];
+      for (const tableName of tables) {
+        await tx.table(tableName).toCollection().modify((row: Record<string, unknown>) => {
+          if (typeof row.workspaceId !== "string") {
+            row.workspaceId = "default";
+          }
+        });
+      }
     });
   }
 }
@@ -182,6 +351,29 @@ export async function clearLocalData(): Promise<void> {
     db.saleDetails.clear(),
     db.purchases.clear(),
     db.purchaseDetails.clear(),
+    db.garments.clear(),
+    db.sizes.clear(),
+    db.garmentColors.clear(),
+    db.materials.clear(),
+    db.productionOrders.clear(),
+    db.productionMaterials.clear(),
+    db.crops.clear(),
+    db.farmLots.clear(),
+    db.agroInputs.clear(),
+    db.applications.clear(),
+    db.labors.clear(),
+    db.harvests.clear(),
+    db.vehicleBrands.clear(),
+    db.vehicleModels.clear(),
+    db.autoParts.clear(),
+    db.partCompatibilities.clear(),
+    db.species.clear(),
+    db.animals.clear(),
+    db.breedingLots.clear(),
+    db.feedings.clear(),
+    db.reproductions.clear(),
+    db.livestockProductions.clear(),
+    db.invoiceDrafts.clear(),
     db.syncOutbox.clear(),
     db.syncLog.clear(),
     db.syncState.clear(),

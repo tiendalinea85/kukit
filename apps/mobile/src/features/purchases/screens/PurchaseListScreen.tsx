@@ -35,7 +35,7 @@ export function PurchaseListScreen() {
             key={p.id}
             icon={p.status === 'recibida' ? '📥' : p.status === 'cancelada' ? '🚫' : '⏳'}
             title={`${p.code} · ${p.supplier || 'Proveedor'}`}
-            subtitle={`${formatDate(p.date)} · ${p.items_count} item(s)`}
+            subtitle={`${formatDate(p.date)} · ${p.invoice ? `F: ${p.invoice} · ` : ''}${p.items_count} item(s)`}
             right={formatMoney(p.total_amount)}
             onPress={() => navigation.navigate('PurchaseForm', { id: p.id })}
           />

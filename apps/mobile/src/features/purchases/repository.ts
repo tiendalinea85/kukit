@@ -3,11 +3,14 @@ import { nextCodeFor, softDelete, upsert, writeTx, type DbLike } from '../../cor
 import type { Purchase, PurchaseItem } from '../../core/domain/types';
 import { newId, nowIso } from '../../core/utils/id';
 import { applyStockMovement } from '../inventory/repository';
+import { requireActiveWorkspaceId } from '../../core/workspace/isolation';
 
 export async function listPurchases(): Promise<Purchase[]> {
   const db = await getDb();
+  const wsId = await requireActiveWorkspaceId();
   return db.getAllAsync<Purchase>(
-    `SELECT * FROM purchases WHERE deleted = 0 ORDER BY date DESC, created_at DESC`
+    `SELECT * FROM purchases WHERE deleted = 0 AND workspace_id = ? ORDER BY date DESC, created_at DESC`,
+    wsId
   );
 }
 
@@ -25,6 +28,8 @@ export async function getPurchase(id: string): Promise<Purchase | null> {
 export interface PurchaseForm {
   id?: string;
   supplier: string;
+  invoice: string;
+  payment_method: Purchase['payment_method'];
   date: string;
   time: string;
   status: Purchase['status'];
@@ -34,6 +39,7 @@ export interface PurchaseForm {
 
 export async function savePurchase(form: PurchaseForm): Promise<Purchase> {
   const db = await getDb();
+  const wsId = await requireActiveWorkspaceId();
   const existing = form.id ? await getPurchase(form.id) : null;
 
   const total = form.items.reduce((acc, i) => acc + Math.round(i.quantity * i.unit_price), 0);
@@ -44,12 +50,15 @@ export async function savePurchase(form: PurchaseForm): Promise<Purchase> {
     id,
     code: existing?.code ?? '',
     supplier: form.supplier.trim(),
+    invoice: form.invoice.trim(),
+    payment_method: form.payment_method,
     date: form.date,
     time: form.time,
     status: form.status,
     total_amount: total,
     items_count: form.items.length,
     notes: form.notes,
+    workspace_id: wsId,
     created_at: existing?.created_at ?? now,
     updated_at: now,
   };
@@ -94,6 +103,7 @@ export async function savePurchase(form: PurchaseForm): Promise<Purchase> {
                 reference_type: 'purchase',
                 reference_id: id,
                 notes: `Compra ${row.code}`,
+                workspace_id: wsId,
               },
               now
             );
@@ -113,6 +123,8 @@ export async function deletePurchase(id: string): Promise<void> {
 
 export const defaultPurchaseForm = (): PurchaseForm => ({
   supplier: '',
+  invoice: '',
+  payment_method: 'efectivo',
   date: new Date().toISOString().slice(0, 10),
   time: new Date().toTimeString().slice(0, 8),
   status: 'recibida',

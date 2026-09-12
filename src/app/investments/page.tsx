@@ -12,9 +12,12 @@ import { db } from "@/lib/db";
 import type { TranslationPath } from "@/lib/translations";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import type { Investment, InvestmentCategory } from "@/types";
+
+const PAGE_SIZE = 25;
 
 function InvestmentsContent() {
   const searchParams = useSearchParams();
@@ -27,6 +30,7 @@ function InvestmentsContent() {
   const [filterDateTo, setFilterDateTo] = useState("");
   const [voidTarget, setVoidTarget] = useState<Investment | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Investment | null>(null);
+  const [page, setPage] = useState(1);
   const { viewMode, setViewMode } = useAppStore();
   const { t: _ } = useTranslation();
 
@@ -47,6 +51,11 @@ function InvestmentsContent() {
   const filtered = useMemo(() => {
     return filterInvestments(investments, { search, categoryId: filterCategory, dateFrom: filterDateFrom, dateTo: filterDateTo }, categoryNames);
   }, [investments, search, filterCategory, filterDateFrom, filterDateTo, categoryNames]);
+
+  const paged = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   const hasActiveFilters = !!(filterCategory || filterDateFrom || filterDateTo);
 
@@ -152,7 +161,7 @@ function InvestmentsContent() {
         </div>
       ) : viewMode === "card" ? (
         <div className="space-y-3">
-          {filtered.map((inv, i) => (
+          {paged.map((inv, i) => (
             <motion.div
               key={inv.id}
               initial={{ opacity: 0, y: 20 }}
@@ -203,7 +212,7 @@ function InvestmentsContent() {
         </div>
       ) : (
         <div className="space-y-1">
-          {filtered.map((inv, i) => (
+          {paged.map((inv, i) => (
             <motion.div key={inv.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }}>
               <Link href={`/investments/${inv.id}`}
                 className="flex items-center gap-3 rounded-xl bg-zinc-900/40 border border-zinc-800/40 px-4 py-3 hover:bg-zinc-800/40 transition-colors"
@@ -241,6 +250,7 @@ function InvestmentsContent() {
           ))}
         </div>
       )}
+      {filtered.length > 0 && <Pagination page={page} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} />}
     </motion.div>
   );
 }

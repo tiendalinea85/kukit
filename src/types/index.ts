@@ -19,6 +19,7 @@ export type InvestmentStatus = "pagado" | "pendiente" | "anulado";
 
 export interface InvestmentCategory {
   id: string;
+  workspaceId: string;
   name: string;
   color: string;
   icon: string;
@@ -28,6 +29,7 @@ export interface InvestmentCategory {
 
 export interface Investment {
   id: string;
+  workspaceId: string;
   name: string;
   value: number;
   categoryId: string;
@@ -46,6 +48,7 @@ export interface Investment {
 
 export interface Expense {
   id: string;
+  workspaceId: string;
   code: string;
   description: string;
   amount: number;
@@ -66,6 +69,7 @@ export interface Expense {
 
 export interface Category {
   id: string;
+  workspaceId: string;
   name: string;
   color: string;
   icon: string;
@@ -75,6 +79,7 @@ export interface Category {
 
 export interface Type {
   id: string;
+  workspaceId: string;
   name: string;
   createdAt: string;
   syncStatus: SyncStatus;
@@ -87,6 +92,7 @@ export type SaleStatus = "pendiente" | "confirmada" | "anulada";
 
 export interface Customer {
   id: string;
+  workspaceId: string;
   name: string;
   phone: string;
   address: string;
@@ -100,6 +106,7 @@ export interface Customer {
 
 export interface Product {
   id: string;
+  workspaceId: string;
   code: string;
   name: string;
   color: string;
@@ -118,6 +125,7 @@ export type InventoryMovementType = "entrada" | "salida" | "ajuste";
 
 export interface InventoryMovement {
   id: string;
+  workspaceId: string;
   productId: string;
   type: InventoryMovementType;
   quantity: number;
@@ -136,6 +144,7 @@ export interface InventoryMovement {
 
 export interface SaleDetail {
   id: string;
+  workspaceId: string;
   saleId: string;
   productId: string;
   code: string;
@@ -151,6 +160,7 @@ export interface SaleDetail {
 
 export interface Sale {
   id: string;
+  workspaceId: string;
   code: string;
   customerId: string;
   date: string;
@@ -175,6 +185,7 @@ export type PurchaseStatus = "pendiente" | "recibida" | "anulada";
 
 export interface PurchaseDetail {
   id: string;
+  workspaceId: string;
   purchaseId: string;
   productId: string;
   code: string;
@@ -190,6 +201,7 @@ export interface PurchaseDetail {
 
 export interface Purchase {
   id: string;
+  workspaceId: string;
   code: string;
   supplier: string;
   date: string;

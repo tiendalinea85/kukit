@@ -1,6 +1,11 @@
 import { db } from "@/lib/db";
 import type { Customer } from "@/types";
 import type { CustomerFormData } from "../schemas/customerSchema";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
+
+function getWorkspaceId(): string {
+  return useWorkspaceStore.getState().activeWorkspaceId ?? "default";
+}
 
 function now(): string {
   return new Date().toISOString();
@@ -9,6 +14,7 @@ function now(): string {
 export async function createCustomer(data: CustomerFormData): Promise<Customer> {
   const customer: Customer = {
     id: crypto.randomUUID(),
+    workspaceId: getWorkspaceId(),
     name: data.name.trim(),
     phone: data.phone?.trim() ?? "",
     address: data.address?.trim() ?? "",

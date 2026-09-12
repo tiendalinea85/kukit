@@ -34,6 +34,28 @@ export const SYNC_ENTITY_TABLES = [
   "saleDetails",
   "purchases",
   "purchaseDetails",
+  "garments",
+  "sizes",
+  "garmentColors",
+  "materials",
+  "productionOrders",
+  "productionMaterials",
+  "crops",
+  "farmLots",
+  "agroInputs",
+  "applications",
+  "labors",
+  "harvests",
+  "vehicleBrands",
+  "vehicleModels",
+  "autoParts",
+  "partCompatibilities",
+  "species",
+  "breedingLots",
+  "animals",
+  "feedings",
+  "reproductions",
+  "livestockProductions",
 ] as const;
 
 export type SyncEntity = (typeof SYNC_ENTITY_TABLES)[number];
@@ -97,11 +119,13 @@ export async function clearSyncLog(): Promise<void> {
 export async function enqueueOperation(input: {
   entity: string;
   entityId: string;
+  workspaceId?: string;
   op: OutboxOperation["op"];
   payload: Record<string, unknown>;
   now?: string;
 }): Promise<OutboxOperation> {
   const now = input.now ?? isoNow();
+  const wsId = input.workspaceId ?? "";
   const existing = await db.syncOutbox.where("[entity+entityId]").equals([input.entity, input.entityId]).first();
 
   if (existing) {
@@ -109,6 +133,7 @@ export async function enqueueOperation(input: {
       op: input.op,
       payload: input.payload,
       payloadHash: hashPayload(input.payload),
+      workspaceId: wsId,
       updatedAt: now,
     };
     if (existing.state !== "syncing") {
@@ -126,6 +151,7 @@ export async function enqueueOperation(input: {
     id: uuid(),
     entity: input.entity,
     entityId: input.entityId,
+    workspaceId: wsId,
     op: input.op,
     payload: input.payload,
     payloadHash: hashPayload(input.payload),
@@ -153,13 +179,35 @@ const SYNC_PUSH_RANK: Record<string, number> = {
   investmentCategories: 2,
   customers: 3,
   products: 4,
-  expenses: 5,
-  investments: 6,
-  purchases: 7,
-  sales: 8,
-  inventoryMovements: 9,
-  purchaseDetails: 10,
-  saleDetails: 11,
+  garmentColors: 5,
+  sizes: 6,
+  vehicleBrands: 7,
+  vehicleModels: 8,
+  species: 9,
+  materials: 10,
+  agroInputs: 11,
+  garments: 12,
+  crops: 13,
+  farmLots: 14,
+  breedingLots: 15,
+  animals: 16,
+  expenses: 20,
+  investments: 21,
+  purchases: 22,
+  sales: 23,
+  productionOrders: 24,
+  applications: 25,
+  labors: 26,
+  harvests: 27,
+  autoParts: 28,
+  feedings: 29,
+  reproductions: 30,
+  livestockProductions: 31,
+  inventoryMovements: 40,
+  purchaseDetails: 41,
+  saleDetails: 42,
+  productionMaterials: 43,
+  partCompatibilities: 44,
 };
 
 function pushRank(entity: string): number {

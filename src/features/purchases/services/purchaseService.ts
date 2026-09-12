@@ -10,6 +10,11 @@ import {
 import type { Purchase, PurchaseDetail, InventoryMovement } from "@/types";
 import type { PurchaseFormData } from "../schemas/purchaseSchema";
 import type { PurchaseDetailInput } from "../domain/purchaseRules";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
+
+function getWorkspaceId(): string {
+  return useWorkspaceStore.getState().activeWorkspaceId ?? "default";
+}
 
 function now(): string {
   return new Date().toISOString();
@@ -22,6 +27,7 @@ export interface PurchaseData {
 
 export async function createPurchase(data: PurchaseData, options?: { receive?: boolean }): Promise<Purchase> {
   const code = await generatePurchaseCode();
+  const wsId = getWorkspaceId();
   const purchase = buildPurchase(
     {
       supplier: data.header.supplier,
@@ -30,6 +36,7 @@ export async function createPurchase(data: PurchaseData, options?: { receive?: b
       notes: data.header.notes ?? "",
       status: options?.receive ? "recibida" : "pendiente",
       details: data.details,
+      workspaceId: wsId,
     },
     code,
     now(),
@@ -38,7 +45,7 @@ export async function createPurchase(data: PurchaseData, options?: { receive?: b
   await db.transaction("rw", db.purchases, db.purchaseDetails, db.inventoryMovements, async () => {
     await db.purchases.add(purchase);
     await db.purchaseDetails.bulkAdd(
-      data.details.map((d) => buildPurchaseDetail(d, purchase.id, purchase.createdAt)),
+      data.details.map((d) => buildPurchaseDetail(d, purchase.id, purchase.createdAt, wsId)),
     );
     if (options?.receive) {
       await applyInboundMovements(purchase);
@@ -58,7 +65,7 @@ export async function receivePurchase(id: string): Promise<Purchase> {
   if (details.length === 0) throw new Error("La compra no tiene detalle de productos");
 
   const received = { ...purchase, status: "recibida" as const, receivedAt: now(), updatedAt: now(), syncStatus: "pending" as const };
-  await db.transaction("rw", db.purchases, db.inventoryMovements, async () => {
+  await db.transaction("rw", db.purchases, db.purchaseDetails, db.inventoryMovements, async () => {
     await db.purchases.update(id, received);
     await applyInboundMovements(received);
   });
@@ -70,6 +77,7 @@ async function applyInboundMovements(purchase: Purchase): Promise<void> {
   const details = await db.purchaseDetails.where("purchaseId").equals(purchase.id).toArray();
   const movements: InventoryMovement[] = details.map((d) => ({
     id: crypto.randomUUID(),
+    workspaceId: purchase.workspaceId,
     productId: d.productId,
     type: "entrada" as const,
     quantity: d.quantity,
@@ -102,7 +110,7 @@ export async function updatePurchase(id: string, data: PurchaseData): Promise<vo
     });
     await db.purchaseDetails.where("purchaseId").equals(id).delete();
     await db.purchaseDetails.bulkAdd(
-      data.details.map((d) => buildPurchaseDetail(d, id, updatedAt)),
+      data.details.map((d) => buildPurchaseDetail(d, id, updatedAt, existing.workspaceId)),
     );
   });
 }
@@ -117,11 +125,12 @@ export async function voidPurchase(id: string): Promise<void> {
   const wasReceived = isReceived(existing);
   const voidedAt = now();
 
-  await db.transaction("rw", db.purchases, db.inventoryMovements, async () => {
+  await db.transaction("rw", db.purchases, db.purchaseDetails, db.inventoryMovements, async () => {
     if (wasReceived) {
       const details = await db.purchaseDetails.where("purchaseId").equals(id).toArray();
       const movements: InventoryMovement[] = details.map((d) => ({
         id: crypto.randomUUID(),
+        workspaceId: existing.workspaceId,
         productId: d.productId,
         type: "salida" as const,
         quantity: d.quantity,

@@ -7,6 +7,7 @@ export type HomeStackParamList = {
   Dashboard: undefined;
   Settings: undefined;
   Audit: undefined;
+  ModuleConfig: { workspaceId: string };
 };
 
 export type CatalogStackParamList = {
@@ -27,6 +28,8 @@ export type OpsStackParamList = {
   PurchaseForm: { id?: string } | undefined;
   ExpenseList: undefined;
   ExpenseForm: { id?: string } | undefined;
+  ExpenseDetail: { id: string };
+  ExpenseReport: undefined;
   InvestmentList: undefined;
   InvestmentForm: { id?: string } | undefined;
   InventoryList: undefined;
@@ -37,6 +40,7 @@ export type OpsStackParamList = {
 
 export type ReportsStackParamList = {
   ReportsHome: undefined;
+  ExpenseReport: undefined;
 };
 
 export type MainTabParamList = {

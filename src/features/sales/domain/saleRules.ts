@@ -19,6 +19,7 @@ export interface NewSaleInput {
   notes: string;
   status?: SaleStatus;
   details: SaleDetailInput[];
+  workspaceId?: string;
 }
 
 export function computeSubtotal(quantity: number, unitPrice: number): number {
@@ -45,9 +46,10 @@ export function isVoided(sale: Pick<Sale, "status">): boolean {
   return sale.status === "anulada";
 }
 
-export function buildSaleDetail(input: SaleDetailInput, saleId: string, now: string): SaleDetail {
+export function buildSaleDetail(input: SaleDetailInput, saleId: string, now: string, workspaceId: string = "default"): SaleDetail {
   return {
     id: crypto.randomUUID(),
+    workspaceId,
     saleId,
     productId: input.productId,
     code: input.code.trim(),
@@ -64,6 +66,7 @@ export function buildSaleDetail(input: SaleDetailInput, saleId: string, now: str
 export function buildSale(input: NewSaleInput, code: string, now: string): Sale {
   return {
     id: crypto.randomUUID(),
+    workspaceId: input.workspaceId ?? "default",
     code,
     customerId: input.customerId,
     date: input.date,

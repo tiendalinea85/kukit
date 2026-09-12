@@ -1,16 +1,21 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { db } from "@/lib/db";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
+import { Pagination } from "@/components/ui/Pagination";
 import toast from "react-hot-toast";
 import type { Type } from "@/types";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
+
+const PAGE_SIZE = 25;
 
 export default function TypesPage() {
   const [types, setTypes] = useState<Type[]>([]);
+  const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Type | null>(null);
   const [name, setName] = useState("");
@@ -18,6 +23,11 @@ export default function TypesPage() {
 
   const load = () => db.types.toArray().then(setTypes);
   useEffect(() => { load(); }, []);
+
+  const paged = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return types.slice(start, start + PAGE_SIZE);
+  }, [types, page]);
 
   const handleSubmit = async () => {
     if (!name.trim()) return;
@@ -27,7 +37,7 @@ export default function TypesPage() {
         await db.types.update(editing.id, { name: name.trim(), syncStatus: "pending" });
         toast.success("Tipo actualizado");
       } else {
-        await db.types.add({ id: crypto.randomUUID(), name: name.trim(), createdAt: new Date().toISOString(), syncStatus: "pending" });
+        await db.types.add({ id: crypto.randomUUID(), workspaceId: useWorkspaceStore.getState().activeWorkspaceId ?? "default", name: name.trim(), createdAt: new Date().toISOString(), syncStatus: "pending" });
         toast.success("Tipo creado");
       }
       setModalOpen(false);
@@ -57,7 +67,7 @@ export default function TypesPage() {
       </div>
 
       <div className="space-y-2">
-        {types.map((t, i) => (
+        {paged.map((t, i) => (
           <motion.div key={t.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
             className="flex items-center justify-between rounded-2xl bg-zinc-900/60 border border-zinc-800/60 p-4"
           >
@@ -76,6 +86,7 @@ export default function TypesPage() {
           <p className="text-center text-zinc-600 py-12">No hay tipos. Crea el primero.</p>
         )}
       </div>
+      <Pagination page={page} totalItems={types.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
 
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} title={editing ? "Editar Tipo" : "Nuevo Tipo"}>
         <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-4">

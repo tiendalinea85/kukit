@@ -12,16 +12,33 @@ import { Screen } from '../../../components/ui/Screen';
 import { colors, font, radius, spacing } from '../../../components/ui/theme';
 import { formatMoney } from '../../../core/utils/format';
 import type { HomeStackParamList } from '../../../navigation/types';
+import { useModuleStore, visibleQuickLinks, visibleDashboardCards } from '../../../core/workspace/moduleRegistry';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList>;
+
+const CARD_CONFIG: Record<string, { title: string; icon: string; key: keyof Summary; accent: string }> = {
+  'Ventas':    { title: 'Ventas',    icon: '💰', key: 'total_sales',    accent: colors.success },
+  'Gastos':    { title: 'Gastos',    icon: '💸', key: 'total_expenses', accent: colors.danger },
+  'Compras':   { title: 'Compras',   icon: '📦', key: 'total_purchases', accent: colors.info },
+  'Invertido': { title: 'Invertido', icon: '📈', key: 'total_invested', accent: colors.warning },
+};
+
+const QUICK_LINK_ICONS: Record<string, string> = {
+  'Nueva venta': '➕',
+  'Productos': '📦',
+  'Nuevo gasto': '💸',
+  'Reportes': '📊',
+};
 
 export function DashboardScreen() {
   const navigation = useNavigation<Nav>();
   const { user, signOut } = useAuthStore();
   const sync = useSyncStore();
   const { data, reload } = useLoad<Summary>(dashboardSummary);
+  const { enabled, load: loadModules } = useModuleStore();
 
   useEffect(() => {
+    loadModules();
     sync.runSync().catch(() => undefined);
     const timer = setInterval(() => sync.runSync().catch(() => undefined), 60000);
     return () => clearInterval(timer);
@@ -45,12 +62,25 @@ export function DashboardScreen() {
         ? colors.danger
         : colors.warning;
 
-  const goTab = (name: 'Ventas' | 'Catalogo' | 'Operaciones' | 'Reportes') => {
+  const goTab = (name: string) => {
     const parent = navigation.getParent() as unknown as
       | { navigate: (screen: string) => void }
       | undefined;
     parent?.navigate(name);
   };
+
+  const goQuickLink = (label: string) => {
+    const tabMap: Record<string, string> = {
+      'Nueva venta': 'Ventas',
+      'Productos': 'Catalogo',
+      'Nuevo gasto': 'Operaciones',
+      'Reportes': 'Reportes',
+    };
+    goTab(tabMap[label] ?? 'Operaciones');
+  };
+
+  const visibleCards = visibleDashboardCards(enabled);
+  const quickLinks = visibleQuickLinks(enabled);
 
   return (
     <Screen scroll={false} padded>
@@ -90,27 +120,50 @@ export function DashboardScreen() {
         ) : (
           <>
             <View style={styles.grid}>
-              <Card title="Ventas" icon="💰" value={formatMoney(data.total_sales)} accent={colors.success} />
-              <Card title="Gastos" icon="💸" value={formatMoney(data.total_expenses)} accent={colors.danger} />
-              <Card title="Compras" icon="📦" value={formatMoney(data.total_purchases)} accent={colors.info} />
-              <Card title="Invertido" icon="📈" value={formatMoney(data.total_invested)} accent={colors.warning} />
+              {visibleCards.map((cardName) => {
+                const cfg = CARD_CONFIG[cardName];
+                if (!cfg) return null;
+                return (
+                  <Card
+                    key={cardName}
+                    title={cfg.title}
+                    icon={cfg.icon}
+                    value={formatMoney(data[cfg.key] as number)}
+                    accent={cfg.accent}
+                  />
+                );
+              })}
             </View>
 
             <Card title="Resumen del negocio" icon="📊">
-              <Text style={styles.statLine}>Productos activos: <Text style={styles.statStrong}>{data.product_count}</Text></Text>
-              <Text style={styles.statLine}>Stock bajo: <Text style={[styles.statStrong, { color: colors.danger }]}>{data.low_stock_count}</Text></Text>
-              <Text style={styles.statLine}>Operaciones de venta: <Text style={styles.statStrong}>{data.sales_count}</Text></Text>
-              <Text style={styles.statLine}>Gastos registrados: <Text style={styles.statStrong}>{data.expenses_count}</Text></Text>
+              {enabled.has('products') && (
+                <>
+                  <Text style={styles.statLine}>Productos activos: <Text style={styles.statStrong}>{data.product_count}</Text></Text>
+                  <Text style={styles.statLine}>Stock bajo: <Text style={[styles.statStrong, { color: colors.danger }]}>{data.low_stock_count}</Text></Text>
+                </>
+              )}
+              {enabled.has('sales') && (
+                <Text style={styles.statLine}>Operaciones de venta: <Text style={styles.statStrong}>{data.sales_count}</Text></Text>
+              )}
+              {enabled.has('expenses') && (
+                <Text style={styles.statLine}>Gastos registrados: <Text style={styles.statStrong}>{data.expenses_count}</Text></Text>
+              )}
             </Card>
 
-            <Card title="Accesos rápidos" icon="⚡">
-              <View style={styles.quickGrid}>
-                <QuickLink icon="➕" label="Nueva venta" onPress={() => goTab('Ventas')} />
-                <QuickLink icon="📦" label="Productos" onPress={() => goTab('Catalogo')} />
-                <QuickLink icon="💸" label="Nuevo gasto" onPress={() => goTab('Operaciones')} />
-                <QuickLink icon="📊" label="Reportes" onPress={() => goTab('Reportes')} />
-              </View>
-            </Card>
+            {quickLinks.length > 0 && (
+              <Card title="Accesos rápidos" icon="⚡">
+                <View style={styles.quickGrid}>
+                  {quickLinks.map((ql) => (
+                    <QuickLink
+                      key={ql.label}
+                      icon={QUICK_LINK_ICONS[ql.label] ?? '•'}
+                      label={ql.label}
+                      onPress={() => goQuickLink(ql.label)}
+                    />
+                  ))}
+                </View>
+              </Card>
+            )}
           </>
         )}
       </ScrollView>

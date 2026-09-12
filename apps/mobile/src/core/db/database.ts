@@ -1,8 +1,11 @@
 import * as SQLite from 'expo-sqlite';
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { nowIso, newId } from '../utils/id';
+import { PRINCIPAL_WORKSPACES } from '../workspace/modules';
+import { ACTIVE_WORKSPACE_KEY, getActiveWorkspaceId } from '../workspace/activeWorkspace';
 
 const DATABASE_NAME = 'cato-ledger.db';
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 6;
 
 let dbPromise: Promise<SQLiteDatabase> | null = null;
 
@@ -21,35 +24,10 @@ async function openAndMigrate(): Promise<SQLiteDatabase> {
   return db;
 }
 
-async function migrate(db: SQLiteDatabase): Promise<void> {
-  let { user_version: current } = (await db.getFirstAsync<{ user_version: number }>(
-    'PRAGMA user_version'
-  )) ?? { user_version: 0 };
-
-  if (current < 1) {
-    await db.withExclusiveTransactionAsync(async (txn) => {
-      await txn.execAsync(migrationV1);
-      await txn.execAsync('PRAGMA user_version = 1');
-    });
-    current = 1;
-  }
-
-  if (current < 2) {
-    await db.withExclusiveTransactionAsync(async (txn) => {
-      for (const table of SYNC_STATUS_TABLES) {
-        const cols = await txn.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
-        if (!cols.some((c) => c.name === 'sync_status')) {
-          await txn.execAsync(
-            `ALTER TABLE ${table} ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'`
-          );
-        }
-      }
-      await txn.execAsync('PRAGMA user_version = 2');
-    });
-    current = 2;
-  }
-
-  await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+interface Migration {
+  version: number;
+  name: string;
+  up: (txn: SQLiteDatabase) => Promise<void>;
 }
 
 const SYNC_STATUS_TABLES = [
@@ -64,13 +42,219 @@ const SYNC_STATUS_TABLES = [
   'sales',
 ];
 
+const DOMAIN_TABLES = [
+  'categories',
+  'products',
+  'purchases',
+  'expense_types',
+  'expenses',
+  'investments',
+  'stock_movements',
+  'clients',
+  'sales',
+];
+
+const MIGRATIONS: Migration[] = [
+  {
+    version: 1,
+    name: 'schema-inicial',
+    up: async (txn) => {
+      await txn.execAsync(migrationV1);
+    },
+  },
+  {
+    version: 2,
+    name: 'sync-status',
+    up: async (txn) => {
+      for (const table of SYNC_STATUS_TABLES) {
+        const cols = await txn.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+        if (!cols.some((c) => c.name === 'sync_status')) {
+          await txn.execAsync(
+            `ALTER TABLE ${table} ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'`
+          );
+        }
+      }
+    },
+  },
+  {
+    version: 3,
+    name: 'workspaces',
+    up: migrateV3,
+  },
+  {
+    version: 4,
+    name: 'expenses-v2',
+    up: async (txn) => {
+      for (const col of ['voided_at', 'receipt_url', 'receipt_thumb_url']) {
+        const cols = await txn.getAllAsync<{ name: string }>(`PRAGMA table_info(expenses)`);
+        if (!cols.some((c) => c.name === col)) {
+          await txn.execAsync(`ALTER TABLE expenses ADD COLUMN ${col} TEXT`);
+        }
+      }
+      await txn.execAsync(
+        'CREATE INDEX IF NOT EXISTS idx_expenses_workspace_date ON expenses(workspace_id, date DESC)'
+      );
+      await txn.execAsync('CREATE INDEX IF NOT EXISTS idx_expenses_code ON expenses(code)');
+    },
+  },
+  {
+    version: 5,
+    name: 'purchases-v2',
+    up: async (txn) => {
+      const cols = await txn.getAllAsync<{ name: string }>(`PRAGMA table_info(purchases)`);
+      if (!cols.some((c) => c.name === 'invoice')) {
+        await txn.execAsync(`ALTER TABLE purchases ADD COLUMN invoice TEXT NOT NULL DEFAULT ''`);
+      }
+      if (!cols.some((c) => c.name === 'payment_method')) {
+        await txn.execAsync(
+          `ALTER TABLE purchases ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'efectivo'`
+        );
+      }
+    },
+  },
+  {
+    version: 6,
+    name: 'investments-v2+stock_movements-user',
+    up: async (txn) => {
+      const smCols = await txn.getAllAsync<{ name: string }>(`PRAGMA table_info(stock_movements)`);
+      if (!smCols.some((c) => c.name === 'user_id')) {
+        await txn.execAsync(
+          `ALTER TABLE stock_movements ADD COLUMN user_id TEXT NOT NULL DEFAULT ''`
+        );
+      }
+
+      const invCols = await txn.getAllAsync<{ name: string }>(`PRAGMA table_info(investments)`);
+      for (const col of ['supplier', 'category']) {
+        if (!invCols.some((c) => c.name === col)) {
+          await txn.execAsync(`ALTER TABLE investments ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`);
+        }
+      }
+      if (!invCols.some((c) => c.name === 'payment_method')) {
+        await txn.execAsync(
+          `ALTER TABLE investments ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'efectivo'`
+        );
+      }
+      if (!invCols.some((c) => c.name === 'status')) {
+        await txn.execAsync(
+          `ALTER TABLE investments ADD COLUMN status TEXT NOT NULL DEFAULT 'pagado'`
+        );
+      }
+      if (!invCols.some((c) => c.name === 'voided_at')) {
+        await txn.execAsync(`ALTER TABLE investments ADD COLUMN voided_at TEXT`);
+      }
+    },
+  },
+];
+
+async function migrate(db: SQLiteDatabase): Promise<void> {
+  const { user_version: current } = (await db.getFirstAsync<{ user_version: number }>(
+    'PRAGMA user_version'
+  )) ?? { user_version: 0 };
+
+  for (const migration of MIGRATIONS) {
+    if (migration.version <= current) continue;
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      await migration.up(txn as unknown as SQLiteDatabase);
+      await txn.execAsync(`PRAGMA user_version = ${migration.version}`);
+    });
+  }
+
+  await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+}
+
+async function migrateV3(txn: SQLiteDatabase): Promise<void> {
+  await txn.execAsync(workspacesV3Sql);
+
+  for (const table of [...DOMAIN_TABLES, 'outbox', 'audit_log']) {
+    const cols = await txn.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+    if (!cols.some((c) => c.name === 'workspace_id')) {
+      await txn.execAsync(`ALTER TABLE ${table} ADD COLUMN workspace_id TEXT NOT NULL DEFAULT ''`);
+    }
+  }
+
+  for (const table of DOMAIN_TABLES) {
+    await txn.execAsync(`CREATE INDEX IF NOT EXISTS idx_${table}_workspace ON ${table}(workspace_id)`);
+  }
+  await txn.execAsync('CREATE INDEX IF NOT EXISTS idx_outbox_workspace ON outbox(workspace_id)');
+  await txn.execAsync('CREATE INDEX IF NOT EXISTS idx_audit_workspace ON audit_log(workspace_id)');
+
+  await provisionWorkspaces(txn);
+  await backfillExistingData(txn);
+}
+
+async function provisionWorkspaces(txn: SQLiteDatabase): Promise<void> {
+  const existing = await txn.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM workspaces'
+  );
+
+  if ((existing?.count ?? 0) === 0) {
+    const now = nowIso();
+    let personalId: string | null = null;
+    for (const ws of PRINCIPAL_WORKSPACES) {
+      const id = newId();
+      if (ws.type === 'PERSONAL') personalId = id;
+      await txn.runAsync(
+        `INSERT INTO workspaces
+           (id, name, type, parent_id, model_key, description, role, status, created_at, updated_at, sync_status)
+         VALUES (?, ?, ?, NULL, NULL, '', 'OWNER', 'active', ?, ?, 'synced')`,
+        id,
+        ws.name,
+        ws.type,
+        now,
+        now
+      );
+      for (const code of ws.modules) {
+        await txn.runAsync(
+          `INSERT INTO workspace_modules (workspace_id, module_key, status, created_at)
+           VALUES (?, ?, 'active', ?)`,
+          id,
+          code,
+          now
+        );
+      }
+    }
+    if (personalId) {
+      await txn.runAsync(
+        `INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+        ACTIVE_WORKSPACE_KEY,
+        personalId
+      );
+    }
+  }
+
+  const device = await txn.getFirstAsync<{ value: string }>(
+    `SELECT value FROM settings WHERE key = 'device_id'`
+  );
+  if (!device) {
+    await txn.runAsync(`INSERT INTO settings (key, value) VALUES ('device_id', ?)`, newId());
+  }
+}
+
+async function backfillExistingData(txn: SQLiteDatabase): Promise<void> {
+  const personal = await txn.getFirstAsync<{ value: string }>(
+    'SELECT value FROM settings WHERE key = ?',
+    ACTIVE_WORKSPACE_KEY
+  );
+  const target = personal?.value ?? '';
+  if (!target) return;
+
+  for (const table of DOMAIN_TABLES) {
+    await txn.runAsync(`UPDATE ${table} SET workspace_id = ? WHERE workspace_id = ''`, target);
+  }
+  await txn.runAsync(`UPDATE outbox SET workspace_id = ? WHERE workspace_id = ''`, target);
+  await txn.runAsync(`UPDATE audit_log SET workspace_id = ? WHERE workspace_id = ''`, target);
+}
+
 export async function seedDefaults(): Promise<void> {
   const db = await getDb();
+  const workspaceId = (await getActiveWorkspaceId(db)) ?? '';
+  const now = nowIso();
+
   const cats = await db.getFirstAsync<{ count: number }>(
     'SELECT COUNT(*) as count FROM categories'
   );
   if ((cats?.count ?? 0) === 0) {
-    const now = new Date().toISOString();
     const defaults = [
       { name: 'General', color: '#8b5cf6', icon: '📦' },
       { name: 'Insumos', color: '#22c55e', icon: '🧱' },
@@ -79,28 +263,32 @@ export async function seedDefaults(): Promise<void> {
     ];
     for (const d of defaults) {
       await db.runAsync(
-        'INSERT INTO categories (id, name, color, icon, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        `${Math.random().toString(36).slice(2)}-${Date.now()}`,
+        `INSERT INTO categories (id, name, color, icon, created_at, updated_at, workspace_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        newId(),
         d.name,
         d.color,
         d.icon,
         now,
-        now
+        now,
+        workspaceId
       );
     }
   }
+
   const types = await db.getFirstAsync<{ count: number }>(
     'SELECT COUNT(*) as count FROM expense_types'
   );
   if ((types?.count ?? 0) === 0) {
-    const now = new Date().toISOString();
     for (const name of ['Operativo', 'Logística', 'Personal', 'Otros']) {
       await db.runAsync(
-        'INSERT INTO expense_types (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)',
-        `${Math.random().toString(36).slice(2)}-${Date.now()}`,
+        `INSERT INTO expense_types (id, name, created_at, updated_at, workspace_id)
+         VALUES (?, ?, ?, ?, ?)`,
+        newId(),
         name,
         now,
-        now
+        now,
+        workspaceId
       );
     }
   }
@@ -315,4 +503,32 @@ CREATE INDEX IF NOT EXISTS idx_sales_client ON sales(client_id);
 CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox(status);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
+`;
+
+const workspacesV3Sql = `
+CREATE TABLE IF NOT EXISTS workspaces (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('PERSONAL', 'TRABAJO', 'ESTUDIO', 'NEGOCIO', 'BUSINESS')),
+  parent_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
+  model_key TEXT,
+  description TEXT NOT NULL DEFAULT '',
+  role TEXT NOT NULL DEFAULT 'OWNER' CHECK (role IN ('OWNER', 'ADMIN', 'USER', 'READ_ONLY')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted INTEGER NOT NULL DEFAULT 0,
+  sync_status TEXT NOT NULL DEFAULT 'pending'
+);
+
+CREATE TABLE IF NOT EXISTS workspace_modules (
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  module_key TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, module_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_workspaces_type ON workspaces(type);
+CREATE INDEX IF NOT EXISTS idx_workspaces_parent ON workspaces(parent_id);
 `;

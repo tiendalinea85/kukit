@@ -1,14 +1,19 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { dashboardSummary, salesSeries, expensesSeries, topProducts, stockValue } from '../repository';
 import type { DashboardSummary, SeriesPoint, TopProduct } from '../repository';
 import { Card } from '../../../components/ui/Card';
 import { Screen } from '../../../components/ui/Screen';
 import { colors, font, radius, spacing } from '../../../components/ui/theme';
 import { formatMoney } from '../../../core/utils/format';
+import type { ReportsStackParamList } from '../../../navigation/types';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+type Nav = NativeStackNavigationProp<ReportsStackParamList, 'ReportsHome'>;
 
 export function ReportsScreen() {
+  const navigation = useNavigation<Nav>();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [sales, setSales] = useState<SeriesPoint[]>([]);
   const [expenses, setExpenses] = useState<SeriesPoint[]>([]);
@@ -52,8 +57,15 @@ export function ReportsScreen() {
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.grid}>
-          <Card title="Ventas" icon="💰" value={formatMoney(summary?.total_sales ?? 0)} accent={colors.success} />
-          <Card title="Gastos" icon="💸" value={formatMoney(summary?.total_expenses ?? 0)} accent={colors.danger} />
+          <View style={styles.gridItem}>
+            <Card title="Ventas" icon="💰" value={formatMoney(summary?.total_sales ?? 0)} accent={colors.success} />
+          </View>
+          <Pressable
+            style={styles.gridItem}
+            onPress={() => navigation.navigate('ExpenseReport')}
+          >
+            <Card title="Gastos" icon="💸" value={formatMoney(summary?.total_expenses ?? 0)} accent={colors.danger} />
+          </Pressable>
         </View>
 
         <Card title="Ventas vs Gastos (14 días)" icon="📈">
@@ -130,6 +142,9 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  gridItem: {
+    flex: 1,
   },
   chartBlock: {
     marginBottom: spacing.md,

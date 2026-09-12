@@ -1,23 +1,42 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card } from '../../../components/ui/Card';
 import { Screen } from '../../../components/ui/Screen';
 import { colors, font, radius, spacing } from '../../../components/ui/theme';
 import type { OpsStackParamList } from '../../../navigation/types';
+import { useModuleStore } from '../../../core/workspace/moduleRegistry';
+import type { ModuleCode } from '../../../core/domain/types';
 
 type Nav = NativeStackNavigationProp<OpsStackParamList>;
 
-const MODULES: { key: keyof OpsStackParamList; icon: string; label: string; accent: string }[] = [
-  { key: 'PurchaseList', icon: '🛒', label: 'Compras', accent: colors.info },
-  { key: 'ExpenseList', icon: '💸', label: 'Gastos', accent: colors.danger },
-  { key: 'InvestmentList', icon: '📈', label: 'Inversiones', accent: colors.warning },
-  { key: 'InventoryList', icon: '📦', label: 'Inventario', accent: colors.success },
-  { key: 'ClientList', icon: '👥', label: 'Clientes', accent: colors.primary },
+interface ModuleTile {
+  key: keyof OpsStackParamList;
+  icon: string;
+  label: string;
+  accent: string;
+  moduleCode: ModuleCode;
+}
+
+const ALL_MODULES: ModuleTile[] = [
+  { key: 'PurchaseList', icon: '🛒', label: 'Compras', accent: colors.info, moduleCode: 'purchases' },
+  { key: 'ExpenseList', icon: '💸', label: 'Gastos', accent: colors.danger, moduleCode: 'expenses' },
+  { key: 'InvestmentList', icon: '📈', label: 'Inversiones', accent: colors.warning, moduleCode: 'investments' },
+  { key: 'InventoryList', icon: '📦', label: 'Inventario', accent: colors.success, moduleCode: 'inventory' },
+  { key: 'ClientList', icon: '👥', label: 'Clientes', accent: colors.primary, moduleCode: 'customers' },
 ];
 
 export function OpsHomeScreen() {
   const navigation = useNavigation<Nav>();
+  const { enabled, load } = useModuleStore();
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const go = navigation.navigate as unknown as (screen: keyof OpsStackParamList) => void;
+  const visibleModules = ALL_MODULES.filter((m) => enabled.has(m.moduleCode));
 
   return (
     <Screen>
@@ -27,11 +46,11 @@ export function OpsHomeScreen() {
         </Text>
       </Card>
       <View style={styles.grid}>
-        {MODULES.map((m) => (
+        {visibleModules.map((m) => (
           <Pressable
             key={m.key}
             style={[styles.tile, { borderColor: m.accent }]}
-            onPress={() => navigation.navigate(m.key)}
+            onPress={() => go(m.key)}
           >
             <Text style={styles.tileIcon}>{m.icon}</Text>
             <Text style={styles.tileLabel}>{m.label}</Text>

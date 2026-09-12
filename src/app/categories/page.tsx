@@ -1,23 +1,33 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { db } from "@/lib/db";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import { CategoryForm } from "@/features/categories/components/CategoryForm";
 import toast from "react-hot-toast";
 import type { CategoryFormData } from "@/features/categories/schemas/categorySchema";
 import type { Category } from "@/types";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
+
+const PAGE_SIZE = 25;
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [loading, setLoading] = useState(false);
 
   const load = () => db.categories.toArray().then(setCategories);
   useEffect(() => { load(); }, []);
+
+  const paged = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return categories.slice(start, start + PAGE_SIZE);
+  }, [categories, page]);
 
   const handleSubmit = async (data: CategoryFormData) => {
     setLoading(true);
@@ -28,6 +38,7 @@ export default function CategoriesPage() {
       } else {
         await db.categories.add({
           id: crypto.randomUUID(),
+          workspaceId: useWorkspaceStore.getState().activeWorkspaceId ?? "default",
           ...data,
           createdAt: new Date().toISOString(),
           syncStatus: "pending",
@@ -60,7 +71,7 @@ export default function CategoriesPage() {
       </div>
 
       <div className="space-y-2">
-        {categories.map((c, i) => (
+        {paged.map((c, i) => (
           <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
             className="flex items-center justify-between rounded-2xl bg-zinc-900/60 border border-zinc-800/60 p-4"
           >
@@ -87,6 +98,7 @@ export default function CategoriesPage() {
           <p className="text-center text-zinc-600 py-12">No hay categorías. Crea la primera.</p>
         )}
       </div>
+      <Pagination page={page} totalItems={categories.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
 
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} title={editing ? "Editar Categoría" : "Nueva Categoría"}>
         <CategoryForm

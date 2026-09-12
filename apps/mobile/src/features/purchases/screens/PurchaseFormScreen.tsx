@@ -31,6 +31,8 @@ export function PurchaseFormScreen() {
           setForm({
             id: p.id,
             supplier: p.supplier,
+            invoice: p.invoice,
+            payment_method: p.payment_method,
             date: p.date,
             time: p.time,
             status: p.status,
@@ -64,6 +66,18 @@ export function PurchaseFormScreen() {
   return (
     <Screen>
       <Input label="Proveedor" value={form.supplier} onChangeText={(supplier) => setForm({ ...form, supplier })} placeholder="Nombre del proveedor" />
+      <Input label="N° Factura" value={form.invoice} onChangeText={(invoice) => setForm({ ...form, invoice })} placeholder="Número de factura (opcional)" />
+      <Select
+        label="Método de pago"
+        options={[
+          { label: 'Efectivo', value: 'efectivo' },
+          { label: 'Tarjeta', value: 'tarjeta' },
+          { label: 'Transferencia', value: 'transferencia' },
+          { label: 'Otro', value: 'otro' },
+        ]}
+        value={form.payment_method}
+        onChange={(payment_method) => setForm({ ...form, payment_method: payment_method as typeof form.payment_method })}
+      />
       <Input label="Fecha" value={form.date} onChangeText={(date) => setForm({ ...form, date })} />
       <Input label="Hora" value={form.time} onChangeText={(time) => setForm({ ...form, time })} />
       <Select

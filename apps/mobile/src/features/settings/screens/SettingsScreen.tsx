@@ -9,6 +9,8 @@ import { ListItem } from '../../../components/ui/ListItem';
 import { Screen } from '../../../components/ui/Screen';
 import { colors, font, spacing } from '../../../components/ui/theme';
 import type { HomeStackParamList } from '../../../navigation/types';
+import { getActiveWorkspaceId } from '../../../core/workspace/activeWorkspace';
+import { getDb } from '../../../core/db/database';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList>;
 
@@ -51,6 +53,17 @@ export function SettingsScreen() {
       </Card>
 
       <Card title="Información" icon="ℹ️">
+        <ListItem
+          title="Configurar módulos"
+          subtitle="Activar o desactivar funcionalidades"
+          onPress={async () => {
+            const db = await getDb();
+            const wsId = await getActiveWorkspaceId(db);
+            if (wsId) {
+              navigation.navigate('ModuleConfig', { workspaceId: wsId });
+            }
+          }}
+        />
         <ListItem title="Auditoría de acciones" subtitle="Historial de cambios locales" onPress={() => navigation.navigate('Audit')} />
       </Card>
 

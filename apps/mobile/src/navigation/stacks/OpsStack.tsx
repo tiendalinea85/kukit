@@ -4,6 +4,8 @@ import { PurchaseListScreen } from '../../features/purchases/screens/PurchaseLis
 import { PurchaseFormScreen } from '../../features/purchases/screens/PurchaseFormScreen';
 import { ExpenseListScreen } from '../../features/expenses/screens/ExpenseListScreen';
 import { ExpenseFormScreen } from '../../features/expenses/screens/ExpenseFormScreen';
+import { ExpenseDetailScreen } from '../../features/expenses/screens/ExpenseDetailScreen';
+import { ExpenseReportScreen } from '../../features/expenses/screens/ExpenseReportScreen';
 import { InvestmentListScreen } from '../../features/investments/screens/InvestmentListScreen';
 import { InvestmentFormScreen } from '../../features/investments/screens/InvestmentFormScreen';
 import { InventoryListScreen } from '../../features/inventory/screens/InventoryListScreen';
@@ -30,6 +32,8 @@ export function OpsNavigator() {
       <Stack.Screen name="PurchaseForm" component={PurchaseFormScreen} options={{ title: 'Compra' }} />
       <Stack.Screen name="ExpenseList" component={ExpenseListScreen} options={{ title: 'Gastos' }} />
       <Stack.Screen name="ExpenseForm" component={ExpenseFormScreen} options={{ title: 'Gasto' }} />
+      <Stack.Screen name="ExpenseDetail" component={ExpenseDetailScreen} options={{ title: 'Detalle de gasto' }} />
+      <Stack.Screen name="ExpenseReport" component={ExpenseReportScreen} options={{ title: 'Reporte de gastos' }} />
       <Stack.Screen name="InvestmentList" component={InvestmentListScreen} options={{ title: 'Inversiones' }} />
       <Stack.Screen name="InvestmentForm" component={InvestmentFormScreen} options={{ title: 'Inversión' }} />
       <Stack.Screen name="InventoryList" component={InventoryListScreen} options={{ title: 'Inventario' }} />

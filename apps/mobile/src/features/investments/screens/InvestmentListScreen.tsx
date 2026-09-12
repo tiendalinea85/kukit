@@ -21,6 +21,15 @@ const TYPE_ICON: Record<string, string> = {
   otro: '📈',
 };
 
+const CATEGORY_ICON: Record<string, string> = {
+  Maquinaria: '⚙️',
+  Herramienta: '🔧',
+  Computadora: '💻',
+  Equipamiento: '📦',
+  Mobiliario: '🪑',
+  Transporte: '🚛',
+};
+
 export function InvestmentListScreen() {
   const navigation = useNavigation<Nav>();
   const { data, loading } = useLoad(listInvestments);
@@ -41,9 +50,9 @@ export function InvestmentListScreen() {
         data.map((i) => (
           <ListItem
             key={i.id}
-            icon={TYPE_ICON[i.asset_type] ?? '📈'}
+            icon={CATEGORY_ICON[i.category] ?? TYPE_ICON[i.asset_type] ?? '📈'}
             title={`${i.code} · ${i.asset_name}`}
-            subtitle={`${formatDate(i.date)} · Rendimiento ${i.return_rate.toFixed(1)}%`}
+            subtitle={`${i.category ? `${i.category} · ` : ''}${formatDate(i.date)}${i.supplier ? ` · ${i.supplier}` : ''}`}
             right={formatMoney(i.current_value)}
             onPress={() => navigation.navigate('InvestmentForm', { id: i.id })}
           />

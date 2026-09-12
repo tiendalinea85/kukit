@@ -4,8 +4,11 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getDb, seedDefaults } from './src/core/db/database';
 import { logger } from './src/core/logging';
+import { startConnectivityMonitoring } from './src/core/network/connectivity';
+import { useSyncStore } from './src/core/sync/syncManager';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
+import { ErrorBanner } from './src/components/ui/ErrorBanner';
 import { colors } from './src/components/ui/theme';
 
 const theme = {
@@ -40,6 +43,14 @@ export default function App() {
       (globalThis as any).addEventListener?.(h.type, h.handler as any);
     }
 
+    const stopConnectivity = startConnectivityMonitoring((online) => {
+      if (online) {
+        void useSyncStore.getState().runSync();
+      } else {
+        useSyncStore.setState({ status: 'offline' });
+      }
+    });
+
     getDb()
       .then(async () => {
         dbLogger.info('SQLite listo');
@@ -51,6 +62,7 @@ export default function App() {
       });
 
     return () => {
+      stopConnectivity();
       for (const h of handlers) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (globalThis as any).removeEventListener?.(h.type, h.handler as any);
@@ -64,6 +76,7 @@ export default function App() {
         <NavigationContainer theme={theme}>
           <StatusBar style="light" />
           <RootNavigator />
+          <ErrorBanner />
         </NavigationContainer>
       </AppErrorBoundary>
     </SafeAreaProvider>

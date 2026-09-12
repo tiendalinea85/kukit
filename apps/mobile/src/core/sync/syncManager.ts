@@ -5,6 +5,9 @@ import { apiClient, type ChangePayload } from './apiClient';
 import { nowIso } from '../utils/id';
 import type { EntityType } from '../domain/types';
 import { logger } from '../logging';
+import { AppError } from '../errors';
+import { emitGlobalError } from '../errors/errorBus';
+import { useConnectivityStore } from '../network/connectivity';
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline' | 'error';
 
@@ -33,6 +36,7 @@ const TABLE_MAP: Record<string, string> = {
   client: 'clients',
   sale: 'sales',
   sale_item: 'sale_items',
+  workspace: 'workspaces',
 };
 
 const CHILD_MAP: Record<string, { table: string; fk: string; childType: string }> = {
@@ -51,6 +55,7 @@ const SYNC_STATUS_TABLES: Record<string, boolean> = {
   stock_movements: true,
   clients: true,
   sales: true,
+  workspaces: true,
 };
 
 async function upsertRow(db: SQLiteDatabase, table: string, cols: Record<string, unknown>): Promise<void> {
@@ -135,6 +140,15 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   runSync: async () => {
     const { status } = get();
     if (status === 'syncing') return;
+
+    const { online } = useConnectivityStore.getState();
+    if (!online) {
+      set({ status: 'offline', lastError: null });
+      syncLogger.info('Sin conexión — sincronización diferida');
+      await get().refreshPending();
+      return;
+    }
+
     set({ status: 'syncing', lastError: null });
     syncLogger.info('Iniciando sincronización');
 
@@ -221,11 +235,11 @@ export const useSyncStore = create<SyncState>((set, get) => ({
         status: 'error',
         lastError: error instanceof Error ? error.message : String(error),
       });
+      emitGlobalError(
+        error instanceof Error ? error.message : String(error),
+        error instanceof AppError ? error.code : undefined
+      );
       await get().refreshPending();
     }
   },
 }));
-
-export async function markSyncOffline(): Promise<void> {
-  useSyncStore.setState({ status: 'offline' });
-}

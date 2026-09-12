@@ -1,14 +1,17 @@
 import { useState, useEffect } from "react";
 import { liveQuery } from "dexie";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { loadDashboard } from "../services/dashboardService";
 import type { DashboardData } from "../services/dashboardService";
 
 export function useDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   useEffect(() => {
-    const observable = liveQuery(async () => loadDashboard());
+    if (!activeWorkspaceId) return;
+    const observable = liveQuery(async () => loadDashboard(activeWorkspaceId));
 
     const sub = observable.subscribe({
       next: (value) => {
@@ -22,7 +25,7 @@ export function useDashboard() {
     });
 
     return () => sub.unsubscribe();
-  }, []);
+  }, [activeWorkspaceId]);
 
   return { data, loading };
 }

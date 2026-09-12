@@ -19,6 +19,7 @@ export interface NewPurchaseInput {
   notes: string;
   status?: PurchaseStatus;
   details: PurchaseDetailInput[];
+  workspaceId?: string;
 }
 
 export function computeSubtotal(quantity: number, unitPrice: number): number {
@@ -42,9 +43,10 @@ export function isReceived(purchase: Pick<Purchase, "status">): boolean {
   return purchase.status === "recibida";
 }
 
-export function buildPurchaseDetail(input: PurchaseDetailInput, purchaseId: string, now: string): PurchaseDetail {
+export function buildPurchaseDetail(input: PurchaseDetailInput, purchaseId: string, now: string, workspaceId: string = "default"): PurchaseDetail {
   return {
     id: crypto.randomUUID(),
+    workspaceId,
     purchaseId,
     productId: input.productId,
     code: input.code.trim(),
@@ -61,6 +63,7 @@ export function buildPurchaseDetail(input: PurchaseDetailInput, purchaseId: stri
 export function buildPurchase(input: NewPurchaseInput, code: string, now: string): Purchase {
   return {
     id: crypto.randomUUID(),
+    workspaceId: input.workspaceId ?? "default",
     code,
     supplier: input.supplier.trim(),
     date: input.date,

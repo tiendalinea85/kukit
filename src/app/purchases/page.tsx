@@ -9,8 +9,11 @@ import { receivePurchase, voidPurchase, deletePurchase, listPurchaseDetailsByPur
 import { formatCurrency } from "@/utils/format";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import toast from "react-hot-toast";
 import type { Purchase, PurchaseDetail } from "@/types";
+
+const PAGE_SIZE = 25;
 
 function PurchasesContent() {
   const searchParams = useSearchParams();
@@ -22,6 +25,7 @@ function PurchasesContent() {
   const [voidTarget, setVoidTarget] = useState<Purchase | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Purchase | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     listPurchaseDetailsByPurchase().then(setDetailsByPurchase);
@@ -45,6 +49,11 @@ function PurchasesContent() {
       })
       .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
   }, [purchases, search, detailsByPurchase]);
+
+  const paged = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   const handleReceive = async () => {
     if (!receiveTarget) return;
@@ -117,7 +126,7 @@ function PurchasesContent() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((p, i) => (
+          {paged.map((p, i) => (
             <motion.div key={p.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
               className="rounded-2xl bg-zinc-900/60 border border-zinc-800/60 p-4"
             >
@@ -153,6 +162,7 @@ function PurchasesContent() {
           ))}
         </div>
       )}
+      {filtered.length > 0 && <Pagination page={page} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} />}
 
       <Modal open={!!receiveTarget} onClose={() => setReceiveTarget(null)} title="Recibir Compra">
         <p className="text-zinc-400 mb-4">

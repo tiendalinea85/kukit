@@ -8,9 +8,15 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"src/features/expenses/**/*.test.ts\" \"src/features/investments/**/*.test.ts\" \"src/features/sales/**/*.test.ts\" \"src/features/purchases/**/*.test.ts\" \"src/lib/sync/**/*.test.ts\"",
-    "test:ci": "node --test --test-reporter=dot \"src/features/expenses/**/*.test.ts\" \"src/features/investments/**/*.test.ts\" \"src/features/sales/**/*.test.ts\" \"src/features/purchases/**/*.test.ts\" \"src/lib/sync/**/*.test.ts\"",
-    "clean": "node -e \"const {rmSync}=require('fs');['.next','.tsbuildinfo'].forEach(p=>rmSync(p,{recursive:true,force:true}))\""
+    "test": "node --import ./register-hooks.ts --test \"src/features/expenses/**/*.test.ts\" \"src/features/investments/**/*.test.ts\" \"src/features/sales/**/*.test.ts\" \"src/features/purchases/**/*.test.ts\" \"src/features/invoice/**/*.test.ts\" \"src/features/tailoring/**/*.test.ts\" \"src/stores/**/*.test.ts\" \"src/lib/sync/**/*.test.ts\" \"src/__tests__/**/*.test.ts\"",
+    "test:ci": "node --import ./register-hooks.ts --test --test-reporter=dot \"src/features/expenses/**/*.test.ts\" \"src/features/investments/**/*.test.ts\" \"src/features/sales/**/*.test.ts\" \"src/features/purchases/**/*.test.ts\" \"src/features/invoice/**/*.test.ts\" \"src/features/tailoring/**/*.test.ts\" \"src/stores/**/*.test.ts\" \"src/lib/sync/**/*.test.ts\" \"src/__tests__/**/*.test.ts\"",
+    "clean": "node -e \"const {rmSync}=require('fs');['.next','.tsbuildinfo'].forEach(p=>rmSync(p,{recursive:true,force:true}))\"",
+    "docker:build": "docker build -t catoledger:latest .",
+    "docker:run": "docker run -d --name catoledger -p 3000:3000 --env-file .env.local catoledger:latest",
+    "backup": "bash scripts/backup.sh",
+    "restore": "bash scripts/restore.sh",
+    "health-check": "bash scripts/health-check.sh",
+    "android:build": "npm run build && npx cap sync android && npx cap open android"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.0",

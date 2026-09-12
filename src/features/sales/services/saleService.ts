@@ -5,6 +5,11 @@ import { generateSaleCode } from "@/utils/code";
 import type { InventoryMovement, Sale } from "@/types";
 import type { SaleFormData } from "../schemas/saleSchema";
 import type { SaleDetailInput } from "../domain/saleRules";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
+
+function getWorkspaceId(): string {
+  return useWorkspaceStore.getState().activeWorkspaceId ?? "default";
+}
 
 function now(): string {
   return new Date().toISOString();
@@ -17,6 +22,7 @@ export interface SaleData {
 
 export async function createSale(data: SaleData, options?: { confirm?: boolean }): Promise<Sale> {
   const code = await generateSaleCode();
+  const wsId = getWorkspaceId();
   const sale = buildSale(
     {
       customerId: data.header.customerId,
@@ -25,6 +31,7 @@ export async function createSale(data: SaleData, options?: { confirm?: boolean }
       notes: data.header.notes ?? "",
       status: options?.confirm ? "confirmada" : "pendiente",
       details: data.details,
+      workspaceId: wsId,
     },
     code,
     now(),
@@ -33,7 +40,7 @@ export async function createSale(data: SaleData, options?: { confirm?: boolean }
   await db.transaction("rw", db.sales, db.saleDetails, db.inventoryMovements, async () => {
     await db.sales.add(sale);
     await db.saleDetails.bulkAdd(
-      data.details.map((d) => buildSaleDetail(d, sale.id, sale.createdAt)),
+      data.details.map((d) => buildSaleDetail(d, sale.id, sale.createdAt, wsId)),
     );
     if (options?.confirm) {
       await applyOutboundMovements(sale);
@@ -64,7 +71,7 @@ export async function confirmSale(id: string): Promise<Sale> {
   }
 
   const confirmed = { ...sale, status: "confirmada" as const, confirmedAt: now(), updatedAt: now(), syncStatus: "pending" as const };
-  await db.transaction("rw", db.sales, db.inventoryMovements, async () => {
+  await db.transaction("rw", db.sales, db.saleDetails, db.inventoryMovements, async () => {
     await db.sales.update(id, confirmed);
     await applyOutboundMovements(confirmed);
   });
@@ -76,6 +83,7 @@ async function applyOutboundMovements(sale: Sale): Promise<void> {
   const details = await db.saleDetails.where("saleId").equals(sale.id).toArray();
   const movements: InventoryMovement[] = details.map((d) => ({
     id: crypto.randomUUID(),
+    workspaceId: sale.workspaceId,
     productId: d.productId,
     type: "salida" as const,
     quantity: d.quantity,
@@ -108,7 +116,7 @@ export async function updateSale(id: string, data: SaleData): Promise<void> {
     });
     await db.saleDetails.where("saleId").equals(id).delete();
     await db.saleDetails.bulkAdd(
-      data.details.map((d) => buildSaleDetail(d, id, updatedAt)),
+      data.details.map((d) => buildSaleDetail(d, id, updatedAt, existing.workspaceId)),
     );
   });
 }
@@ -123,11 +131,12 @@ export async function voidSale(id: string): Promise<void> {
   const wasConfirmed = isConfirmed(existing);
   const voidedAt = now();
 
-  await db.transaction("rw", db.sales, db.inventoryMovements, async () => {
+  await db.transaction("rw", db.sales, db.saleDetails, db.inventoryMovements, async () => {
     if (wasConfirmed) {
       const details = await db.saleDetails.where("saleId").equals(id).toArray();
       const movements: InventoryMovement[] = details.map((d) => ({
         id: crypto.randomUUID(),
+        workspaceId: existing.workspaceId,
         productId: d.productId,
         type: "entrada" as const,
         quantity: d.quantity,

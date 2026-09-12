@@ -1,6 +1,59 @@
 export type PaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia' | 'otro';
 
-export type SyncStatus = 'pending' | 'synced' | 'error';
+export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'failed' | 'conflict' | 'error';
+
+export type WorkspaceType = 'PERSONAL' | 'TRABAJO' | 'ESTUDIO' | 'NEGOCIO' | 'BUSINESS';
+
+export type WorkspaceStatus = 'active' | 'archived';
+
+export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'USER' | 'READ_ONLY';
+
+export type ModuleCode =
+  | 'expenses'
+  | 'products'
+  | 'inventory'
+  | 'purchases'
+  | 'suppliers'
+  | 'sales'
+  | 'customers'
+  | 'investments'
+  | 'reports'
+  | 'tailoring'
+  | 'agriculture'
+  | 'automotive_parts'
+  | 'breeding';
+
+export type BusinessModelKey =
+  | 'tailoring'
+  | 'agriculture'
+  | 'automotive_parts'
+  | 'breeding'
+  | 'commerce'
+  | 'services'
+  | 'custom';
+
+export interface WorkspaceModule {
+  workspace_id: string;
+  module_key: ModuleCode;
+  status: 'active' | 'disabled';
+  created_at: string;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  type: WorkspaceType;
+  parent_id: string | null;
+  model_key: BusinessModelKey | null;
+  description: string;
+  role: WorkspaceRole;
+  status: WorkspaceStatus;
+  created_at: string;
+  updated_at: string;
+  deleted?: number;
+  sync_status?: SyncStatus;
+  modules?: WorkspaceModule[];
+}
 
 export type ExpenseStatus = 'activo' | 'pendiente' | 'pagado' | 'cancelado';
 
@@ -8,11 +61,23 @@ export type PurchaseStatus = 'pendiente' | 'recibida' | 'cancelada';
 
 export type SaleStatus = 'borrador' | 'completada' | 'cancelada';
 
+export type InvestmentStatus = 'pagado' | 'pendiente' | 'anulado';
+
 export type MovementType = 'entrada' | 'salida' | 'ajuste' | 'transferencia';
 
 export type MovementReference = 'purchase' | 'sale' | 'ajuste' | 'transferencia';
 
 export type InvestmentType = 'activo' | 'ahorro' | 'crypto' | 'inmobiliaria' | 'otro';
+
+export const INVESTMENT_CATEGORIES = [
+  'Maquinaria',
+  'Herramienta',
+  'Computadora',
+  'Equipamiento',
+  'Mobiliario',
+  'Transporte',
+  'Otro',
+] as const;
 
 export interface Category {
   id: string;
@@ -23,6 +88,7 @@ export interface Category {
   updated_at: string;
   deleted?: number;
   sync_status?: SyncStatus;
+  workspace_id?: string;
   product_count?: number;
 }
 
@@ -44,6 +110,7 @@ export interface Product {
   updated_at: string;
   deleted?: number;
   sync_status?: SyncStatus;
+  workspace_id?: string;
 }
 
 export interface PurchaseItem {
@@ -60,9 +127,11 @@ export interface Purchase {
   id: string;
   code: string;
   supplier: string;
+  invoice: string;
   date: string;
   time: string;
   status: PurchaseStatus;
+  payment_method: PaymentMethod;
   total_amount: number;
   items_count: number;
   notes: string;
@@ -70,6 +139,7 @@ export interface Purchase {
   updated_at: string;
   deleted?: number;
   sync_status?: SyncStatus;
+  workspace_id?: string;
   items?: PurchaseItem[];
 }
 
@@ -98,10 +168,14 @@ export interface Expense {
   date: string;
   time: string;
   notes: string;
+  voided_at: string | null;
+  receipt_url: string | null;
+  receipt_thumb_url: string | null;
   created_at: string;
   updated_at: string;
   deleted?: number;
   sync_status?: SyncStatus;
+  workspace_id?: string;
   category_name?: string;
   type_name?: string;
   details?: ExpenseDetail[];
@@ -113,6 +187,7 @@ export interface ExpenseType {
   created_at: string;
   updated_at: string;
   sync_status?: SyncStatus;
+  workspace_id?: string;
 }
 
 export interface Investment {
@@ -123,12 +198,18 @@ export interface Investment {
   amount: number;
   current_value: number;
   return_rate: number;
+  category: string;
+  supplier: string;
+  payment_method: PaymentMethod;
+  status: InvestmentStatus;
+  voided_at: string | null;
   date: string;
   notes: string;
   created_at: string;
   updated_at: string;
   deleted?: number;
   sync_status?: SyncStatus;
+  workspace_id?: string;
 }
 
 export interface StockMovement {
@@ -138,10 +219,12 @@ export interface StockMovement {
   quantity: number;
   reference_type: MovementReference | null;
   reference_id: string | null;
+  user_id: string;
   date: string;
   notes: string;
   created_at: string;
   sync_status?: SyncStatus;
+  workspace_id?: string;
 }
 
 export interface Client {
@@ -156,6 +239,7 @@ export interface Client {
   updated_at: string;
   deleted?: number;
   sync_status?: SyncStatus;
+  workspace_id?: string;
 }
 
 export interface SaleItem {
@@ -187,6 +271,7 @@ export interface Sale {
   updated_at: string;
   deleted?: number;
   sync_status?: SyncStatus;
+  workspace_id?: string;
   client_name?: string;
   items?: SaleItem[];
 }
@@ -203,7 +288,9 @@ export type EntityType =
   | 'stock_movement'
   | 'client'
   | 'sale'
-  | 'sale_item';
+  | 'sale_item'
+  | 'workspace'
+  | 'workspace_module';
 
 export type OutboxOperation = 'INSERT' | 'UPDATE' | 'DELETE';
 

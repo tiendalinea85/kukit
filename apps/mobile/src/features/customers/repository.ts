@@ -2,11 +2,14 @@ import { getDb } from '../../core/db/database';
 import { nextCodeFor, softDelete, writeWithOutbox } from '../../core/db/repo';
 import type { Client } from '../../core/domain/types';
 import { newId, nowIso } from '../../core/utils/id';
+import { requireActiveWorkspaceId } from '../../core/workspace/isolation';
 
 export async function listClients(): Promise<Client[]> {
   const db = await getDb();
+  const wsId = await requireActiveWorkspaceId();
   return db.getAllAsync<Client>(
-    `SELECT * FROM clients WHERE deleted = 0 ORDER BY name COLLATE NOCASE`
+    `SELECT * FROM clients WHERE deleted = 0 AND workspace_id = ? ORDER BY name COLLATE NOCASE`,
+    wsId
   );
 }
 
@@ -26,6 +29,7 @@ export interface ClientForm {
 
 export async function saveClient(form: ClientForm): Promise<Client> {
   const db = await getDb();
+  const wsId = await requireActiveWorkspaceId();
   const existing = form.id ? await getClient(form.id) : null;
 
   const now = nowIso();
@@ -37,6 +41,7 @@ export async function saveClient(form: ClientForm): Promise<Client> {
     email: form.email,
     address: form.address,
     notes: form.notes,
+    workspace_id: wsId,
     created_at: existing?.created_at ?? now,
     updated_at: now,
   };

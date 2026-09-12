@@ -1,26 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
-import * as SecureStore from 'expo-secure-store';
+import { env, isSupabaseConfigured } from '../config/env';
+import { secureStorage, SecureKeys } from '../secure/secureStorage';
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+if (!isSupabaseConfigured()) {
   console.warn(
     'Faltan EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY en el entorno.'
   );
 }
 
-const secureStorage = {
-  getItem: (name: string) => SecureStore.getItemAsync(name),
-  setItem: (name: string, value: string) => SecureStore.setItemAsync(name, value),
-  removeItem: (name: string) => SecureStore.deleteItemAsync(name),
-};
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const supabase = createClient(env.supabaseUrl, env.supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: false,
+    storageKey: SecureKeys.supabaseSession,
     storage: secureStorage,
   },
 });

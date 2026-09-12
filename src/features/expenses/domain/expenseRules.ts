@@ -22,6 +22,7 @@ export interface NewExpenseInput {
   time: string;
   notes?: string;
   receiptPhoto?: string;
+  workspaceId?: string;
 }
 
 export function canEditExpense(status: ExpenseStatus): boolean {
@@ -54,6 +55,7 @@ export function buildExpense(input: {
     time: data.time,
     notes: data.notes || "",
     receiptPhoto: data.receiptPhoto,
+    workspaceId: data.workspaceId ?? "default",
     voidedAt: null,
     createdAt: now,
     updatedAt: now,

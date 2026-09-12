@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .db import close_pool, init_pool
-from .routers import health, sync
+from .routers import auth, health, sync, workspaces
 
 logging.basicConfig(level=logging.INFO)
 
@@ -33,8 +33,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(health.router)
 app.include_router(sync.router)
+app.include_router(workspaces.router)
 
 
 @app.get("/", tags=["meta"])

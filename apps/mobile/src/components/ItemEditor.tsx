@@ -18,9 +18,10 @@ interface ItemEditorProps {
   withDiscount?: boolean;
   priceField?: 'sale' | 'cost';
   onAdd?: () => void;
+  editable?: boolean;
 }
 
-export function ItemEditor({ items, products, onChange, withDiscount = false, priceField = 'sale', onAdd }: ItemEditorProps) {
+export function ItemEditor({ items, products, onChange, withDiscount = false, priceField = 'sale', onAdd, editable = true }: ItemEditorProps) {
   const productOptions = products.map((p) => ({ label: p.name, value: p.id }));
 
   function updateLine(index: number, patch: Partial<LineItem>) {
@@ -54,7 +55,7 @@ export function ItemEditor({ items, products, onChange, withDiscount = false, pr
         <View key={index} style={styles.line}>
           <View style={styles.lineHeader}>
             <Text style={styles.lineNum}>#{index + 1}</Text>
-            <Pressable onPress={() => removeLine(index)} style={styles.remove}>
+            <Pressable onPress={() => editable && removeLine(index)} style={styles.remove}>
               <Text style={styles.removeText}>✕</Text>
             </Pressable>
           </View>
@@ -63,12 +64,14 @@ export function ItemEditor({ items, products, onChange, withDiscount = false, pr
             options={productOptions}
             value={item.product_id}
             onChange={(v) => pickProduct(index, v)}
+            editable={editable}
           />
           {item.product_id === null ? (
             <Input
               label="Nombre (producto libre)"
               value={item.product_name}
               onChangeText={(product_name) => updateLine(index, { product_name })}
+              editable={editable}
             />
           ) : null}
           <View style={styles.row}>
@@ -78,6 +81,7 @@ export function ItemEditor({ items, products, onChange, withDiscount = false, pr
                 value={String(item.quantity)}
                 onChangeText={(t) => updateLine(index, { quantity: parseFloat(t || '0') })}
                 keyboardType="decimal-pad"
+                editable={editable}
               />
             </View>
             <View style={styles.flex}>
@@ -86,6 +90,7 @@ export function ItemEditor({ items, products, onChange, withDiscount = false, pr
                 value={item.unit_price ? String(item.unit_price / 100) : ''}
                 onChangeText={(t) => updateLine(index, { unit_price: Math.round(parseFloat(t || '0') * 100) })}
                 keyboardType="decimal-pad"
+                editable={editable}
               />
             </View>
           </View>
@@ -95,12 +100,13 @@ export function ItemEditor({ items, products, onChange, withDiscount = false, pr
               value={item.discount ? String(item.discount / 100) : ''}
               onChangeText={(t) => updateLine(index, { discount: Math.round(parseFloat(t || '0') * 100) })}
               keyboardType="decimal-pad"
+              editable={editable}
             />
           ) : null}
         </View>
       ))}
 
-      <Pressable style={styles.add} onPress={onAdd ?? addLine}>
+      <Pressable style={[styles.add, !editable && styles.addDisabled]} onPress={editable ? (onAdd ?? addLine) : undefined}>
         <Text style={styles.addText}>+ Agregar línea</Text>
       </Pressable>
     </View>
@@ -161,6 +167,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
     alignItems: 'center',
+  },
+  addDisabled: {
+    opacity: 0.5,
   },
   addText: {
     color: colors.primary,

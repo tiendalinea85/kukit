@@ -2,13 +2,16 @@ import { getDb } from '../../core/db/database';
 import { nextCodeFor, softDelete, writeWithOutbox } from '../../core/db/repo';
 import type { Category, Product } from '../../core/domain/types';
 import { nowIso, newId, todayDate } from '../../core/utils/id';
+import { requireActiveWorkspaceId } from '../../core/workspace/isolation';
 
 export async function listProducts(): Promise<Product[]> {
   const db = await getDb();
+  const wsId = await requireActiveWorkspaceId();
   return db.getAllAsync<Product>(
     `SELECT p.*, c.name as category_name
      FROM products p LEFT JOIN categories c ON c.id = p.category_id
-     WHERE p.deleted = 0 ORDER BY p.name COLLATE NOCASE`
+     WHERE p.deleted = 0 AND p.workspace_id = ? ORDER BY p.name COLLATE NOCASE`,
+    wsId
   );
 }
 
@@ -19,6 +22,7 @@ export async function getProduct(id: string): Promise<Product | null> {
 
 export async function saveProduct(input: Omit<Product, 'id' | 'code' | 'created_at' | 'updated_at'> & { id?: string }): Promise<Product> {
   const db = await getDb();
+  const wsId = await requireActiveWorkspaceId();
   const existing = input.id ? await getProduct(input.id) : null;
   const row: Product = {
     id: input.id ?? newId(),
@@ -34,6 +38,7 @@ export async function saveProduct(input: Omit<Product, 'id' | 'code' | 'created_
     stock: existing?.stock ?? input.stock ?? 0,
     min_stock: input.min_stock ?? 0,
     active: input.active ?? 1,
+    workspace_id: wsId,
     created_at: existing?.created_at ?? nowIso(),
     updated_at: nowIso(),
   };
@@ -60,9 +65,11 @@ export async function deleteProduct(id: string): Promise<void> {
 
 export async function listCategories(): Promise<Category[]> {
   const db = await getDb();
+  const wsId = await requireActiveWorkspaceId();
   return db.getAllAsync<Category>(
-    `SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.deleted = 0) as product_count
-     FROM categories c WHERE c.deleted = 0 ORDER BY c.name COLLATE NOCASE`
+    `SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.deleted = 0 AND p.workspace_id = ?) as product_count
+     FROM categories c WHERE c.deleted = 0 ORDER BY c.name COLLATE NOCASE`,
+    wsId
   );
 }
 
@@ -73,12 +80,14 @@ export async function getCategory(id: string): Promise<Category | null> {
 
 export async function saveCategory(input: { id?: string; name: string; color?: string; icon?: string }): Promise<Category> {
   const db = await getDb();
+  const wsId = await requireActiveWorkspaceId();
   const existing = input.id ? await getCategory(input.id) : null;
   const row: Category = {
     id: input.id ?? newId(),
     name: input.name.trim(),
     color: input.color ?? '#8b5cf6',
     icon: input.icon ?? '📦',
+    workspace_id: wsId,
     created_at: existing?.created_at ?? nowIso(),
     updated_at: nowIso(),
   };
@@ -101,12 +110,17 @@ export async function deleteCategory(id: string): Promise<void> {
 
 export async function listExpenseTypes(): Promise<{ id: string; name: string }[]> {
   const db = await getDb();
-  return db.getAllAsync<{ id: string; name: string }>('SELECT * FROM expense_types ORDER BY name COLLATE NOCASE');
+  const wsId = await requireActiveWorkspaceId();
+  return db.getAllAsync<{ id: string; name: string }>(
+    'SELECT * FROM expense_types WHERE workspace_id = ? ORDER BY name COLLATE NOCASE',
+    wsId
+  );
 }
 
 export async function saveExpenseType(name: string): Promise<{ id: string; name: string }> {
   const db = await getDb();
-  const row = { id: newId(), name: name.trim(), created_at: nowIso(), updated_at: nowIso() };
+  const wsId = await requireActiveWorkspaceId();
+  const row = { id: newId(), name: name.trim(), workspace_id: wsId, created_at: nowIso(), updated_at: nowIso() };
   await writeWithOutbox(db, {
     table: 'expense_types',
     entityType: 'expense_type',

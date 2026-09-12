@@ -2,15 +2,21 @@ import { db } from "@/lib/db";
 import { generateExpenseCode } from "@/utils/code";
 import { buildExpense, canEditExpense } from "../domain/expenseRules";
 import type { Expense } from "@/types";
-import type { ExpenseFormData } from "../schemas/expenseSchema";
+import { expenseSchema, type ExpenseFormData } from "../schemas/expenseSchema";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
+
+function getWorkspaceId(): string {
+  return useWorkspaceStore.getState().activeWorkspaceId ?? "default";
+}
 
 export async function createExpense(
   data: ExpenseFormData,
   code?: string
 ): Promise<Expense> {
+  const parsed = expenseSchema.parse(data);
   const finalCode = code || (await generateExpenseCode());
   const now = new Date().toISOString();
-  const expense = buildExpense({ data, code: finalCode, now });
+  const expense = buildExpense({ data: { ...parsed, workspaceId: getWorkspaceId() }, code: finalCode, now });
   await db.expenses.add(expense);
   return expense;
 }

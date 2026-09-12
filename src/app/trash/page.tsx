@@ -1,12 +1,15 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { RotateCcw, Trash2 } from "lucide-react";
 import { liveQuery } from "dexie";
 import { db } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/utils/format";
+import { Pagination } from "@/components/ui/Pagination";
 import toast from "react-hot-toast";
 import type { Expense, Investment, Customer, Product, Sale } from "@/types";
+
+const PAGE_SIZE = 25;
 
 type TrashKind = "expense" | "investment" | "customer" | "product" | "sale";
 
@@ -32,6 +35,7 @@ export default function TrashPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const expObs = liveQuery(() => db.expenses.where({ deleted: true }).reverse().sortBy("updatedAt"));
@@ -91,6 +95,11 @@ export default function TrashPage() {
     })),
   ].sort((a, b) => b.meta.localeCompare(a.meta));
 
+  const paged = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return items.slice(start, start + PAGE_SIZE);
+  }, [items, page]);
+
   const handleRestore = async (item: TrashItem) => {
     if (item.kind === "expense") {
       await db.expenses.update(item.id, { deleted: false, syncStatus: "pending" });
@@ -136,7 +145,7 @@ export default function TrashPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {items.map((item, i) => (
+          {paged.map((item, i) => (
             <motion.div key={`${item.kind}-${item.id}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
               className="flex items-center justify-between rounded-2xl bg-zinc-900/60 border border-zinc-800/60 p-4"
             >
@@ -156,6 +165,7 @@ export default function TrashPage() {
           ))}
         </div>
       )}
+      {items.length > 0 && <Pagination page={page} totalItems={items.length} pageSize={PAGE_SIZE} onPageChange={setPage} />}
     </motion.div>
   );
 }

@@ -10,9 +10,12 @@ import { filterSales, canEditSale, canVoidSale, SALE_STATUSES } from "@/features
 import { db } from "@/lib/db";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import type { Sale, SaleDetail, Customer, PaymentMethod } from "@/types";
+
+const PAGE_SIZE = 25;
 
 const PAYMENT_LABELS: Record<PaymentMethod, string> = {
   efectivo: "Efectivo",
@@ -37,6 +40,7 @@ function SalesContent() {
   const [filterDateTo, setFilterDateTo] = useState("");
   const [voidTarget, setVoidTarget] = useState<Sale | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Sale | null>(null);
+  const [page, setPage] = useState(1);
   const { viewMode, setViewMode } = useAppStore();
 
   useEffect(() => {
@@ -72,6 +76,11 @@ function SalesContent() {
       dateTo: filterDateTo,
     });
   }, [enriched, search, filterStatus, filterPayment, filterDateFrom, filterDateTo]);
+
+  const paged = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   const hasActiveFilters = !!(filterStatus !== "all" || filterPayment || filterDateFrom || filterDateTo);
 
@@ -192,7 +201,7 @@ function SalesContent() {
         </div>
       ) : viewMode === "card" ? (
         <div className="space-y-3">
-          {filtered.map((s, i) => (
+          {paged.map((s, i) => (
             <motion.div
               key={s.id}
               initial={{ opacity: 0, y: 20 }}
@@ -244,7 +253,7 @@ function SalesContent() {
         </div>
       ) : (
         <div className="space-y-1">
-          {filtered.map((s, i) => (
+          {paged.map((s, i) => (
             <motion.div key={s.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }}>
               <Link href={`/sales/${s.id}`}
                 className="flex items-center gap-3 rounded-xl bg-zinc-900/40 border border-zinc-800/40 px-4 py-3 hover:bg-zinc-800/40 transition-colors"
@@ -282,6 +291,7 @@ function SalesContent() {
           ))}
         </div>
       )}
+      {filtered.length > 0 && <Pagination page={page} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} />}
     </motion.div>
   );
 }

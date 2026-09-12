@@ -73,9 +73,12 @@ export async function queryExpensesReport(options: {
   dateTo?: string;
   categoryName?: string;
   language: "es" | "en";
+  workspaceId?: string;
 }): Promise<ReportQueryResult> {
   const [all, categories] = await Promise.all([
-    db.expenses.toArray(),
+    options.workspaceId
+      ? db.expenses.where("workspaceId").equals(options.workspaceId).toArray()
+      : db.expenses.toArray(),
     db.categories.toArray(),
   ]);
 

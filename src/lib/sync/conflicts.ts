@@ -92,12 +92,10 @@ export function resolveConflict(
  * fue idempotente y el movimiento local se considera aplicado tal cual.
  */
 export function isAppendOnly(entity: string): boolean {
-  return entity === "inventoryMovements";
+  return entity === "inventoryMovements" || entity === "productionMaterials" || entity === "partCompatibilities";
 }
 
 export function isRegisteredOperation(entity: string): boolean {
-  // Ventas, compras, gastos e inversiones son operaciones históricas: se
-  // registran con revisión y no se sobrescriben ciegamente desde otro lado.
   return [
     "sales",
     "saleDetails",
@@ -106,6 +104,20 @@ export function isRegisteredOperation(entity: string): boolean {
     "expenses",
     "investments",
     "inventoryMovements",
+    "productionOrders",
+    "productionMaterials",
+    "crops",
+    "farmLots",
+    "applications",
+    "labors",
+    "harvests",
+    "autoParts",
+    "partCompatibilities",
+    "breedingLots",
+    "animals",
+    "feedings",
+    "reproductions",
+    "livestockProductions",
   ].includes(entity);
 }
 

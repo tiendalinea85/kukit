@@ -58,11 +58,14 @@ export interface DashboardData {
 
 const SALE_STATUS_INDEXED = "confirmada";
 
-async function queryConfirmedSales(dateFrom: string, dateTo: string): Promise<Sale[]> {
-  const sales = await db.sales
+async function queryConfirmedSales(dateFrom: string, dateTo: string, workspaceId?: string): Promise<Sale[]> {
+  let sales = await db.sales
     .where("date")
     .between(dateFrom, dateTo, true, true)
     .toArray();
+  if (workspaceId) {
+    sales = sales.filter((s) => s.workspaceId === workspaceId);
+  }
   return sales.filter((s) => !s.deleted && s.status === SALE_STATUS_INDEXED);
 }
 
@@ -81,11 +84,14 @@ async function countPending(tableName: string): Promise<number> {
   return 0;
 }
 
-export async function loadDashboard(): Promise<DashboardData> {
+export async function loadDashboard(workspaceId?: string): Promise<DashboardData> {
   const now = new Date();
   const todayKey = format(now, "yyyy-MM-dd");
   const weekStartKey = format(startOfWeek(now, { weekStartsOn: 0 }), "yyyy-MM-dd");
   const windowStartKey = format(subDays(now, SALES_BY_DAY_WINDOW - 1), "yyyy-MM-dd");
+
+  const filterByWorkspace = <T extends { workspaceId?: string }>(arr: T[]): T[] =>
+    workspaceId ? arr.filter((item) => item.workspaceId === workspaceId) : arr;
 
   const [
     confirmedToday,
@@ -99,13 +105,13 @@ export async function loadDashboard(): Promise<DashboardData> {
     movements,
     pendingChanges,
   ] = await Promise.all([
-    queryConfirmedSales(todayKey, todayKey),
-    queryConfirmedSales(weekStartKey, todayKey),
-    queryConfirmedSales(windowStartKey, todayKey),
-    db.purchases.toArray(),
-    db.expenses.toArray(),
-    db.investments.toArray(),
-    db.products.toArray(),
+    queryConfirmedSales(todayKey, todayKey, workspaceId),
+    queryConfirmedSales(weekStartKey, todayKey, workspaceId),
+    queryConfirmedSales(windowStartKey, todayKey, workspaceId),
+    filterByWorkspace(await db.purchases.toArray()),
+    filterByWorkspace(await db.expenses.toArray()),
+    filterByWorkspace(await db.investments.toArray()),
+    filterByWorkspace(await db.products.toArray()),
     db.categories.toArray(),
     db.inventoryMovements.toArray(),
     Promise.all([

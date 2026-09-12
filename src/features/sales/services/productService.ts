@@ -2,6 +2,11 @@ import { db } from "@/lib/db";
 import { computeStock } from "../domain/stockRules";
 import type { InventoryMovement, Product } from "@/types";
 import type { ProductFormData, ProductWithStockFormData } from "../schemas/productSchema";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
+
+function getWorkspaceId(): string {
+  return useWorkspaceStore.getState().activeWorkspaceId ?? "default";
+}
 
 function now(): string {
   return new Date().toISOString();
@@ -37,6 +42,7 @@ export async function createProduct(data: ProductWithStockFormData): Promise<Pro
   const t = now();
   const product: Product = {
     id: crypto.randomUUID(),
+    workspaceId: getWorkspaceId(),
     code: data.code.trim(),
     name: data.name.trim(),
     color: data.color?.trim() ?? "",
@@ -54,6 +60,7 @@ export async function createProduct(data: ProductWithStockFormData): Promise<Pro
     if ((data.initialStock ?? 0) > 0) {
       const movement: InventoryMovement = {
         id: crypto.randomUUID(),
+        workspaceId: product.workspaceId,
         productId: product.id,
         type: "entrada",
         quantity: data.initialStock as number,
@@ -102,6 +109,7 @@ export async function addStockMovement(input: {
 }): Promise<InventoryMovement> {
   const movement: InventoryMovement = {
     id: crypto.randomUUID(),
+    workspaceId: getWorkspaceId(),
     productId: input.productId,
     type: input.type,
     quantity: input.quantity,

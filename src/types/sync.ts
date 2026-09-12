@@ -22,6 +22,7 @@ export interface OutboxOperation {
   id: string;
   entity: string;
   entityId: string;
+  workspaceId: string;
   op: SyncOp;
   payload: Record<string, unknown>;
   payloadHash: string;
