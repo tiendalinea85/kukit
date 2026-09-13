@@ -3,7 +3,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X, Home, PlusCircle, List, Briefcase, Tag, Type, BarChart3, Settings, Trash2, ReceiptText, Users, Package, ShoppingBag, Truck, Scissors, Wheat, Car, Egg, ChevronDown, Building2 } from "lucide-react";
+import { X, Home, PlusCircle, List, Briefcase, Tag, Type, BarChart3, Settings, Trash2, ReceiptText, Users, Package, ShoppingBag, Truck, Scissors, Wheat, Car, Egg, ChevronDown, Building2, Plus } from "lucide-react";
 import { useAppStore } from "@/stores/useAppStore";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 
@@ -52,7 +52,7 @@ function getModuleForHref(href: string): string | undefined {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { sidebarOpen, toggleSidebar } = useAppStore();
+  const { sidebarOpen, toggleSidebar, openWorkspaceSetup } = useAppStore();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
 
   const workspaces = useWorkspaceStore((s) => s.workspaces);
@@ -141,6 +141,15 @@ export function Sidebar() {
                         </button>
                       </li>
                     ))}
+                    <li className="border-t border-zinc-700/60 mt-1 pt-1">
+                      <button
+                        onClick={() => { setWorkspaceOpen(false); toggleSidebar(); openWorkspaceSetup(); }}
+                        className="w-full text-left px-3 py-2 text-sm text-purple-400 hover:text-purple-300 hover:bg-purple-600/10 flex items-center gap-2 transition-colors"
+                      >
+                        <Plus size={14} />
+                        Nuevo espacio de trabajo
+                      </button>
+                    </li>
                   </motion.ul>
                 )}
               </AnimatePresence>

@@ -1,12 +1,15 @@
 "use client";
 import { useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useAppStore } from "@/stores/useAppStore";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { WorkspaceSetup } from "./WorkspaceSetup";
 import { WorkspacePicker } from "./WorkspacePicker";
 
 export function WorkspaceGate({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const workspaceSetupOpen = useAppStore((s) => s.workspaceSetupOpen);
+  const closeWorkspaceSetup = useAppStore((s) => s.closeWorkspaceSetup);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
 
@@ -14,20 +17,26 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
   const [enteredId, setEnteredId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
+  const created = (id: string) => {
+    setActiveWorkspace(id);
+    setEnteredId(id);
+    setCreating(false);
+    closeWorkspaceSetup();
+  };
+
   if (!user) return <>{children}</>;
 
   const insideWorkspace = enteredId !== null && workspaces.some((w) => w.id === enteredId);
-  if (insideWorkspace) return <>{children}</>;
+  if (insideWorkspace) {
+    // Desde la app también se pueden crear nuevos espacios de trabajo.
+    if (workspaceSetupOpen) {
+      return <WorkspaceSetup onCreated={created} />;
+    }
+    return <>{children}</>;
+  }
 
   if (creating || workspaces.filter((w) => w.id !== "default").length === 0) {
-    return (
-      <WorkspaceSetup
-        onCreated={(id) => {
-          setActiveWorkspace(id);
-          setEnteredId(id);
-        }}
-      />
-    );
+    return <WorkspaceSetup onCreated={created} />;
   }
 
   return (
