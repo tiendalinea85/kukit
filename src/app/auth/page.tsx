@@ -23,7 +23,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
 
-  const demo = !isSupabaseConfigured();
+  const demo = !isSupabaseConfigured() && process.env.NODE_ENV !== "production";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
