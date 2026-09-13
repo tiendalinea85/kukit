@@ -31,10 +31,10 @@ export type MaterialUnit = (typeof MATERIAL_UNITS)[number];
 export function buildGarment(input: {
   data: {
     name: string;
-    description: string;
+    description?: string;
     categoryId: string;
     salePrice: number;
-    notes: string;
+    notes?: string;
   };
   code: string;
   now: string;
@@ -43,7 +43,7 @@ export function buildGarment(input: {
     id: crypto.randomUUID(),
     code: input.code,
     name: input.data.name.trim(),
-    description: input.data.description.trim(),
+    description: (input.data.description || "").trim(),
     categoryId: input.data.categoryId,
     salePrice: input.data.salePrice,
     notes: input.data.notes || "",
@@ -93,7 +93,7 @@ export function buildMaterial(input: {
     unit: string;
     costPerUnit: number;
     stock: number;
-    notes: string;
+    notes?: string;
   };
   code: string;
   now: string;
@@ -127,7 +127,7 @@ export function buildProductionOrder(input: {
     totalCost: number;
     startDate: string;
     dueDate: string;
-    notes: string;
+    notes?: string;
   };
   code: string;
   now: string;

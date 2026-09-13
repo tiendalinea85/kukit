@@ -1,5 +1,5 @@
 "use client";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { autoPartSchema, type AutoPartFormData } from "../schemas/autopartsSchema";
 import { PART_CATEGORIES } from "../domain/autopartsRules";
@@ -16,7 +16,7 @@ interface Props {
 
 export function AutoPartForm({ onSubmit, defaultValues, loading, code }: Props) {
   const { register, handleSubmit, formState: { errors } } = useForm<AutoPartFormData>({
-    resolver: zodResolver(autoPartSchema),
+    resolver: zodResolver(autoPartSchema) as Resolver<AutoPartFormData>,
     defaultValues: {
       name: defaultValues?.name || "",
       partNumber: defaultValues?.partNumber || "",

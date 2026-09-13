@@ -28,6 +28,7 @@ const header = {
   date: "2026-08-15",
   paymentMethod: "transferencia" as const,
   notes: "Pedido mensual",
+  status: "pendiente" as const,
 };
 
 beforeEach(async () => {

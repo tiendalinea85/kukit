@@ -86,7 +86,7 @@ export function InvestmentFormScreen() {
       <Select
         label="Categoría"
         options={CATEGORY_OPTIONS}
-        value={form.category || undefined}
+        value={form.category || null}
         onChange={(category) => setForm({ ...form, category })}
       />
       <Select

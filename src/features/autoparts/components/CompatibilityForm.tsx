@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { partCompatibilitySchema, type PartCompatibilityFormData } from "../schemas/autopartsSchema";
 import { useAutoParts, useVehicleModels, useVehicleBrands } from "../hooks/useAutoparts";
@@ -20,7 +20,7 @@ export function CompatibilityForm({ onSubmit, defaultValues, loading }: Props) {
   const [selectedModelId, setSelectedModelId] = useState(defaultValues?.modelId || "");
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<PartCompatibilityFormData>({
-    resolver: zodResolver(partCompatibilitySchema),
+    resolver: zodResolver(partCompatibilitySchema) as Resolver<PartCompatibilityFormData>,
     defaultValues: {
       partId: defaultValues?.partId || "",
       modelId: defaultValues?.modelId || "",

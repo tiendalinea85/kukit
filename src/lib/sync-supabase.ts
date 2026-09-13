@@ -16,6 +16,11 @@ import type {
 } from "../types/index.ts";
 import type { OutboxOperation, SyncErrorInfo, SyncTransportEntity } from "../types/sync.ts";
 import { classifySyncError } from "./sync/errors.ts";
+import { useWorkspaceStore } from "../stores/useWorkspaceStore.ts";
+
+function defaultWorkspaceId(): string {
+  return useWorkspaceStore.getState().activeWorkspaceId || "default";
+}
 
 // TRANSPORTE: refleja las tablas locales (Dexie) en Supabase.
 //
@@ -259,6 +264,7 @@ function purchaseDetailToPayload(row: Record<string, unknown>, userId: string) {
 function expenseFromRow(row: Record<string, unknown>): Expense {
   return {
     id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
     code: asStr(row.code),
     description: asStr(row.description),
     amount: asNum(row.amount),
@@ -284,6 +290,7 @@ function expenseFromRow(row: Record<string, unknown>): Expense {
 function categoryFromRow(row: Record<string, unknown>): Category {
   return {
     id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
     name: asStr(row.name),
     color: asStr(row.color, "#8b5cf6"),
     icon: asStr(row.icon, "📦"),
@@ -295,6 +302,7 @@ function categoryFromRow(row: Record<string, unknown>): Category {
 function typeFromRow(row: Record<string, unknown>): Type {
   return {
     id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
     name: asStr(row.name),
     createdAt: asStr(row.created_at),
     syncStatus: "synced",
@@ -304,6 +312,7 @@ function typeFromRow(row: Record<string, unknown>): Type {
 function investmentFromRow(row: Record<string, unknown>): Investment {
   return {
     id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
     name: asStr(row.name),
     value: asNum(row.value),
     categoryId: asStr(row.category_id),
@@ -328,6 +337,7 @@ function investmentFromRow(row: Record<string, unknown>): Investment {
 function investmentCategoryFromRow(row: Record<string, unknown>): InvestmentCategory {
   return {
     id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
     name: asStr(row.name),
     color: asStr(row.color, "#6366f1"),
     icon: asStr(row.icon, "📦"),
@@ -339,6 +349,7 @@ function investmentCategoryFromRow(row: Record<string, unknown>): InvestmentCate
 function customerFromRow(row: Record<string, unknown>): Customer {
   return {
     id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
     name: asStr(row.name),
     phone: asStr(row.phone),
     address: asStr(row.address),
@@ -354,6 +365,7 @@ function customerFromRow(row: Record<string, unknown>): Customer {
 function productFromRow(row: Record<string, unknown>): Product {
   return {
     id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
     code: asStr(row.code),
     name: asStr(row.name),
     color: asStr(row.color),
@@ -369,6 +381,7 @@ function productFromRow(row: Record<string, unknown>): Product {
 function movementFromRow(row: Record<string, unknown>): InventoryMovement {
   return {
     id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
     productId: asStr(row.product_id),
     type: normalizeStatus(
       row.type,
@@ -398,6 +411,7 @@ function movementFromRow(row: Record<string, unknown>): InventoryMovement {
 function saleFromRow(row: Record<string, unknown>): Sale {
   return {
     id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
     code: asStr(row.code),
     customerId: asStr(row.customer_id),
     date: asStr(row.date),
@@ -422,6 +436,7 @@ function saleFromRow(row: Record<string, unknown>): Sale {
 function saleDetailFromRow(row: Record<string, unknown>): SaleDetail {
   return {
     id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
     saleId: asStr(row.sale_id),
     productId: asStr(row.product_id),
     code: asStr(row.code),
@@ -439,6 +454,7 @@ function saleDetailFromRow(row: Record<string, unknown>): SaleDetail {
 function purchaseFromRow(row: Record<string, unknown>): Purchase {
   return {
     id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
     code: asStr(row.code),
     supplier: asStr(row.supplier),
     date: asStr(row.date),
@@ -463,6 +479,7 @@ function purchaseFromRow(row: Record<string, unknown>): Purchase {
 function purchaseDetailFromRow(row: Record<string, unknown>): PurchaseDetail {
   return {
     id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
     purchaseId: asStr(row.purchase_id),
     productId: asStr(row.product_id),
     code: asStr(row.code),

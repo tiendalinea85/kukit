@@ -324,7 +324,7 @@ describe("SyncEngine: offline mode", () => {
 
     await db.expenses.add({
       id: "e1", code: "G000001", description: "Test", amount: 10,
-      categoryId: "", paymentMethod: "efectivo", status: "pagado",
+      workspaceId: "default", categoryId: "", paymentMethod: "efectivo", status: "pagado",
       date: "2025-01-01", time: "00:00", notes: "", voidedAt: null,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       deleted: false, syncStatus: "pending",
@@ -565,7 +565,7 @@ describe("reconcilePendingEntities", () => {
   it("enqueues pending records without outbox entry", async () => {
     await db.expenses.add({
       id: "e-reconcile", code: "G000099", description: "Reconcile test", amount: 50,
-      categoryId: "", paymentMethod: "efectivo", status: "pagado",
+      workspaceId: "default", categoryId: "", paymentMethod: "efectivo", status: "pagado",
       date: "2025-01-01", time: "00:00", notes: "", voidedAt: null,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       deleted: false, syncStatus: "pending",
@@ -585,7 +585,7 @@ describe("reconcilePendingEntities", () => {
     });
     await db.expenses.add({
       id: "e1", code: "G000001", description: "Test", amount: 10,
-      categoryId: "", paymentMethod: "efectivo", status: "pagado",
+      workspaceId: "default", categoryId: "", paymentMethod: "efectivo", status: "pagado",
       date: "2025-01-01", time: "00:00", notes: "", voidedAt: null,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       deleted: false, syncStatus: "pending",

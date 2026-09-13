@@ -32,6 +32,7 @@ describe("addWorkspace", () => {
       name: "Taller",
       model: "tailoring" as const,
       modules: ["tailoring"],
+      categoryId: "trabajo",
       createdAt: "2026-08-14T10:00:00.000Z",
     };
     useWorkspaceStore.getState().addWorkspace(ws);
@@ -49,6 +50,7 @@ describe("removeWorkspace", () => {
       name: "Temporal",
       model: "general",
       modules: [],
+      categoryId: "personal",
       createdAt: "2026-08-14T10:00:00.000Z",
     });
     assert.equal(useWorkspaceStore.getState().workspaces.length, 2);
@@ -66,6 +68,7 @@ describe("removeWorkspace", () => {
       name: "Temporal",
       model: "general",
       modules: [],
+      categoryId: "personal",
       createdAt: "2026-08-14T10:00:00.000Z",
     });
     useWorkspaceStore.getState().setActiveWorkspace("ws-temp");
@@ -84,6 +87,7 @@ describe("setActiveWorkspace", () => {
       name: "Dos",
       model: "general",
       modules: [],
+      categoryId: "personal",
       createdAt: "2026-08-14T10:00:00.000Z",
     });
     useWorkspaceStore.getState().setActiveWorkspace("ws-two");
@@ -161,6 +165,7 @@ describe("aislamiento entre workspaces", () => {
       name: "B",
       model: "tailoring",
       modules: ["tailoring"],
+      categoryId: "trabajo",
       createdAt: "2026-08-14T10:00:00.000Z",
     });
 
