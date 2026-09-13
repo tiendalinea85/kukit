@@ -4,10 +4,11 @@ import path from "path";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 
 const isDev = process.env.NODE_ENV === "development";
-// En previews de Vercel con protección (SSO), los recursos se sirven a través
-// de vercel.com/sso-api; se permite solo en preview, no en producción.
-const isVercelPreview = process.env.VERCEL_ENV === "preview";
-const ssoHost = isVercelPreview ? "https://vercel.com" : "";
+// En cualquier deploy de Vercel que tenga Deployment Protection (SSO) activa,
+// los recursos se reenvían a través de vercel.com/sso-api. Se permite ese host
+// fijo únicamente cuando la app corre en Vercel; nunca en desarrollo local.
+const onVercel = !!process.env.VERCEL_ENV;
+const ssoHost = onVercel ? "https://vercel.com" : "";
 
 function securityHeaders() {
   const connectSrc = ["'self'"];
