@@ -90,19 +90,49 @@ CREATE POLICY "Workspace modules delete own" ON public.workspace_modules
   );
 
 -- ============================================================
--- 3. FK: workspace_members → workspaces (completa 00009)
+-- 3. FK: workspace_members → workspaces
 -- ============================================================
+-- workspace_members puede no existir todavía en bases que aplicaron
+-- migraciones anteriores sin ese paso. Solo se crea la FK si la
+-- tabla existe; en otro caso se omite con NOTICE.
 
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.table_constraints
-    WHERE constraint_name = 'fk_workspace_members_workspace'
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'workspace_members'
   ) THEN
+
+    -- Primero garantizar que workspace_id exista.
     ALTER TABLE public.workspace_members
-      ADD CONSTRAINT fk_workspace_members_workspace
-      FOREIGN KEY (workspace_id) REFERENCES public.workspaces(id) ON DELETE CASCADE;
+      ADD COLUMN IF NOT EXISTS workspace_id UUID;
+
+    -- Crear la FK solamente si todavía no existe.
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_constraint
+      WHERE conname = 'fk_workspace_members_workspace'
+        AND conrelid = 'public.workspace_members'::regclass
+    ) THEN
+
+      ALTER TABLE public.workspace_members
+        ADD CONSTRAINT fk_workspace_members_workspace
+        FOREIGN KEY (workspace_id)
+        REFERENCES public.workspaces(id)
+        ON DELETE CASCADE;
+
+    END IF;
+
+  ELSE
+
+    RAISE NOTICE
+      'workspace_members no existe todavía. Se omite la FK; se implementará posteriormente.';
+
   END IF;
+
 END $$;
 
 -- ============================================================
