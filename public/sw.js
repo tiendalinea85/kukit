@@ -1,4 +1,4 @@
-const CACHE_NAME = "zane-cache-v5";
+const CACHE_NAME = "zane-cache-v6";
 
 const STATIC_ASSETS = [
   "/",
@@ -56,6 +56,11 @@ self.addEventListener("fetch", (event) => {
   // no deben llegar nunca a cache.put().
   if (!isCacheableRequest(request)) return;
 
+  // Solo se atienden peticiones del propio origen; el resto (Supabase,
+  // fuentes externas, etc.) se deja pasar tal cual al navegador.
+  const requestUrl = new URL(request.url);
+  if (requestUrl.origin !== self.location.origin) return;
+
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
@@ -94,6 +99,25 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Las peticiones internas del router de Next.js (RSC, prefetch) llevan
+  // cabeceras/query propios. NUNCA deben pasar por la caché del SW porque el
+  // router espera la respuesta "flight" sin transformar; interceptarlas rompe
+  // la navegación (TypeError: Failed to fetch) y deja la pantalla en blanco.
+  if (requestUrl.searchParams.has("_rsc")) return;
+  if (
+    request.headers.get("rsc") ||
+    request.headers.get("next-router-state-tree") ||
+    request.headers.get("next-router-prefetch") ||
+    request.headers.get("next-router-segment-prefetch")
+  ) {
+    return;
+  }
+
+  // Solo se cachean assets estáticos locales; el resto se deja a la red.
+  if (!/\.(js|css|json|svg|png|jpg|jpeg|webp|gif|ico|woff2?|ttf|map)$/i.test(requestUrl.pathname)) {
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then((cached) => {
       const fetchPromise = fetch(request)
@@ -110,7 +134,7 @@ self.addEventListener("fetch", (event) => {
 
           return response;
         })
-        .catch(() => cached);
+        .catch(() => cached || Response.error());
 
       return cached || fetchPromise;
     })

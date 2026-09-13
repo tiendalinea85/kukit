@@ -129,8 +129,8 @@ export function VoiceAssistant() {
 
   useEffect(() => {
     setMounted(true);
-    db.categories.toArray().then(setCategories);
-    db.types.toArray().then(setTypes);
+    db.categories.toArray().then(setCategories).catch(() => setCategories([]));
+    db.types.toArray().then(setTypes).catch(() => setTypes([]));
     return () => cancel();
   }, [cancel]);
 

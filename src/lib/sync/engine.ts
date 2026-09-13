@@ -175,6 +175,17 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
         if (counts.failed > 0 || counts.conflict > 0 || counts.pending > 0) {
           scheduleRetry();
         }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Error de sincronización";
+        try {
+          await logSyncEvent(
+            { level: "error", event: "sync_failed", message: msg, errorType: "unknown" },
+            nowFn(),
+          );
+        } catch {
+          // El log no debe romper el flujo de sincronización.
+        }
+        publish({ status: "error", lastError: msg });
       } finally {
         inFlight = null;
       }
@@ -198,8 +209,13 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
       started = true;
 
       void (async () => {
-        await recoverStaleOps({ now: nowFn() });
-        await refreshCounts();
+        try {
+          await recoverStaleOps({ now: nowFn() });
+          await refreshCounts();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Error al recuperar operaciones";
+          publish({ status: "error", lastError: msg });
+        }
       })();
 
       deps.connection.onChange((state) => {

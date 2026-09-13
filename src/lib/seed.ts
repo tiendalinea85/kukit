@@ -27,9 +27,13 @@ function daysAgo(n: number): string {
   return d.toISOString().split("T")[0];
 }
 
-export async function seedIfEmpty() {
-  const workspaceId = useWorkspaceStore.getState().activeWorkspaceId || "default";
-  const catCount = await db.categories.count();
+/**
+ * Siembra la base de un workspace (categorías, tipos e categorías de
+ * inversión) y, opcionalmente, datos de ejemplo. Todo queda aislado por
+ * workspaceId: cada workspace solo ve sus propios registros.
+ */
+export async function seedForWorkspace(workspaceId: string, withSamples = false) {
+  const catCount = await db.categories.where("workspaceId").equals(workspaceId).count();
   let catIds: string[] = [];
 
   if (catCount === 0) {
@@ -43,11 +47,11 @@ export async function seedIfEmpty() {
     await db.categories.bulkAdd(categories);
     catIds = categories.map((c) => c.id);
   } else {
-    const cats = await db.categories.toArray();
+    const cats = await db.categories.where("workspaceId").equals(workspaceId).toArray();
     catIds = cats.map((c) => c.id);
   }
 
-  const typeCount = await db.types.count();
+  const typeCount = await db.types.where("workspaceId").equals(workspaceId).count();
 
   if (typeCount === 0) {
     const types = defaultTypes.map((t) => ({
@@ -60,7 +64,7 @@ export async function seedIfEmpty() {
     await db.types.bulkAdd(types);
   }
 
-  const invCatCount = await db.investmentCategories.count();
+  const invCatCount = await db.investmentCategories.where("workspaceId").equals(workspaceId).count();
   let invCatIds: string[] = [];
 
   if (invCatCount === 0) {
@@ -74,11 +78,13 @@ export async function seedIfEmpty() {
     await db.investmentCategories.bulkAdd(invCats);
     invCatIds = invCats.map((c) => c.id);
   } else {
-    const invCats = await db.investmentCategories.toArray();
+    const invCats = await db.investmentCategories.where("workspaceId").equals(workspaceId).toArray();
     invCatIds = invCats.map((c) => c.id);
   }
 
-  const expenseCount = await db.expenses.count();
+  if (!withSamples) return;
+
+  const expenseCount = await db.expenses.where("workspaceId").equals(workspaceId).count();
   if (expenseCount === 0 && catIds.length > 0) {
     const now = new Date().toISOString();
     const [servicios, transporte, publicidad, arriendo, mantenimiento, sueldos, otros] = catIds;
@@ -98,7 +104,7 @@ export async function seedIfEmpty() {
     await db.expenses.bulkAdd(sampleExpenses);
   }
 
-  const investmentCount = await db.investments.count();
+  const investmentCount = await db.investments.where("workspaceId").equals(workspaceId).count();
   if (investmentCount === 0 && invCatIds.length > 0) {
     const now = new Date().toISOString();
     const [maquinaria, equipamiento, herramientas, computacion, muebles, otros] = invCatIds;
@@ -115,7 +121,7 @@ export async function seedIfEmpty() {
     await db.investments.bulkAdd(sampleInvestments);
   }
 
-  const customerCount = await db.customers.count();
+  const customerCount = await db.customers.where("workspaceId").equals(workspaceId).count();
   if (customerCount === 0) {
     const now = new Date().toISOString();
     const sampleCustomers = [
@@ -136,7 +142,7 @@ export async function seedIfEmpty() {
     );
   }
 
-  const productCount = await db.products.count();
+  const productCount = await db.products.where("workspaceId").equals(workspaceId).count();
   if (productCount === 0) {
     const now = new Date().toISOString();
     const sampleProducts = [
@@ -178,11 +184,11 @@ export async function seedIfEmpty() {
     }
   }
 
-  const saleCount = await db.sales.count();
+  const saleCount = await db.sales.where("workspaceId").equals(workspaceId).count();
   if (saleCount === 0) {
     const now = new Date().toISOString();
-    const [mary, carlos, luisa] = (await db.customers.toArray()).filter((c) => !c.deleted);
-    const products = (await db.products.toArray()).filter((p) => !p.deleted);
+    const [mary, carlos, luisa] = (await db.customers.toArray()).filter((c) => c.workspaceId === workspaceId && !c.deleted);
+    const products = (await db.products.toArray()).filter((p) => p.workspaceId === workspaceId && !p.deleted);
     const leggings = products.find((p) => p.code === "LEG-001");
     const topBlanco = products.find((p) => p.code === "TOP-001");
 
@@ -271,4 +277,10 @@ export async function seedIfEmpty() {
       }
     }
   }
+}
+
+export async function seedIfEmpty() {
+  const workspaceId = useWorkspaceStore.getState().activeWorkspaceId;
+  if (!workspaceId) return;
+  await seedForWorkspace(workspaceId, true);
 }

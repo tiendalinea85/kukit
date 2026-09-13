@@ -94,7 +94,23 @@ export function Sidebar() {
               </button>
             </div>
 
-            <div className="relative px-3 pt-3">
+            <nav className="flex-1 p-3 space-y-1 overflow-y-auto mt-2">
+              {visibleLinks.map((link) => {
+                const active = pathname === link.href;
+                return (
+                  <Link key={link.href} href={link.href} onClick={toggleSidebar}
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all ${
+                      active ? "bg-purple-600/20 text-purple-400" : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+                    }`}
+                  >
+                    <link.icon size={18} />
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            <div className="relative px-3 pb-2">
               <button
                 onClick={() => setWorkspaceOpen((v) => !v)}
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 transition-colors"
@@ -109,9 +125,9 @@ export function Sidebar() {
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
-                    className="absolute left-3 right-3 mt-1 bg-zinc-800 border border-zinc-700 rounded-xl shadow-lg overflow-hidden z-50 max-h-48 overflow-y-auto"
+                    className="absolute left-3 right-3 bottom-full mb-1 bg-zinc-800 border border-zinc-700 rounded-xl shadow-lg overflow-hidden z-50 max-h-48 overflow-y-auto"
                   >
-                    {workspaces.map((w) => (
+                    {workspaces.filter((w) => w.id !== "default").map((w) => (
                       <li key={w.id}>
                         <button
                           onClick={() => { setActiveWorkspace(w.id); setWorkspaceOpen(false); }}
@@ -129,22 +145,6 @@ export function Sidebar() {
                 )}
               </AnimatePresence>
             </div>
-
-            <nav className="flex-1 p-3 space-y-1 overflow-y-auto mt-2">
-              {visibleLinks.map((link) => {
-                const active = pathname === link.href;
-                return (
-                  <Link key={link.href} href={link.href} onClick={toggleSidebar}
-                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all ${
-                      active ? "bg-purple-600/20 text-purple-400" : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-                    }`}
-                  >
-                    <link.icon size={18} />
-                    {link.label}
-                  </Link>
-                );
-              })}
-            </nav>
             <div className="p-4 border-t border-zinc-800 text-xs text-zinc-600 text-center">
               Zane v1.0.0
             </div>

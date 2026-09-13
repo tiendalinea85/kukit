@@ -64,7 +64,8 @@ export type SyncLogEvent =
   | "recovered_stale"
   | "reconciled"
   | "sync_started"
-  | "sync_complete";
+  | "sync_complete"
+  | "sync_failed";
 
 export interface SyncLogEntry {
   id: string;

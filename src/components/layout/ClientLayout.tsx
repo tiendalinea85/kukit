@@ -10,6 +10,7 @@ import { seedIfEmpty } from "@/lib/seed";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
 import { VoiceAssistant } from "@/components/voice/VoiceAssistant";
+import { WorkspaceGate } from "@/features/workspaces/components/WorkspaceGate";
 
 function LayoutInner({ children }: { children: React.ReactNode }) {
   const { setOnline, theme } = useAppStore();
@@ -45,19 +46,23 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 
   const isAuthPage = typeof window !== "undefined" && window.location.pathname === "/auth";
 
+  const appChrome = (
+    <div className="min-h-screen bg-zinc-950">
+      <TopBar />
+      <Sidebar />
+      <main className="pt-[68px] pb-24 max-w-lg mx-auto px-4">
+        {children}
+      </main>
+      <BottomNav />
+    </div>
+  );
+
   return (
     <>
       {isAuthPage ? (
         <div className="min-h-screen bg-zinc-950">{children}</div>
       ) : (
-        <div className="min-h-screen bg-zinc-950">
-          <TopBar />
-          <Sidebar />
-          <main className="pt-[68px] pb-24 max-w-lg mx-auto px-4">
-            {children}
-          </main>
-          <BottomNav />
-        </div>
+        <WorkspaceGate>{appChrome}</WorkspaceGate>
       )}
       <Toaster
         position="top-center"

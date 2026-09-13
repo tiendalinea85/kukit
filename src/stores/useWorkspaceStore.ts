@@ -77,28 +77,12 @@ interface WorkspaceState {
   isModuleEnabled: (moduleKey: string) => boolean;
 }
 
-const DEFAULT_CATEGORY: WorkspaceCategoryItem = {
-  id: "personal",
-  name: "Personal",
-  icon: "🏠",
-  createdAt: "2025-01-01T00:00:00Z",
-};
-
-const DEFAULT_WORKSPACE: Workspace = {
-  id: "default",
-  name: "General",
-  model: "general",
-  modules: [...MODEL_MODULES.general],
-  categoryId: "personal",
-  createdAt: new Date().toISOString(),
-};
-
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
       categories: [...WORKSPACE_CATEGORIES],
-      workspaces: [DEFAULT_WORKSPACE],
-      activeWorkspaceId: "default",
+      workspaces: [],
+      activeWorkspaceId: null,
 
       addCategory: (c) =>
         set((s) => ({ categories: [...s.categories, c] })),

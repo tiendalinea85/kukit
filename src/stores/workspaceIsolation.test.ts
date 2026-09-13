@@ -1,12 +1,20 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { useWorkspaceStore } from "./useWorkspaceStore.ts";
+import { MODEL_MODULES, useWorkspaceStore } from "./useWorkspaceStore.ts";
 
 beforeEach(() => {
   const state = useWorkspaceStore.getState();
   for (const ws of state.workspaces) {
-    if (ws.id !== "default") state.removeWorkspace(ws.id);
+    state.removeWorkspace(ws.id);
   }
+  state.addWorkspace({
+    id: "default",
+    name: "General",
+    model: "general",
+    modules: [...MODEL_MODULES.general],
+    categoryId: "personal",
+    createdAt: "2026-08-14T10:00:00.000Z",
+  });
   state.setActiveWorkspace("default");
 });
 
