@@ -1,4 +1,5 @@
-const CACHE_NAME = "zane-cache-v4";
+const CACHE_NAME = "zane-cache-v5";
+
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -6,64 +7,111 @@ const STATIC_ASSETS = [
   "/icons/icon-512.svg",
 ];
 
+function isCacheableRequest(request) {
+  try {
+    const url = new URL(request.url);
+
+    return (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      request.method === "GET"
+    );
+  } catch {
+    return false;
+  }
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
+
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => caches.delete(key))
+      )
     )
   );
+
   self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-  if (event.request.url.includes("/api/")) return;
-  // Solo se interceptan solicitudes HTTP(S). Esquemas como chrome-extension://,
-  // moz-extension://, file://, data: o blob: no pueden resolverse ni cachearse
-  // desde el Service Worker (cache.put() rechaza URLs no http); devolverlas
-  // sin tocar la caché evita excepciones en el fetch handler.
-  if (!/^https?:\/\//i.test(event.request.url)) return;
+  const request = event.request;
 
-  if (event.request.mode === "navigate") {
+  // Nunca interceptar solicitudes que no sean GET.
+  if (request.method !== "GET") return;
+
+  // No manejar API desde este Service Worker.
+  if (request.url.includes("/api/")) return;
+
+  // IMPORTANTE:
+  // chrome-extension://, moz-extension://, file://, data:, blob:, etc.
+  // no deben llegar nunca a cache.put().
+  if (!isCacheableRequest(request)) return;
+
+  if (request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request)
+      fetch(request)
         .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          if (response.ok && isCacheableRequest(request)) {
+            const clone = response.clone();
+
+            event.waitUntil(
+              caches.open(CACHE_NAME).then((cache) =>
+                cache.put(request, clone)
+              )
+            );
+          }
+
           return response;
         })
         .catch(() => {
           return caches.match("/").then((cached) => {
             if (cached) return cached;
-            const headers = new Headers({ "Content-Type": "text/html; charset=utf-8" });
+
+            const headers = new Headers({
+              "Content-Type": "text/html; charset=utf-8",
+            });
+
             return new Response(
               "<!doctype html><html><body><h1>Sin conexión</h1></body></html>",
-              { status: 503, headers }
+              {
+                status: 503,
+                headers,
+              }
             );
           });
         })
     );
+
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetchPromise = fetch(event.request)
+    caches.match(request).then((cached) => {
+      const fetchPromise = fetch(request)
         .then((response) => {
-          if (response.ok) {
+          if (response.ok && isCacheableRequest(request)) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+
+            event.waitUntil(
+              caches.open(CACHE_NAME).then((cache) =>
+                cache.put(request, clone)
+              )
+            );
           }
+
           return response;
         })
         .catch(() => cached);
+
       return cached || fetchPromise;
     })
   );
