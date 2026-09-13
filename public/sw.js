@@ -1,4 +1,4 @@
-const CACHE_NAME = "zane-cache-v3";
+const CACHE_NAME = "zane-cache-v4";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -25,6 +25,11 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   if (event.request.url.includes("/api/")) return;
+  // Solo se interceptan solicitudes HTTP(S). Esquemas como chrome-extension://,
+  // moz-extension://, file://, data: o blob: no pueden resolverse ni cachearse
+  // desde el Service Worker (cache.put() rechaza URLs no http); devolverlas
+  // sin tocar la caché evita excepciones en el fetch handler.
+  if (!/^https?:\/\//i.test(event.request.url)) return;
 
   if (event.request.mode === "navigate") {
     event.respondWith(
