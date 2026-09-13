@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -22,10 +22,23 @@ export default function AuthPage() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
+  const [cooldownLeft, setCooldownLeft] = useState(0);
   const submittingRef = useRef(false);
   const lastSubmitAtRef = useRef(0);
+  const cooldownUntilRef = useRef(0);
 
   const demo = !isSupabaseConfigured() && process.env.NODE_ENV !== "production";
+
+  // Cuenta atrás del cooldown tras un 429 (rate limit de Supabase). Al llegar
+  // a 0 se vuelve a habilitar el botón sin recargar la página.
+  useEffect(() => {
+    if (cooldownLeft <= 0) return;
+    const id = setInterval(() => {
+      const left = Math.ceil((cooldownUntilRef.current - Date.now()) / 1000);
+      setCooldownLeft(left <= 0 ? 0 : left);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [cooldownLeft > 0]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,8 +49,10 @@ export default function AuthPage() {
     }
 
     // Guard anti-duplicados: bloquea llamadas en paralelo (doble submit
-    // antes del re-render) y reintentos inmediatos tras un error (throttle).
+    // antes del re-render), reintentos inmediatos tras un error (throttle)
+    // y reintentos durante el cooldown impuesto por un 429.
     if (loading || submittingRef.current) return;
+    if (Date.now() < cooldownUntilRef.current) return;
     const now = Date.now();
     if (now - lastSubmitAtRef.current < 1500) return;
     submittingRef.current = true;
@@ -85,6 +100,10 @@ export default function AuthPage() {
       const lower = message.toLowerCase();
 
       if (status === 429) {
+        // El 429 lo devuelve el edge de Supabase (rate limit). No reenviar:
+        // se aplica un cooldown visible y el botón muestra la cuenta atrás.
+        cooldownUntilRef.current = Date.now() + 45000;
+        setCooldownLeft(45);
         toast.error(_("auth.rateLimit"));
       } else if (lower.includes("already")) {
         toast.error(_("auth.emailInUse"));
@@ -183,8 +202,15 @@ export default function AuthPage() {
               </p>
             )}
 
-            <Button type="submit" className="w-full" loading={loading} disabled={loading}>
-              {mode === "login" ? (
+            <Button
+              type="submit"
+              className="w-full"
+              loading={loading}
+              disabled={loading || cooldownLeft > 0}
+            >
+              {cooldownLeft > 0 ? (
+                _("auth.waitRetry").replace("{s}", String(cooldownLeft))
+              ) : mode === "login" ? (
                 <>
                   <LogIn size={16} /> {_("auth.login")}
                 </>
