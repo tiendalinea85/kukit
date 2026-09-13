@@ -461,6 +461,8 @@ ALTER TABLE reproductions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE livestock_productions ENABLE ROW LEVEL SECURITY;
 
 -- Policies: each user can only access their own rows.
+-- (PostgreSQL no soporta CREATE POLICY IF NOT EXISTS, por eso se
+-- usa DROP POLICY IF EXISTS + CREATE POLICY: re-ejecución idempotente).
 DO $$
 DECLARE
   t TEXT;
@@ -475,7 +477,10 @@ BEGIN
     ])
   LOOP
     EXECUTE format(
-      'CREATE POLICY IF NOT EXISTS "%s_user_isolation" ON %I
+      'DROP POLICY IF EXISTS "%s_user_isolation" ON %I', t, t
+    );
+    EXECUTE format(
+      'CREATE POLICY "%s_user_isolation" ON %I
         USING (auth.uid() = user_id)
         WITH CHECK (auth.uid() = user_id)',
       t, t

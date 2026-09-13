@@ -42,25 +42,31 @@ GEMINI_API_KEY=            # opcional, asistente de voz
 
 ### Base de datos (Supabase)
 
-Aplica las migraciones de `supabase/migrations/` **en orden** (00001 a 00008):
+Aplica las migraciones de `supabase/migrations/` **en orden** (00001 a 00013):
 
 | Migración | Contenido |
 |-----------|-----------|
-| `00001` | Tablas base + user_id + RLS |
-| `00002` | Detalle de gastos |
+| `00001` | Estructura base (categories, types, expenses) + user_id + RLS |
+| `00002` | Usuarios / perfiles (profiles, audit_events) |
 | `00003` | Códigos únicos por usuario |
 | `00004` | Módulo de gastos |
 | `00005` | Inversiones |
-| `00006` | Ventas + inventario |
-| `00007` | Motor de sync (revisiones, compras, sync_log) |
-| `00008` | Hardening RLS (WITH CHECK, índices, sales único) |
-| `00009` | Seed de datos de prueba (dev; requiere un usuario creado) |
+| `00006` | Clientes, productos, inventario y ventas |
+| `00007` | Compras: `purchases` + `purchase_details` (antes de revisiones) |
+| `00008` | Motor de sync: `revision` + trigger `trg_bump_revision` (solo tablas existentes) |
+| `00009` | Workspace members / usuarios de workspace |
+| `00010` | Multi-workspace (`workspaces`, `workspace_modules`, `workspace_id`) |
+| `00011` | Seed de datos de prueba (dev; requiere un usuario creado) |
+| `00012` | Gastos: recibo/OCR (receipt_thumb_url) |
+| `00013` | Módulos especializados (tailoring, agricultura, repuestos, crianza) |
 
-> ℹ️ `00001` ya incluye `user_id` antes de las políticas (bug de orden
-> corregido) y `00008` excluye `expense_details` (la eliminó `00004`), por lo
-> que la secuencia `00001`→`00008` corre limpia de corrida en una base nueva.
-> `00008` es idempotente y protege también a proyectos que aplicaron la
-> versión anterior con el fallo. Ver `docs/audit.md` §6.
+> ℹ️ Las migraciones están ordenadas por dependencia: `products` → `purchases`
+> → `purchase_details` → `revision/triggers` → `workspace_id` → sincronización.
+> Cada ALTER/trigger solo toca tablas que ya existen (comprobación con
+> `information_schema`), y todo es idempotente (IF NOT EXISTS + DROP/CREATE),
+> por lo que la secuencia 00001→00013 corre limpia de corrida en una base
+> nueva y también sobre una base existente sin borrar datos. Validación en
+> `supabase/validation/validate_schema.sql`.
 
 ## Scripts
 

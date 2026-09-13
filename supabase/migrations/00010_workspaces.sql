@@ -1,17 +1,9 @@
 -- ============================================================
--- 00011 — MULTI-WORKSPACE: workspaces, workspace_modules,
+-- 00010 — MULTI-WORKSPACE: workspaces, workspace_modules,
 --          workspace_id en tablas de negocio, FK en members.
 -- ============================================================
---
--- Regla: TODO dato pertenece a un workspace. Las políticas RLS existentes
--- (user_id = auth.uid()) se conservan como capa primaria de aislamiento
--- entre usuarios. workspace_id es un filtro de organización aplicado por
--- la capa de aplicación (queries + sync). En Etapa B (multi-usuario)
--- se refinarán las RLS para escopo por workspace.
---
--- Jerarquía de workspaces:
---   PERSONAL, TRABAJO, ESTUDIO → espacios individuales.
---   NEGOCIO → padre, con hijos tipo BUSINESS (Taller Mary, etc.).
+-- Regla de la casa: workspace_id se agrega ÚNICAMENTE a las tablas
+-- de negocio que realmente existen (misma comprobación que en 00008).
 
 -- ============================================================
 -- 1. TABLA workspaces
@@ -98,7 +90,7 @@ CREATE POLICY "Workspace modules delete own" ON public.workspace_modules
   );
 
 -- ============================================================
--- 3. FK: workspace_members → workspaces (completa 00010)
+-- 3. FK: workspace_members → workspaces (completa 00009)
 -- ============================================================
 
 DO $$
@@ -114,10 +106,11 @@ BEGIN
 END $$;
 
 -- ============================================================
--- 4. workspace_id en todas las tablas de negocio
+-- 4. workspace_id en las tablas de negocio EXISTENTES
 -- ============================================================
--- Se agrega workspace_id a cada tabla que tiene user_id.
--- Default '' para compatibilidad con datos pre-migración (backfill después).
+-- workspace_id es un filtro de organización aplicado por la capa de
+-- aplicación (queries + sync). Las RLS por user_id se conservan como
+-- capa primaria de aislamiento entre usuarios.
 
 DO $$
 DECLARE
@@ -132,31 +125,17 @@ DECLARE
   ];
 BEGIN
   FOREACH t IN ARRAY business_tables LOOP
-    EXECUTE format(
-      'ALTER TABLE %I ADD COLUMN IF NOT EXISTS workspace_id uuid',
-      t
-    );
-  END LOOP;
-END $$;
-
--- Índices de workspace en cada tabla de negocio
-DO $$
-DECLARE
-  t text;
-  business_tables text[] := ARRAY[
-    'categories', 'types', 'expenses',
-    'investment_categories', 'investments',
-    'customers', 'products',
-    'sales', 'sale_details',
-    'purchases', 'purchase_details',
-    'inventory_movements'
-  ];
-BEGIN
-  FOREACH t IN ARRAY business_tables LOOP
-    EXECUTE format(
-      'CREATE INDEX IF NOT EXISTS idx_%I_workspace ON %I(workspace_id)',
-      t, t
-    );
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = t
+    ) THEN
+      EXECUTE format(
+        'ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS workspace_id uuid', t);
+      EXECUTE format(
+        'CREATE INDEX IF NOT EXISTS idx_%I_workspace ON public.%I(workspace_id)', t, t);
+    END IF;
   END LOOP;
 END $$;
 

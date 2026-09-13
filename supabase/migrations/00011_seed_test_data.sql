@@ -5,7 +5,7 @@
 -- usuario autenticado del proyecto.
 --
 -- CÓMO USARLO:
---   1. Aplica 00001..00008 en orden.
+--   1. Aplica 00001..00010 en orden.
 --   2. Crea tu cuenta en la app (Registrarse) para que exista un usuario en
 --      auth.users. El seed asigna los datos a ESE primer usuario.
 --   3. Ejecuta este archivo en el SQL Editor de Supabase.
