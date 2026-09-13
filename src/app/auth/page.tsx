@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -22,20 +22,30 @@ export default function AuthPage() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
+  const submittingRef = useRef(false);
+  const lastSubmitAtRef = useRef(0);
 
   const demo = !isSupabaseConfigured() && process.env.NODE_ENV !== "production";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading) return;
+
+    if (mode === "register" && password !== confirm) {
+      toast.error(_("auth.passwordMismatch"));
+      return;
+    }
+
+    // Guard anti-duplicados: bloquea llamadas en paralelo (doble submit
+    // antes del re-render) y reintentos inmediatos tras un error (throttle).
+    if (loading || submittingRef.current) return;
+    const now = Date.now();
+    if (now - lastSubmitAtRef.current < 1500) return;
+    submittingRef.current = true;
+    lastSubmitAtRef.current = now;
     setLoading(true);
     setNotice("");
 
     try {
-      if (mode === "register" && password !== confirm) {
-        toast.error(_("auth.passwordMismatch"));
-        return;
-      }
 
       if (demo) {
         if (mode === "login" && email === "admin@test.com" && password === "123456") {
@@ -57,10 +67,15 @@ export default function AuthPage() {
         await signInWithEmail(email, password);
         toast.success(_("auth.success"));
       } else {
-        const { session } = await signUpWithEmail(email, password);
+        const { session, user } = await signUpWithEmail(email, password);
         if (session) {
           toast.success(_("auth.signupSuccess"));
+        } else if (user) {
+          // Confirmación por email activa: aún no hay sesión.
+          setNotice(_("auth.checkEmail"));
         } else {
+          // Sin error, ni sesión ni user (usuario ya creado / confirmación en
+          // curso): no reintentar para no disparar el rate limit (429).
           setNotice(_("auth.checkEmail"));
         }
       }
@@ -89,6 +104,7 @@ export default function AuthPage() {
         toast.error(_("auth.error"));
       }
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
@@ -167,7 +183,7 @@ export default function AuthPage() {
               </p>
             )}
 
-            <Button type="submit" className="w-full" loading={loading}>
+            <Button type="submit" className="w-full" loading={loading} disabled={loading}>
               {mode === "login" ? (
                 <>
                   <LogIn size={16} /> {_("auth.login")}
