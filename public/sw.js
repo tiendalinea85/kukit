@@ -1,4 +1,4 @@
-const CACHE_NAME = "zane-cache-v2";
+const CACHE_NAME = "zane-cache-v3";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -34,7 +34,16 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           return response;
         })
-        .catch(() => caches.match("/"))
+        .catch(() => {
+          return caches.match("/").then((cached) => {
+            if (cached) return cached;
+            const headers = new Headers({ "Content-Type": "text/html; charset=utf-8" });
+            return new Response(
+              "<!doctype html><html><body><h1>Sin conexión</h1></body></html>",
+              { status: 503, headers }
+            );
+          });
+        })
     );
     return;
   }
