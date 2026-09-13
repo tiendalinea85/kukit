@@ -65,9 +65,26 @@ export default function AuthPage() {
         }
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.toLowerCase().includes("already")) {
+      const status = (err as { status?: number })?.status ?? 0;
+      const message = err instanceof Error ? err.message : "";
+      const lower = message.toLowerCase();
+
+      if (status === 429) {
+        toast.error(_("auth.rateLimit"));
+      } else if (lower.includes("already")) {
         toast.error(_("auth.emailInUse"));
+      } else if (lower.includes("not confirmed")) {
+        setNotice(_("auth.checkEmail"));
+      } else if (lower.includes("password should be")) {
+        toast.error(_("auth.weakPassword"));
+      } else if (
+        lower.includes("signup not allowed") ||
+        lower.includes("anonymous provider") ||
+        lower.includes("otp verification disabled")
+      ) {
+        toast.error(_("auth.signupsDisabled"));
+      } else if (mode === "register") {
+        toast.error(_("auth.signupError"));
       } else {
         toast.error(_("auth.error"));
       }
