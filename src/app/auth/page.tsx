@@ -16,6 +16,18 @@ import {
 
 type Mode = "login" | "register" | "reset";
 
+// Validación previa antes de tocar la API: evita que correos inválidos
+// disparen el rate limit (429) de Supabase en /auth/v1/signup.
+function isValidEmail(email: string): boolean {
+  if (email.length > 254) return false;
+  const trimmed = email.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return false;
+  const [local, domain] = trimmed.split("@");
+  if (/^\.|\.$/.test(local)) return false;
+  if (/^\.|\.$|\.\./.test(domain)) return false;
+  return true;
+}
+
 function GoogleIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 48">
@@ -61,6 +73,11 @@ export default function AuthPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isValidEmail(email)) {
+      toast.error(_("auth.invalidEmail"));
+      return;
+    }
 
     if (mode === "register" && password !== confirm) {
       toast.error(_("auth.passwordMismatch"));
