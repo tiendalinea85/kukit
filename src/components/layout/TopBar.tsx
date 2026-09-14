@@ -44,7 +44,7 @@ export function TopBar() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-30 bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800/50 safe-area-top">
-      <div className="max-w-lg mx-auto px-4 py-3">
+      <div className="max-w-lg mx-auto px-4 py-3 lg:max-w-full lg:mx-0 lg:ml-64 lg:mr-0 lg:px-6">
         <div className="flex items-center gap-3">
           <button onClick={toggleSidebar} className="p-1.5 rounded-xl hover:bg-zinc-800 text-zinc-400 lg:hidden">
             <Menu size={22} />

@@ -50,7 +50,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-zinc-950">
       <TopBar />
       <Sidebar />
-      <main className="pt-[68px] pb-24 lg:pb-8 max-w-lg lg:max-w-4xl mx-auto px-4 lg:ml-64 lg:mr-auto">
+      <main className="pt-[68px] pb-24 lg:pb-8 max-w-lg lg:max-w-5xl mx-auto px-4 lg:ml-64 lg:mr-auto">
         {children}
       </main>
       <BottomNav />

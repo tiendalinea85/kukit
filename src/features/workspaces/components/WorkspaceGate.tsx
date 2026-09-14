@@ -19,16 +19,28 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
   const [creating, setCreating] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  // Al tener sesión, bajar workspaces del servidor (cross-device sync) una sola vez.
+  // Con sesión: 1) bajar workspaces del servidor (cross-device) si no hay
+  // locales, 2) auto-entrar al workspace activo persistido (o al único)
+  // para evitar mostrar el picker en cada recarga.
   useEffect(() => {
     if (!user) return;
     const hasReal = workspaces.some((w) => w.id !== "default");
-    if (hasReal) return;
-    setSyncing(true);
-    pullWorkspacesFromSupabase()
-      .catch(() => {})
-      .finally(() => setSyncing(false));
+    if (!hasReal) {
+      setSyncing(true);
+      pullWorkspacesFromSupabase()
+        .catch(() => {})
+        .finally(() => setSyncing(false));
+    }
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || enteredId) return;
+    const visible = workspaces.filter((w) => w.id !== "default");
+    if (visible.length === 0) return;
+    const activeId = useWorkspaceStore.getState().activeWorkspaceId;
+    const target = visible.find((w) => w.id === activeId) ?? visible[0];
+    setEnteredId(target.id);
+  }, [user?.id, workspaces.length, syncing]);
 
   const created = (id: string) => {
     setActiveWorkspace(id);
