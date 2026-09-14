@@ -1,15 +1,19 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Scan, Menu, Plus } from "lucide-react";
+import { Search, Scan, Menu, Plus, Building2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppStore } from "@/stores/useAppStore";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { SyncIndicator } from "@/components/sync/SyncIndicator";
 
 export function TopBar() {
   const router = useRouter();
   const { toggleSidebar, online } = useAppStore();
   const [query, setQuery] = useState("");
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const [focused, setFocused] = useState(false);
 
   const handleSearch = useCallback((e: React.FormEvent) => {
@@ -77,9 +81,13 @@ export function TopBar() {
             <SyncIndicator />
           </button>
 
-          <div className="relative">
-            <div className={`w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white cursor-pointer`}>
-              U
+          <div className="relative flex items-center gap-2 min-w-0">
+            <span className="flex items-center gap-1.5 text-xs text-zinc-400 truncate max-w-[90px] sm:max-w-[140px]" title={activeWorkspace?.name ?? "Sin workspace"}>
+              <Building2 size={14} className="text-purple-400 shrink-0" />
+              <span className="truncate">{activeWorkspace?.name ?? "Sin workspace"}</span>
+            </span>
+            <div className={`w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white cursor-pointer shrink-0`}>
+              {(activeWorkspace?.name ?? " ").charAt(0).toUpperCase()}
             </div>
             {!online && (
               <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-zinc-900" />
