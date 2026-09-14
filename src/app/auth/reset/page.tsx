@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { KeyRound } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import toast from "react-hot-toast";
-import { getSupabase, updatePassword, signOut } from "@/lib/supabase";
+import { getOAuthCode, getSupabase, updatePassword, signOut } from "@/lib/supabase";
 
 export default function AuthResetPage() {
   const { t: _ } = useTranslation();
@@ -19,11 +19,7 @@ export default function AuthResetPage() {
     if (exchangingRef.current) return;
     exchangingRef.current = true;
 
-    const url = new URL(window.location.href);
-    let code = url.searchParams.get("code");
-    if (!code) {
-      code = new URLSearchParams(window.location.hash.slice(1)).get("code");
-    }
+    const code = getOAuthCode();
 
     if (!code) {
       toast.error(_("auth.resetInvalid"));

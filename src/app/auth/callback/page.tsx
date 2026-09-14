@@ -1,17 +1,13 @@
 "use client";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getSupabase } from "@/lib/supabase";
+import { getSupabase, getOAuthCode } from "@/lib/supabase";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const url = new URL(window.location.href);
-    let code = url.searchParams.get("code");
-    if (!code) {
-      code = new URLSearchParams(window.location.hash.slice(1)).get("code");
-    }
+    const code = getOAuthCode();
 
     if (!code) {
       router.replace("/auth");

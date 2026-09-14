@@ -17,6 +17,17 @@ export function isSupabaseConfigured(): boolean {
   return !!(getSupabaseUrl() && getSupabaseAnonKey());
 }
 
+// Lee el código OAuth/recovery desde la URL, tanto si llega como query param
+// (PKCE) como en el hash. Usado por /auth/callback y /auth/reset.
+export function getOAuthCode(): string | null {
+  const url = new URL(window.location.href);
+  let code = url.searchParams.get("code");
+  if (!code) {
+    code = new URLSearchParams(window.location.hash.slice(1)).get("code");
+  }
+  return code;
+}
+
 export function getSupabase(): SupabaseClient | null {
   if (_supabase) return _supabase;
   if (!isSupabaseConfigured()) return null;
