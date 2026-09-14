@@ -148,6 +148,16 @@ export default function AuthPage() {
         cooldownUntilRef.current = Date.now() + 45000;
         setCooldownLeft(45);
         toast.error(_("auth.rateLimit"));
+      } else if (
+        status === 504 ||
+        lower.includes("failed to fetch") ||
+        lower.includes("networkerror") ||
+        lower.includes("load failed") ||
+        lower.includes("timeout")
+      ) {
+        // Fallos de red/timeout del gateway (incluido el 504 "Gateway Timeout").
+        console.error("[auth] network error:", err);
+        toast.error(_("auth.networkError"));
       } else if (lower.includes("already")) {
         toast.error(_("auth.emailInUse"));
       } else if (lower.includes("not confirmed")) {
