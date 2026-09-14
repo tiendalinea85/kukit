@@ -160,8 +160,28 @@ export default function AuthPage() {
       const lower = message.toLowerCase();
 
       if (status === 429) {
-        // El 429 lo devuelve el edge de Supabase (rate limit). No reenviar:
-        // se aplica un cooldown visible y el botón muestra la cuenta atrás.
+        // El 429 lo devuelve el edge de Supabase (rate limit). No reenviar.
+        // Pero si venimos de un registro, la cuenta pudo crearse antes de que
+        // saltara el límite: verifica UNA vez con un sign-in silencioso antes
+        // de mostrar "demasiados intentos" (mismo patrón que el timeout).
+        if (mode === "register") {
+          const outcome = await userCreatedAfterTimeout(email, password);
+          if (outcome === "confirmed") {
+            toast.success(_("auth.signupSuccess"));
+            window.location.href = "/";
+            return;
+          } else if (outcome === "unconfirmed") {
+            setNotice(_("auth.checkEmail"));
+            // El sign-in de verificación devuelve 400 "Email not confirmed":
+            // la cuenta existe pero falta confirmar. Aun así applicamos el
+            // cooldown para que el usuario no reintente el registro en bucle
+            // y siga disparando 429 (signup) y 400 (token).
+            cooldownUntilRef.current = Date.now() + 45000;
+            setCooldownLeft(45);
+            return;
+          }
+        }
+        // Se aplica un cooldown visible y el botón muestra la cuenta atrás.
         cooldownUntilRef.current = Date.now() + 45000;
         setCooldownLeft(45);
         toast.error(_("auth.rateLimit"));
