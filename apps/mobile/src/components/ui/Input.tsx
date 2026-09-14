@@ -1,4 +1,6 @@
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing } from './theme';
 
 interface InputProps {
@@ -24,21 +26,39 @@ export function Input({
   autoCapitalize = 'sentences',
   editable = true,
 }: InputProps) {
+  const [show, setShow] = useState(false);
+
   return (
     <View style={styles.wrap}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-      <TextInput
-        style={[styles.input, multiline && styles.multiline]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
-        keyboardType={keyboardType}
-        multiline={multiline}
-        secureTextEntry={secure}
-        autoCapitalize={autoCapitalize}
-        editable={editable}
-      />
+      <View>
+        <TextInput
+          style={[styles.input, multiline && styles.multiline, secure && styles.inputSecure]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textMuted}
+          keyboardType={keyboardType}
+          multiline={multiline}
+          secureTextEntry={secure && !show}
+          autoCapitalize={autoCapitalize}
+          editable={editable}
+        />
+        {secure && (
+          <Pressable
+            onPress={() => setShow((s) => !s)}
+            hitSlop={8}
+            style={styles.eye}
+            accessibilityLabel={show ? 'Ocultar contraseña' : 'Ver contraseña'}
+          >
+            <Ionicons
+              name={show ? 'eye-off' : 'eye'}
+              size={20}
+              color={colors.textMuted}
+            />
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }
@@ -61,6 +81,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     color: colors.text,
     fontSize: 15,
+  },
+  inputSecure: {
+    paddingRight: spacing.xxl,
+  },
+  eye: {
+    position: 'absolute',
+    right: spacing.md,
+    top: '50%',
+    marginTop: -10,
   },
   multiline: {
     minHeight: 80,
