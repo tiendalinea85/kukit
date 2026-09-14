@@ -3,16 +3,29 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { UserPlus, LogIn } from "lucide-react";
+import { UserPlus, LogIn, ArrowLeft } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import toast from "react-hot-toast";
 import {
   signInWithEmail,
   signUpWithEmail,
+  signInWithGoogle,
+  resetPassword,
   isSupabaseConfigured,
 } from "@/lib/supabase";
 
-type Mode = "login" | "register";
+type Mode = "login" | "register" | "reset";
+
+function GoogleIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+    </svg>
+  );
+}
 
 export default function AuthPage() {
   const { t: _ } = useTranslation();
@@ -21,6 +34,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const submittingRef = useRef(false);
@@ -39,6 +53,11 @@ export default function AuthPage() {
     }, 1000);
     return () => clearInterval(id);
   }, [cooldownLeft > 0]);
+
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    setNotice("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +80,6 @@ export default function AuthPage() {
     setNotice("");
 
     try {
-
       if (demo) {
         if (mode === "login" && email === "admin@test.com" && password === "123456") {
           localStorage.setItem("zane-auth", "true");
@@ -70,11 +88,19 @@ export default function AuthPage() {
             JSON.stringify({ email: "admin@test.com" })
           );
           window.location.href = "/";
+        } else if (mode === "reset") {
+          setNotice(_("auth.needSupabase"));
         } else if (mode === "login") {
           toast.error(_("auth.error"));
         } else {
           setNotice(_("auth.needSupabase"));
         }
+        return;
+      }
+
+      if (mode === "reset") {
+        await resetPassword(email);
+        setNotice(_("auth.resetEmailSent"));
         return;
       }
 
@@ -111,6 +137,8 @@ export default function AuthPage() {
         setNotice(_("auth.checkEmail"));
       } else if (lower.includes("password should be")) {
         toast.error(_("auth.weakPassword"));
+      } else if (lower.includes("validate") || lower.includes("invalid")) {
+        toast.error(_("auth.invalidEmail"));
       } else if (
         lower.includes("signup not allowed") ||
         lower.includes("anonymous provider") ||
@@ -118,7 +146,9 @@ export default function AuthPage() {
       ) {
         toast.error(_("auth.signupsDisabled"));
       } else if (mode === "register") {
-        toast.error(_("auth.signupError"));
+        // Muestra el mensaje real del servidor para poder diagnosticar el 400.
+        console.error("[auth] signup error:", err);
+        toast.error(message || _("auth.signupError"));
       } else {
         toast.error(_("auth.error"));
       }
@@ -126,6 +156,29 @@ export default function AuthPage() {
       submittingRef.current = false;
       setLoading(false);
     }
+  };
+
+  const handleGoogle = async () => {
+    if (googleLoading) return;
+    if (demo) {
+      toast.error(_("auth.needSupabase"));
+      return;
+    }
+    setGoogleLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      console.error("[auth] google error:", err);
+      toast.error(_("auth.googleError"));
+      setGoogleLoading(false);
+    }
+  };
+
+  const submitLabel = () => {
+    if (cooldownLeft > 0) return _("auth.waitRetry").replace("{s}", String(cooldownLeft));
+    if (mode === "reset") return _("auth.resetPassword");
+    if (mode === "login") return _("auth.login");
+    return _("auth.register");
   };
 
   return (
@@ -143,30 +196,40 @@ export default function AuthPage() {
         </div>
 
         <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800/60 p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-800/60">
+          {mode === "reset" ? (
             <button
               type="button"
-              onClick={() => { setMode("login"); setNotice(""); }}
-              className={`flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-colors ${
-                mode === "login"
-                  ? "bg-purple-600 text-white"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
+              onClick={() => switchMode("login")}
+              className="flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
             >
-              <LogIn size={14} /> {_("auth.login")}
+              <ArrowLeft size={14} /> {_("auth.backToLogin")}
             </button>
-            <button
-              type="button"
-              onClick={() => { setMode("register"); setNotice(""); }}
-              className={`flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-colors ${
-                mode === "register"
-                  ? "bg-purple-600 text-white"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              <UserPlus size={14} /> {_("auth.register")}
-            </button>
-          </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-800/60">
+              <button
+                type="button"
+                onClick={() => switchMode("login")}
+                className={`flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-colors ${
+                  mode === "login"
+                    ? "bg-purple-600 text-white"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <LogIn size={14} /> {_("auth.login")}
+              </button>
+              <button
+                type="button"
+                onClick={() => switchMode("register")}
+                className={`flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-colors ${
+                  mode === "register"
+                    ? "bg-purple-600 text-white"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <UserPlus size={14} /> {_("auth.register")}
+              </button>
+            </div>
+          )}
 
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
             <Input
@@ -177,23 +240,39 @@ export default function AuthPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
-            <Input
-              label={_("auth.password")}
-              type="password"
-              required
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            {mode === "register" && (
-              <Input
-                label={_("auth.confirmPassword")}
-                type="password"
-                required
-                autoComplete="new-password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-              />
+            {mode !== "reset" && (
+              <>
+                <Input
+                  label={_("auth.password")}
+                  type="password"
+                  required
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                {mode === "register" && (
+                  <Input
+                    label={_("auth.confirmPassword")}
+                    type="password"
+                    required
+                    autoComplete="new-password"
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                  />
+                )}
+              </>
+            )}
+
+            {mode === "login" && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => switchMode("reset")}
+                  className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                >
+                  {_("auth.forgotPassword")}
+                </button>
+              </div>
             )}
 
             {notice && (
@@ -208,19 +287,29 @@ export default function AuthPage() {
               loading={loading}
               disabled={loading || cooldownLeft > 0}
             >
-              {cooldownLeft > 0 ? (
-                _("auth.waitRetry").replace("{s}", String(cooldownLeft))
-              ) : mode === "login" ? (
-                <>
-                  <LogIn size={16} /> {_("auth.login")}
-                </>
-              ) : (
-                <>
-                  <UserPlus size={16} /> {_("auth.register")}
-                </>
-              )}
+              <LogIn size={16} /> {submitLabel()}
             </Button>
           </form>
+
+          {mode !== "reset" && (
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-zinc-800" />
+              <span className="text-xs text-zinc-600">{_("auth.or")}</span>
+              <div className="flex-1 h-px bg-zinc-800" />
+            </div>
+          )}
+
+          {mode !== "reset" && (
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              onClick={() => void handleGoogle()}
+              disabled={googleLoading}
+            >
+              <GoogleIcon /> {_("auth.google")}
+            </Button>
+          )}
 
           {demo && (
             <p className="text-[11px] text-zinc-600 text-center">

@@ -76,6 +76,34 @@ export async function signUpWithEmail(email: string, password: string) {
   return data;
 }
 
+export async function signInWithGoogle() {
+  const sb = getSupabase();
+  if (!sb) throw new Error("Supabase no configurado");
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    },
+  });
+  if (error) throw error;
+}
+
+export async function resetPassword(email: string) {
+  const sb = getSupabase();
+  if (!sb) throw new Error("Supabase no configurado");
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/auth/reset`,
+  });
+  if (error) throw error;
+}
+
+export async function updatePassword(password: string) {
+  const sb = getSupabase();
+  if (!sb) throw new Error("Supabase no configurado");
+  const { error } = await sb.auth.updateUser({ password });
+  if (error) throw error;
+}
+
 export async function signOut() {
   const sb = getSupabase();
   if (!sb) return;
