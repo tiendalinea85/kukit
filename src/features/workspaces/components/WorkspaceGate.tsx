@@ -1,10 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useAppStore } from "@/stores/useAppStore";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { WorkspaceSetup } from "./WorkspaceSetup";
 import { WorkspacePicker } from "./WorkspacePicker";
+import { pullWorkspacesFromSupabase } from "@/lib/workspace-sync";
 
 export function WorkspaceGate({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -16,6 +17,18 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
   // Sesión actual: solo se muestra la app tras elegir/crear un workspace.
   const [enteredId, setEnteredId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  // Al tener sesión, bajar workspaces del servidor (cross-device sync) una sola vez.
+  useEffect(() => {
+    if (!user) return;
+    const hasReal = workspaces.some((w) => w.id !== "default");
+    if (hasReal) return;
+    setSyncing(true);
+    pullWorkspacesFromSupabase()
+      .catch(() => {})
+      .finally(() => setSyncing(false));
+  }, [user?.id]);
 
   const created = (id: string) => {
     setActiveWorkspace(id);
@@ -25,6 +38,14 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
   };
 
   if (!user) return <>{children}</>;
+
+  if (syncing) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   const insideWorkspace = enteredId !== null && workspaces.some((w) => w.id === enteredId);
   if (insideWorkspace) {

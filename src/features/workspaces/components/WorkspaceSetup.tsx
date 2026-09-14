@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/Select";
 import { useTranslation } from "@/hooks/useTranslation";
 import { MODEL_MODULES, WORKSPACE_CATEGORIES, useWorkspaceStore, type BusinessModel } from "@/stores/useWorkspaceStore";
 import { seedForWorkspace } from "@/lib/seed";
+import { pushWorkspaceToSupabase } from "@/lib/workspace-sync";
 
 interface Props {
   onCreated: (id: string) => void;
@@ -43,6 +44,8 @@ export function WorkspaceSetup({ onCreated }: Props) {
     });
     setActiveWorkspace(id);
     await seedForWorkspace(id);
+    const ws = useWorkspaceStore.getState().workspaces.find((w) => w.id === id);
+    if (ws) pushWorkspaceToSupabase(ws).catch(() => {});
     onCreated(id);
   };
 
