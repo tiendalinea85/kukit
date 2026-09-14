@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Scan, Menu, Plus, Building2 } from "lucide-react";
+import { Search, Scan, Menu, Plus, Building2, ChevronDown, LayoutGrid } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppStore } from "@/stores/useAppStore";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
@@ -9,10 +9,14 @@ import { SyncIndicator } from "@/components/sync/SyncIndicator";
 
 export function TopBar() {
   const router = useRouter();
-  const { toggleSidebar, online } = useAppStore();
+  const { toggleSidebar, online, openWorkspaceSetup } = useAppStore();
   const [query, setQuery] = useState("");
+  const [wsOpen, setWsOpen] = useState(false);
+  const wsRef = useRef<HTMLDivElement>(null);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
+  const getWorkspaceCategory = useWorkspaceStore((s) => s.getWorkspaceCategory);
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const [focused, setFocused] = useState(false);
 
@@ -22,12 +26,21 @@ export function TopBar() {
   }, [query, router]);
 
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
+    if (!wsOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (wsRef.current && !wsRef.current.contains(e.target as Node)) setWsOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setWsOpen(false);
       if (e.key === "Escape") setFocused(false);
     };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, []);
+    document.addEventListener("mousedown", onDocClick);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [wsOpen]);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-30 bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800/50 safe-area-top">
@@ -81,11 +94,62 @@ export function TopBar() {
             <SyncIndicator />
           </button>
 
-          <div className="relative flex items-center gap-2 min-w-0">
-            <span className="flex items-center gap-1.5 text-xs text-zinc-400 truncate max-w-[90px] sm:max-w-[140px]" title={activeWorkspace?.name ?? "Sin workspace"}>
+          <div className="relative flex items-center gap-2 min-w-0" ref={wsRef}>
+            <button
+              onClick={() => setWsOpen((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-zinc-400 truncate max-w-[110px] sm:max-w-[180px] hover:text-zinc-200 transition-colors"
+              title={activeWorkspace?.name ?? "Sin workspace"}
+            >
               <Building2 size={14} className="text-purple-400 shrink-0" />
               <span className="truncate">{activeWorkspace?.name ?? "Sin workspace"}</span>
-            </span>
+              <ChevronDown size={12} className={`shrink-0 transition-transform ${wsOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            <AnimatePresence>
+              {wsOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setWsOpen(false)} />
+                  <motion.ul
+                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-64 rounded-xl border border-zinc-700/60 bg-zinc-900/95 backdrop-blur-xl shadow-2xl shadow-black/50 py-1.5 z-50 max-h-72 overflow-y-auto"
+                  >
+                    {workspaces.filter((w) => w.id !== "default").map((w) => {
+                      const cat = getWorkspaceCategory(w.id);
+                      return (
+                        <li key={w.id}>
+                          <button
+                            onClick={() => { setActiveWorkspace(w.id); setWsOpen(false); }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors ${
+                              w.id === activeWorkspaceId
+                                ? "bg-purple-600/15 text-purple-300"
+                                : "text-zinc-300 hover:bg-zinc-800/70"
+                            }`}
+                          >
+                            <span className="text-base shrink-0">{cat?.icon ?? "🏠"}</span>
+                            <span className="truncate flex-1">{w.name}</span>
+                            {w.id === activeWorkspaceId && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />}
+                          </button>
+                        </li>
+                      );
+                    })}
+                    <li className="border-t border-zinc-800 mt-1 pt-1">
+                      <button
+                        onClick={() => { setWsOpen(false); openWorkspaceSetup(); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-purple-400 hover:bg-purple-600/10 transition-colors"
+                      >
+                        <Plus size={15} className="shrink-0" />
+                        Nuevo espacio de trabajo
+                        <LayoutGrid size={13} className="ml-auto shrink-0 opacity-60" />
+                      </button>
+                    </li>
+                  </motion.ul>
+                </>
+              )}
+            </AnimatePresence>
+
             <div className={`w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white cursor-pointer shrink-0`}>
               {(activeWorkspace?.name ?? " ").charAt(0).toUpperCase()}
             </div>
