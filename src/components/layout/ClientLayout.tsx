@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { TopBar } from "./TopBar";
 import { BottomNav } from "./BottomNav";
 import { Sidebar } from "./Sidebar";
@@ -14,7 +15,8 @@ import { WorkspaceGate } from "@/features/workspaces/components/WorkspaceGate";
 
 function LayoutInner({ children }: { children: React.ReactNode }) {
   const { setOnline, theme } = useAppStore();
-  const { loading } = useAuth();
+  const { user, loading } = useAuth();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -44,7 +46,19 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 
   if (loading) return <div className="min-h-screen bg-zinc-950 flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" /></div>;
 
-  const isAuthPage = typeof window !== "undefined" && window.location.pathname === "/auth";
+  const isAuthPage = pathname?.startsWith("/auth") ?? false;
+  const configured = isSupabaseConfigured();
+
+  // Sin sesión: si Supabase está configurado y NO estamos en el login,
+  // NO montar el panel de la app (AuthProvider redirige a /auth en un efecto).
+  // Evita ver login + panel superpuestos antes de ingresar.
+  if (configured && !user && !isAuthPage) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   const appChrome = (
     <div className="min-h-screen bg-zinc-950">
