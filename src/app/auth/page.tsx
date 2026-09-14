@@ -212,7 +212,9 @@ export default function AuthPage() {
       } else if (lower.includes("already")) {
         toast.error(_("auth.emailInUse"));
       } else if (lower.includes("not confirmed")) {
-        setNotice(_("auth.checkEmail"));
+        setNotice(_("auth.emailNotConfirmed"));
+      } else if (lower.includes("invalid login credentials")) {
+        toast.error(_("auth.invalidCredentials"));
       } else if (lower.includes("password should be")) {
         toast.error(_("auth.weakPassword"));
       } else if (lower.includes("validate") || lower.includes("invalid")) {

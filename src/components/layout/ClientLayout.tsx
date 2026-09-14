@@ -61,12 +61,16 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   }
 
   const appChrome = (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen w-full bg-zinc-950">
       <TopBar />
       <Sidebar />
-      <main className="pt-[68px] pb-24 lg:pb-8 max-w-lg lg:max-w-5xl mx-auto px-4 lg:ml-64 lg:mr-auto">
-        {children}
+
+      <main className="min-h-screen w-full pt-[68px] pb-24 px-4 lg:pb-8 lg:pl-[272px] lg:pr-6">
+        <div className="w-full min-w-0">
+          {children}
+        </div>
       </main>
+
       <BottomNav />
     </div>
   );
