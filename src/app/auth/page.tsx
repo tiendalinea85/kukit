@@ -28,6 +28,23 @@ function isValidEmail(email: string): boolean {
   return true;
 }
 
+// Tras un timeout del gateway (504) el registro pudo haberse completado igual.
+// Verificamos UNA vez con un sign-in silencioso para no reintentar a ciegas
+// (evita duplicados y 429).
+async function userCreatedAfterTimeout(
+  email: string,
+  password: string
+): Promise<"confirmed" | "unconfirmed" | "unknown"> {
+  try {
+    await signInWithEmail(email, password);
+    return "confirmed";
+  } catch (err) {
+    const lower = (err instanceof Error ? err.message : "").toLowerCase();
+    if (lower.includes("not confirmed")) return "unconfirmed";
+    return "unknown";
+  }
+}
+
 function GoogleIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 48">
@@ -157,7 +174,21 @@ export default function AuthPage() {
       ) {
         // Fallos de red/timeout del gateway (incluido el 504 "Gateway Timeout").
         console.error("[auth] network error:", err);
-        toast.error(_("auth.networkError"));
+        if (mode === "register") {
+          // El timeout no implica que el registro fallara: comprueba si la
+          // cuenta se creó de todos modos antes de mostrar el error.
+          const outcome = await userCreatedAfterTimeout(email, password);
+          if (outcome === "confirmed") {
+            toast.success(_("auth.signupSuccess"));
+            window.location.href = "/";
+          } else if (outcome === "unconfirmed") {
+            setNotice(_("auth.checkEmail"));
+          } else {
+            toast.error(_("auth.networkError"));
+          }
+        } else {
+          toast.error(_("auth.networkError"));
+        }
       } else if (lower.includes("already")) {
         toast.error(_("auth.emailInUse"));
       } else if (lower.includes("not confirmed")) {
