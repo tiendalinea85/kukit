@@ -146,12 +146,15 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Desktop: sidebar fija permanente */}
-      <aside className="flex fixed left-0 top-0 bottom-0 w-64 bg-zinc-900 border-r border-zinc-800 z-[9999] flex-col">
+      {/* Desktop (>= 1024px): sidebar fija y siempre visible.
+          max-lg:hidden lo oculta solo en móvil/tablet para que no aparezcan
+          dos sidebars (este + el drawer). z-[60] > z-30 del TopBar y del
+          contenido, pero por debajo de modales críticos. */}
+      <aside className="max-lg:hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800 z-[60] flex-col">
         {sidebarContent}
       </aside>
 
-      {/* Móvil: overlay animado */}
+      {/* Móvil/tablet: drawer lateral con overlay oscuro */}
       <AnimatePresence>
         {sidebarOpen && (
           <>

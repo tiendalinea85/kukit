@@ -61,16 +61,19 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   }
 
   const appChrome = (
-    <div className="min-h-screen w-full bg-zinc-950">
+    <div className="min-h-screen w-full bg-zinc-950 overflow-x-hidden">
       <TopBar />
       <Sidebar />
 
+      {/* En desktop el contenido ocupa TODO el ancho tras el sidebar (256px),
+          sin max-w-* ni mx-auto. En móvil padding normal con BottomNav. */}
       <main className="min-h-screen w-full pt-[68px] pb-24 px-4 lg:pb-8 lg:pl-[272px] lg:pr-6">
         <div className="w-full min-w-0">
           {children}
         </div>
       </main>
 
+      {/* BottomNav: solo móvil/tablet (lg:hidden), oculto en desktop. */}
       <BottomNav />
     </div>
   );

@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     await supabaseSignOut();
     await clearLocalData();
-    useWorkspaceStore.setState({ workspaces: [], activeWorkspaceId: null });
+    useWorkspaceStore.getState().resetWorkspaces();
     localStorage.removeItem("zane-workspaces");
     localStorage.removeItem("zane-auth");
     localStorage.removeItem("zane-user");

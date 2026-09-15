@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { getCurrentUser, getSupabase } from "@/lib/supabase";
+import { fetchWorkspacesForUser, insertWorkspace } from "@/lib/workspace-sync";
 
 export type BusinessModel =
   | "tailoring"
@@ -21,6 +23,8 @@ export interface Workspace {
   categoryId: string;
   createdAt: string;
 }
+
+export type CreateWorkspaceInput = Pick<Workspace, "name" | "model" | "modules" | "categoryId">;
 
 export interface WorkspaceCategoryItem {
   id: string;
@@ -59,6 +63,8 @@ interface WorkspaceState {
   categories: WorkspaceCategoryItem[];
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
+  loadingWorkspaces: boolean;
+  loadedForUserId: string | null;
 
   addCategory: (c: WorkspaceCategoryItem) => void;
   removeCategory: (id: string) => void;
@@ -70,6 +76,10 @@ interface WorkspaceState {
 
   enableModule: (workspaceId: string, moduleKey: string) => void;
   disableModule: (workspaceId: string, moduleKey: string) => void;
+
+  loadWorkspaces: (userId: string) => Promise<void>;
+  createWorkspace: (input: CreateWorkspaceInput) => Promise<Workspace>;
+  resetWorkspaces: () => void;
 
   getActiveWorkspace: () => Workspace | undefined;
   getWorkspaceCategory: (workspaceId: string) => WorkspaceCategoryItem | undefined;
@@ -83,6 +93,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       categories: [...WORKSPACE_CATEGORIES],
       workspaces: [],
       activeWorkspaceId: null,
+      loadingWorkspaces: false,
+      loadedForUserId: null,
 
       addCategory: (c) =>
         set((s) => ({ categories: [...s.categories, c] })),
@@ -129,6 +141,47 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           ),
         })),
 
+      // Fuente de verdad: Supabase. Reemplaza la lista en memoria con la del
+      // usuario y conserva el workspace activo persistido solo si le pertenece.
+      loadWorkspaces: async (userId) => {
+        const prevActive = get().activeWorkspaceId;
+        set({ loadingWorkspaces: true, loadedForUserId: userId });
+        try {
+          const next = await fetchWorkspacesForUser(userId);
+          const activeWorkspaceId = next.some((w) => w.id === prevActive) ? prevActive : null;
+          set({ workspaces: next, activeWorkspaceId, loadingWorkspaces: false });
+        } catch (err) {
+          set({ loadingWorkspaces: false });
+          throw err;
+        }
+      },
+
+      // Crea en Supabase (si hay sesión) y actualiza el store de inmediato.
+      createWorkspace: async (input) => {
+        const id = crypto.randomUUID();
+        const ws: Workspace = {
+          id,
+          name: input.name,
+          model: input.model,
+          modules: [...input.modules],
+          categoryId: input.categoryId,
+          createdAt: new Date().toISOString(),
+        };
+
+        const sb = getSupabase();
+        const user = await getCurrentUser();
+        if (sb && user) {
+          await insertWorkspace(ws, user.id);
+        }
+
+        set((s) => ({ workspaces: [...s.workspaces, ws] }));
+        set({ activeWorkspaceId: id });
+        return ws;
+      },
+
+      resetWorkspaces: () =>
+        set({ workspaces: [], activeWorkspaceId: null, loadingWorkspaces: false, loadedForUserId: null }),
+
       getActiveWorkspace: () => {
         const { workspaces, activeWorkspaceId } = get();
         return workspaces.find((w) => w.id === activeWorkspaceId);
@@ -149,6 +202,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         return ws?.modules.includes(moduleKey) ?? false;
       },
     }),
-    { name: "zane-workspaces" },
+    {
+      // Solo el workspace activo se persiste localmente (preferencia del
+      // dispositivo). La lista de workspaces SIEMPRE viene de Supabase.
+      name: "zane-workspaces",
+      version: 2,
+      migrate: () => ({ activeWorkspaceId: null }),
+      partialize: (s) => ({ activeWorkspaceId: s.activeWorkspaceId }),
+    },
   ),
 );

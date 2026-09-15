@@ -1,22 +1,15 @@
-import { getSupabase, getCurrentUser } from "./supabase";
-import { useWorkspaceStore, type Workspace } from "@/stores/useWorkspaceStore";
-import { MODEL_MODULES } from "@/stores/useWorkspaceStore";
+import { getSupabase } from "./supabase";
+import type { Workspace } from "@/stores/useWorkspaceStore";
 
 // ===========================================================================
-// SYNC DE WORKSPACES
+// PERSISTENCIA DE WORKSPACES (Supabase = fuente de verdad)
 //
-// A diferencia de las entidades de negocio (syncan via ENTITY_SPECS a tablas
-// Dexie con user_id), los workspaces viven en useWorkspaceStore (zustand +
-// localStorage, una copia por DISPOSITIVO). El resultado es que un workspace
-// creado en el celular no aparece en el PC con la misma cuenta.
+// Los workspaces pertenecen a un usuario autenticado (user_id → auth.users).
+// Este módulo es la ÚNICA capa que toca public.workspaces / workspace_modules
+// desde el frontend. useWorkspaceStore orquesta (load on login, create, reset)
+// llamando a fetchWorkspacesForUser / insertWorkspace.
 //
-// Este módulo sincroniza workspaces por usuario:
-//   - push: al crear un workspace lo sube a public.workspaces (+ modules).
-//   - pull: al entrar a la app baja los del usuario y los fusiona en el store,
-//           deduplicando por nombre (un correo = un workspace, no duplicados).
-//
-// workspace_modules NO tiene user_id, por eso se maneja aquí por separado y
-// no entra en ENTITY_SPECS.
+// NO importa el store en runtime: el store importa este módulo (no hay ciclo).
 // ===========================================================================
 
 /** Uppercase del type de negocio del workspace (PERSONAL/TRABAJO/ESTUDIO/NEGOCIO). */
@@ -30,10 +23,6 @@ const TYPE_BY_CATEGORY: Record<string, string> = {
 
 function asStr(v: unknown, fallback = ""): string {
   return typeof v === "string" ? v : fallback;
-}
-
-function asBool(v: unknown, fallback = false): boolean {
-  return typeof v === "boolean" ? v : fallback;
 }
 
 export function workspaceToPayload(row: Workspace, userId: string): Record<string, unknown> {
@@ -80,53 +69,25 @@ export function workspaceFromRow(row: Record<string, unknown>): Workspace {
 }
 
 // ---------------------------------------------------------------------------
-// PUSH
+// READ: solo los workspaces del usuario (con sus módulos)
 // ---------------------------------------------------------------------------
 
-/** Sube un workspace (re-creado o nuevo) a Supabase para el usuario actual. */
-export async function pushWorkspaceToSupabase(w: Workspace): Promise<void> {
+export async function fetchWorkspacesForUser(userId: string): Promise<Workspace[]> {
   const sb = getSupabase();
-  if (!sb) return;
-  const user = await getCurrentUser();
-  if (!user) return;
-
-  const { error } = await sb
-    .from("workspaces")
-    .upsert(workspaceToPayload(w, user.id), { onConflict: "id" });
-  if (error) throw error;
-
-  if (w.modules.length > 0) {
-    const { error: modErr } = await sb
-      .from("workspace_modules")
-      .upsert(workspaceModulesToPayload(w.id, w.modules), {
-        onConflict: "workspace_id,module_key",
-      });
-    if (modErr) throw modErr;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// PULL (por usuario, dedupe por nombre)
-// ---------------------------------------------------------------------------
-
-export async function pullWorkspacesFromSupabase(): Promise<void> {
-  const sb = getSupabase();
-  if (!sb) return;
-  const user = await getCurrentUser();
-  if (!user) return;
+  if (!sb || !userId) return [];
 
   const { data, error } = await sb
     .from("workspaces")
     .select("*")
-    .eq("user_id", user.id)
-    .eq("deleted", false);
+    .eq("user_id", userId)
+    .eq("deleted", false)
+    .order("created_at", { ascending: true });
   if (error) throw error;
 
-  const serverRows = (data ?? []) as Array<Record<string, unknown>>;
-  if (serverRows.length === 0) return;
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  if (rows.length === 0) return [];
 
-  // Traer modules de los workspaces remotos.
-  const ids = serverRows.map((r) => asStr(r.id)).filter(Boolean);
+  const ids = rows.map((r) => asStr(r.id)).filter(Boolean);
   const modMap = new Map<string, string[]>();
   if (ids.length > 0) {
     const { data: modRows, error: modErr } = await sb
@@ -141,41 +102,36 @@ export async function pullWorkspacesFromSupabase(): Promise<void> {
     }
   }
 
-  const store = useWorkspaceStore.getState();
-  const existingByName = new Map(
-    store.workspaces
-      .filter((w) => w.id !== "default")
-      .map((w) => [w.name.trim().toLowerCase(), w.name]),
-  );
-  // Limpiar el workspace sintético "default" si no lo creó el usuario.
-  const hasRealWorkspace = store.workspaces.some((w) => w.id !== "default");
-
-  for (const row of serverRows) {
-    const ws = workspaceFromRow(row);
+  return rows.map((r) => {
+    const ws = workspaceFromRow(r);
     ws.modules = modMap.get(ws.id) ?? ws.modules;
+    return ws;
+  });
+}
 
-    // Dedupe por nombre: si ya existe localmente un workspace con ese nombre
-    // (p. ej. creado en este dispositivo), NO creamos un duplicado.
-    const key = ws.name.trim().toLowerCase();
-    const sameId = store.workspaces.some((w) => w.id === ws.id);
-    if (sameId) continue;
-    if (existingByName.has(key)) {
-      // Ancla el id remoto al workspace local existente para no duplicar.
-      store.updateWorkspace(existingByName.get(key)!, {});
-      continue;
-    }
-    useWorkspaceStore.setState((s) => ({
-      workspaces: [...s.workspaces.filter((w) => w.id !== "default"), ws],
-    }));
-  }
+// ---------------------------------------------------------------------------
+// WRITE: crea el workspace + sus módulos (INSERT, no upsert: id genera el cliente)
+// ---------------------------------------------------------------------------
 
-  // Si no había un workspace local y el usuario sí tiene en la nube, activar
-  // automáticamente el primero remoto para no forzar la creación duplicada.
-  if (!hasRealWorkspace) {
-    const { workspaces } = useWorkspaceStore.getState();
-    const first = workspaces.find((w) => w.id !== "default");
-    if (first) {
-      useWorkspaceStore.getState().setActiveWorkspace(first.id);
+export async function insertWorkspace(ws: Workspace, userId: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) return;
+
+  const { error } = await sb.from("workspaces").insert(workspaceToPayload(ws, userId));
+  if (error) throw error;
+
+  if (ws.modules.length === 0) return;
+
+  const { error: modErr } = await sb
+    .from("workspace_modules")
+    .insert(workspaceModulesToPayload(ws.id, ws.modules));
+  if (modErr) {
+    // Rollback: borrar el workspace para no dejar un huérfano sin módulos.
+    try {
+      await sb.from("workspaces").delete().eq("id", ws.id);
+    } catch {
+      // sin importar el resultado, el error original es el que se propaga
     }
+    throw modErr;
   }
 }

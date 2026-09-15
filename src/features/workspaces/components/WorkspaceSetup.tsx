@@ -1,14 +1,13 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Building2, Sparkles } from "lucide-react";
+import { AlertCircle, Building2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { useTranslation } from "@/hooks/useTranslation";
 import { MODEL_MODULES, WORKSPACE_CATEGORIES, useWorkspaceStore, type BusinessModel } from "@/stores/useWorkspaceStore";
 import { seedForWorkspace } from "@/lib/seed";
-import { pushWorkspaceToSupabase } from "@/lib/workspace-sync";
 
 interface Props {
   onCreated: (id: string) => void;
@@ -22,9 +21,9 @@ export function WorkspaceSetup({ onCreated }: Props) {
   const [model, setModel] = useState<BusinessModel>("general");
   const [category, setCategory] = useState(WORKSPACE_CATEGORIES[0].id);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
 
-  const addWorkspace = useWorkspaceStore((s) => s.addWorkspace);
-  const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
+  const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
 
   const canSubmit = name.trim().length > 0 && !loading;
 
@@ -33,20 +32,20 @@ export function WorkspaceSetup({ onCreated }: Props) {
     if (!canSubmit) return;
 
     setLoading(true);
-    const id = crypto.randomUUID();
-    addWorkspace({
-      id,
-      name: name.trim(),
-      model,
-      modules: [...MODEL_MODULES[model]],
-      categoryId: category,
-      createdAt: new Date().toISOString(),
-    });
-    setActiveWorkspace(id);
-    await seedForWorkspace(id);
-    const ws = useWorkspaceStore.getState().workspaces.find((w) => w.id === id);
-    if (ws) pushWorkspaceToSupabase(ws).catch(() => {});
-    onCreated(id);
+    setError(false);
+    try {
+      const ws = await createWorkspace({
+        name: name.trim(),
+        model,
+        modules: [...MODEL_MODULES[model]],
+        categoryId: category,
+      });
+      await seedForWorkspace(ws.id);
+      onCreated(ws.id);
+    } catch {
+      setError(true);
+      setLoading(false);
+    }
   };
 
   return (
@@ -107,6 +106,13 @@ export function WorkspaceSetup({ onCreated }: Props) {
               ))}
             </div>
           </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-300">
+              <AlertCircle size={14} className="shrink-0" />
+              {t("workspace.createError")}
+            </div>
+          )}
 
           <Button type="submit" size="lg" className="w-full" loading={loading} disabled={!canSubmit}>
             {loading ? t("workspace.creating") : t("workspace.create")}

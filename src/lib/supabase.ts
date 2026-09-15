@@ -1,4 +1,5 @@
-import { createClient, SupabaseClient, User } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 let _supabase: SupabaseClient | null = null;
 let _currentUser: User | null = null;

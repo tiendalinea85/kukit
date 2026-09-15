@@ -31,8 +31,10 @@ export function TopBar() {
       if (wsRef.current && !wsRef.current.contains(e.target as Node)) setWsOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setWsOpen(false);
-      if (e.key === "Escape") setFocused(false);
+      if (e.key === "Escape") {
+        setWsOpen(false);
+        setFocused(false);
+      }
     };
     document.addEventListener("mousedown", onDocClick);
     window.addEventListener("keydown", onKey);
@@ -44,8 +46,11 @@ export function TopBar() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-30 bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800/50 safe-area-top">
-      <div className="max-w-lg mx-auto px-4 py-3 lg:max-w-full lg:mx-0 lg:ml-64 lg:mr-0 lg:px-6">
+      {/* En desktop el header cubre el área tras el sidebar (256px), en móvil
+          ocupa todo el ancho. Sin max-w-lg ni mx-auto en pantallas grandes. */}
+      <div className="px-4 py-3 lg:pl-[272px] lg:pr-6">
         <div className="flex items-center gap-3">
+          {/* Hamburguesa: solo en móvil/tablet. En desktop el sidebar está fijo. */}
           <button onClick={toggleSidebar} className="p-1.5 rounded-xl hover:bg-zinc-800 text-zinc-400 lg:hidden">
             <Menu size={22} />
           </button>

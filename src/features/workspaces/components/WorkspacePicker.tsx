@@ -1,6 +1,6 @@
 "use client";
 import { motion } from "framer-motion";
-import { Building2, ChevronRight, LayoutGrid, Plus } from "lucide-react";
+import { Building2, Check, ChevronRight, LayoutGrid, Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
@@ -14,6 +14,7 @@ export function WorkspacePicker({ onEnter, onCreate }: Props) {
   const { t } = useTranslation();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const getWorkspaceCategory = useWorkspaceStore((s) => s.getWorkspaceCategory);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   // Solo se muestran los espacios creados por el usuario (nunca el "default").
   const visible = workspaces.filter((w) => w.id !== "default");
@@ -41,14 +42,20 @@ export function WorkspacePicker({ onEnter, onCreate }: Props) {
             {t("workspace.noWorkspaces")}
           </div>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-2 max-h-[50vh] overflow-y-auto">
             {visible.map((w) => {
               const cat = getWorkspaceCategory(w.id);
+              const isActive = w.id === activeWorkspaceId;
               return (
                 <li key={w.id}>
                   <button
                     onClick={() => onEnter(w.id)}
-                    className="w-full flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-800/40 hover:bg-zinc-800 px-4 py-3 text-left transition-colors"
+                    className={
+                      "w-full flex items-center gap-3 rounded-xl border bg-zinc-800/40 hover:bg-zinc-800 px-4 py-3 text-left transition-colors " +
+                      (isActive
+                        ? "border-purple-600/50 ring-1 ring-purple-600/30"
+                        : "border-zinc-800")
+                    }
                   >
                     <span className="flex items-center justify-center w-11 h-11 rounded-xl bg-purple-600/15 border border-purple-600/25 text-xl shrink-0">
                       {cat?.icon ?? <Building2 size={20} className="text-purple-400" />}
@@ -59,7 +66,11 @@ export function WorkspacePicker({ onEnter, onCreate }: Props) {
                         {cat?.name ?? ""} · {w.modules.length} {t("workspace.modules")}
                       </span>
                     </span>
-                    <ChevronRight size={18} className="text-zinc-500 shrink-0" />
+                    {isActive ? (
+                      <Check size={18} className="text-purple-400 shrink-0" />
+                    ) : (
+                      <ChevronRight size={18} className="text-zinc-500 shrink-0" />
+                    )}
                   </button>
                 </li>
               );
