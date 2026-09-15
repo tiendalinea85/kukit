@@ -50,6 +50,13 @@ function getModuleForHref(href: string): string | undefined {
   return undefined;
 }
 
+const brand = (right: React.ReactNode) => (
+  <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+    <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Zane</span>
+    {right}
+  </div>
+);
+
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, toggleSidebar, openWorkspaceSetup } = useAppStore();
@@ -69,92 +76,97 @@ export function Sidebar() {
     return isModuleEnabled(mod);
   });
 
-  const sidebarContent = (
-    <>
-      <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-        <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Zane</span>
-        <button onClick={toggleSidebar} className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 md:hidden">
-          <X size={20} />
-        </button>
-      </div>
+  const nav = (
+    <nav className="flex-1 p-3 space-y-1 overflow-y-auto mt-2">
+      {visibleLinks.map((link) => {
+        const active = pathname === link.href;
+        return (
+          <Link key={link.href} href={link.href} onClick={toggleSidebar}
+            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all ${
+              active ? "bg-purple-600/20 text-purple-400" : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+            }`}
+          >
+            <link.icon size={18} />
+            {link.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
 
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto mt-2">
-        {visibleLinks.map((link) => {
-          const active = pathname === link.href;
-          return (
-            <Link key={link.href} href={link.href} onClick={toggleSidebar}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all ${
-                active ? "bg-purple-600/20 text-purple-400" : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-              }`}
-            >
-              <link.icon size={18} />
-              {link.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="relative px-3 pb-2">
-        <button
-          onClick={() => setWorkspaceOpen((v) => !v)}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 transition-colors"
-        >
-          <Building2 size={16} className="text-purple-400 shrink-0" />
-          <span className="truncate flex-1 text-left">{activeWorkspace?.name ?? "Sin workspace"}</span>
-          <ChevronDown size={14} className={`shrink-0 transition-transform ${workspaceOpen ? "rotate-180" : ""}`} />
-        </button>
-        <AnimatePresence>
-          {workspaceOpen && (
-            <motion.ul
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              className="absolute left-3 right-3 bottom-full mb-1 bg-zinc-800 border border-zinc-700 rounded-xl shadow-lg overflow-hidden z-50 max-h-48 overflow-y-auto"
-            >
-              {workspaces.filter((w) => w.id !== "default").map((w) => (
-                <li key={w.id}>
-                  <button
-                    onClick={() => { setActiveWorkspace(w.id); setWorkspaceOpen(false); }}
-                    className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                      w.id === activeWorkspaceId
-                        ? "bg-purple-600/20 text-purple-400"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50"
-                    }`}
-                  >
-                    {w.name}
-                  </button>
-                </li>
-              ))}
-              <li className="border-t border-zinc-700/60 mt-1 pt-1">
+  const workspaceDropdown = (
+    <div className="relative px-3 pb-2">
+      <button
+        onClick={() => setWorkspaceOpen((v) => !v)}
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 transition-colors"
+      >
+        <Building2 size={16} className="text-purple-400 shrink-0" />
+        <span className="truncate flex-1 text-left">{activeWorkspace?.name ?? "Sin workspace"}</span>
+        <ChevronDown size={14} className={`shrink-0 transition-transform ${workspaceOpen ? "rotate-180" : ""}`} />
+      </button>
+      <AnimatePresence>
+        {workspaceOpen && (
+          <motion.ul
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="absolute left-3 right-3 bottom-full mb-1 bg-zinc-800 border border-zinc-700 rounded-xl shadow-lg overflow-hidden z-50 max-h-48 overflow-y-auto"
+          >
+            {workspaces.filter((w) => w.id !== "default").map((w) => (
+              <li key={w.id}>
                 <button
-                  onClick={() => { setWorkspaceOpen(false); toggleSidebar(); openWorkspaceSetup(); }}
-                  className="w-full text-left px-3 py-2 text-sm text-purple-400 hover:text-purple-300 hover:bg-purple-600/10 flex items-center gap-2 transition-colors"
+                  onClick={() => { setActiveWorkspace(w.id); setWorkspaceOpen(false); }}
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                    w.id === activeWorkspaceId
+                      ? "bg-purple-600/20 text-purple-400"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50"
+                  }`}
                 >
-                  <Plus size={14} />
-                  Nuevo espacio de trabajo
+                  {w.name}
                 </button>
               </li>
-            </motion.ul>
-          )}
-        </AnimatePresence>
-      </div>
-      <div className="p-4 border-t border-zinc-800 text-xs text-zinc-600 text-center">
-        Zane v1.0.0
-      </div>
-    </>
+            ))}
+            <li className="border-t border-zinc-700/60 mt-1 pt-1">
+              <button
+                onClick={() => { setWorkspaceOpen(false); toggleSidebar(); openWorkspaceSetup(); }}
+                className="w-full text-left px-3 py-2 text-sm text-purple-400 hover:text-purple-300 hover:bg-purple-600/10 flex items-center gap-2 transition-colors"
+              >
+                <Plus size={14} />
+                Nuevo espacio de trabajo
+              </button>
+            </li>
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+
+  const footer = (
+    <div className="px-4 py-3 border-t border-zinc-800 text-xs text-zinc-600 text-center">
+      Zane v1.0.0
+    </div>
   );
 
   return (
     <>
-      {/* Desktop (>= 768px): sidebar fija y siempre visible.
-          max-md:hidden lo oculta solo en móvil para que no aparezcan
-          dos sidebars (este + el drawer). z-[60] > z-30 del TopBar y del
-          contenido, pero por debajo de modales críticos. */}
-      <aside className="max-md:hidden md:flex fixed left-0 top-0 bottom-0 w-64 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800 z-[60] flex-col">
-        {sidebarContent}
+      {/*
+        DESKTOP (>= 1024px): sidebar permanente.
+        El gating lo hace la clase CSS propia .zane-desktop-sidebar
+        (ver globals.css), no utilidades Tailwind. No es un drawer:
+        no depende de sidebarOpen, no tiene botón X y no se anima.
+      */}
+      <aside className="zane-desktop-sidebar">
+        {brand(null)}
+        {nav}
+        {workspaceDropdown}
+        {footer}
       </aside>
 
-      {/* Móvil/tablet: drawer lateral con overlay oscuro */}
+      {/*
+        MOBILE (< 1024px): drawer lateral abierto por sidebarOpen.
+        .zane-mobile-sidebar / .zane-mobile-overlay se ocultan con
+        display:none !important en pantallas >= 1024px.
+      */}
       <AnimatePresence>
         {sidebarOpen && (
           <>
@@ -162,7 +174,7 @@ export function Sidebar() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 z-40 md:hidden"
+              className="zane-mobile-overlay"
               onClick={toggleSidebar}
             />
             <motion.aside
@@ -170,9 +182,16 @@ export function Sidebar() {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed left-0 top-0 bottom-0 w-64 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800 z-50 flex flex-col md:hidden"
+              className="zane-mobile-sidebar"
             >
-              {sidebarContent}
+              {brand(
+                <button onClick={toggleSidebar} className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400">
+                  <X size={20} />
+                </button>,
+              )}
+              {nav}
+              {workspaceDropdown}
+              {footer}
             </motion.aside>
           </>
         )}

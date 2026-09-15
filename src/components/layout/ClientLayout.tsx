@@ -66,14 +66,15 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
       <Sidebar />
 
       {/* En desktop el contenido ocupa TODO el ancho tras el sidebar (256px),
-          sin max-w-* ni mx-auto. En móvil padding normal con BottomNav. */}
-      <main className="min-h-screen w-full pt-[68px] pb-24 px-4 md:pb-8 md:pl-[272px] md:pr-6">
+          sin max-w-* ni mx-auto; en móvil padding normal con BottomNav.
+          El padding lo impone .zane-main-area (globals.css). */}
+      <main className="zane-main-area">
         <div className="w-full min-w-0">
           {children}
         </div>
       </main>
 
-      {/* BottomNav: solo móvil (md:hidden), oculto en desktop/tablet. */}
+      {/* BottomNav: solo móvil (< 1024px), oculto en desktop (.zane-mobile-bottomnav). */}
       <BottomNav />
     </div>
   );

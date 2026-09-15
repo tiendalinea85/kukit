@@ -46,12 +46,13 @@ export function TopBar() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-30 bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800/50 safe-area-top">
-      {/* En desktop el header cubre el área tras el sidebar (256px), en móvil
-          ocupa todo el ancho. Sin max-w-lg ni mx-auto en pantallas grandes. */}
-      <div className="px-4 py-3 md:pl-[272px] md:pr-6">
+      {/* En desktop el TopBar ocupa el ancho restante tras el sidebar (256px),
+          sin max-w-* ni mx-auto; en móvil todo el ancho. El padding lo impone
+          la clase propia .zane-topbar-inner (globals.css). */}
+      <div className="zane-topbar-inner">
         <div className="flex items-center gap-3">
-          {/* Hamburguesa: solo en móvil. En desktop el sidebar está fijo. */}
-          <button onClick={toggleSidebar} className="p-1.5 rounded-xl hover:bg-zinc-800 text-zinc-400 md:hidden">
+          {/* Hamburguesa: solo móvil (< 1024px). En desktop no existe. */}
+          <button onClick={toggleSidebar} className="zane-topbar-hamburger p-1.5 rounded-xl hover:bg-zinc-800 text-zinc-400">
             <Menu size={22} />
           </button>
 
