@@ -10,7 +10,7 @@ const translations = {
     investmentForm: { newInvestment: "Nueva Inversión", editInvestment: "Editar Inversión", name: "Nombre", value: "Valor", category: "Categoría", supplier: "Proveedor (opcional)", paymentMethod: "Método de Pago", status: "Estado", date: "Fecha", notes: "Observaciones", save: "Guardar", cancel: "Cancelar", delete: "Eliminar" },
     delete: { title: "Eliminar Gasto", confirm: "¿Eliminar el gasto", cancel: "Cancelar" },
     reports: { title: "Reportes", total: "Total", records: "Registros", average: "Promedio", topCategory: "Categoría con mayor gasto", bar: "Barras", pie: "Circular", line: "Líneas", custom: "Personalizado" },
-    settings: { title: "Configuración", appearance: "Apariencia", darkMode: "Modo oscuro", enabled: "Activado", disabled: "Desactivado", language: "Idioma", data: "Datos", sync: "Sincronizar", online: "En línea", offline: "Sin conexión", exportCSV: "Exportar CSV", exportBackup: "Exportar respaldo", importData: "Importar datos", user: "Usuario", logout: "Cerrar sesión", logoutConfirm: "¿Seguro que quieres cerrar sesión?", version: "Zane v1.0.0 • Hecho con 💜" },
+    settings: { title: "Configuración", appearance: "Apariencia", darkMode: "Modo oscuro", enabled: "Activado", disabled: "Desactivado", language: "Idioma", data: "Datos", sync: "Sincronizar", online: "En línea", offline: "Sin conexión", exportCSV: "Exportar CSV", exportBackup: "Exportar respaldo", importData: "Importar datos", user: "Usuario", loadingUser: "Cargando...", notAuthenticated: "No autenticado", logout: "Cerrar sesión", logoutConfirm: "¿Seguro que quieres cerrar sesión?", version: "Zane v1.0.0 • Hecho con 💜" },
     categories: { title: "Categorías", new: "Nueva", edit: "Editar Categoría", create: "Nueva Categoría", noCategories: "No hay categorías. Crea la primera.", created: "Categoría creada", updated: "Categoría actualizada", deleted: "Categoría eliminada" },
     types: { title: "Tipos", new: "Nuevo", edit: "Editar Tipo", create: "Nuevo Tipo", noTypes: "No hay tipos. Crea el primero.", created: "Tipo creado", updated: "Tipo actualizado", deleted: "Tipo eliminado" },
     trash: { title: "Papelera", description: "Los gastos eliminados se pueden recuperar.", empty: "La papelera está vacía", restored: "Gasto restaurado", deletedPermanent: "Gasto eliminado permanentemente" },
@@ -36,6 +36,10 @@ const translations = {
       createNew: "Nuevo espacio de trabajo",
       noWorkspaces: "Aún no tienes espacios de trabajo creados.",
       modelNames: { personal: "Personal", general: "General", commerce: "Comercio", services: "Servicios", tailoring: "Confección", agriculture: "Agrícola", automotive_parts: "Autopartes", breeding: "Crianza" },
+    },
+    pwa: {
+      updateAvailable: "Nueva versión disponible",
+      update: "Actualizar",
     },
     voice: {
       title: "Asistente por voz",
@@ -80,7 +84,7 @@ const translations = {
     investmentForm: { newInvestment: "New Investment", editInvestment: "Edit Investment", name: "Name", value: "Value", category: "Category", supplier: "Supplier (optional)", paymentMethod: "Payment Method", status: "Status", date: "Date", notes: "Notes", save: "Save", cancel: "Cancel", delete: "Delete" },
     delete: { title: "Delete Expense", confirm: "Delete expense", cancel: "Cancel" },
     reports: { title: "Reports", total: "Total", records: "Records", average: "Average", topCategory: "Top spending category", bar: "Bar", pie: "Pie", line: "Line", custom: "Custom" },
-    settings: { title: "Settings", appearance: "Appearance", darkMode: "Dark mode", enabled: "Enabled", disabled: "Disabled", language: "Language", data: "Data", sync: "Sync", online: "Online", offline: "Offline", exportCSV: "Export CSV", exportBackup: "Export backup", importData: "Import data", user: "User", logout: "Log out", logoutConfirm: "Are you sure you want to log out?", version: "Zane v1.0.0 • Made with 💜" },
+    settings: { title: "Settings", appearance: "Appearance", darkMode: "Dark mode", enabled: "Enabled", disabled: "Disabled", language: "Language", data: "Data", sync: "Sync", online: "Online", offline: "Offline", exportCSV: "Export CSV", exportBackup: "Export backup", importData: "Import data", user: "User", loadingUser: "Loading...", notAuthenticated: "Not authenticated", logout: "Log out", logoutConfirm: "Are you sure you want to log out?", version: "Zane v1.0.0 • Made with 💜" },
     categories: { title: "Categories", new: "New", edit: "Edit Category", create: "New Category", noCategories: "No categories. Create the first one.", created: "Category created", updated: "Category updated", deleted: "Category deleted" },
     types: { title: "Types", new: "New", edit: "Edit Type", create: "New Type", noTypes: "No types. Create the first one.", created: "Type created", updated: "Type updated", deleted: "Type deleted" },
     trash: { title: "Trash", description: "Deleted expenses can be recovered.", empty: "Trash is empty", restored: "Expense restored", deletedPermanent: "Expense permanently deleted" },
@@ -106,6 +110,10 @@ const translations = {
       createNew: "New workspace",
       noWorkspaces: "You don't have any workspace yet.",
       modelNames: { personal: "Personal", general: "General", commerce: "Commerce", services: "Services", tailoring: "Tailoring", agriculture: "Agriculture", automotive_parts: "Auto parts", breeding: "Breeding" },
+    },
+    pwa: {
+      updateAvailable: "New version available",
+      update: "Update",
     },
     voice: {
       title: "Voice Assistant",

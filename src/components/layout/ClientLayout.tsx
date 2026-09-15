@@ -7,15 +7,18 @@ import { Sidebar } from "./Sidebar";
 import { useAppStore } from "@/stores/useAppStore";
 import { startSyncEngine, stopSyncEngine, useSyncStore } from "@/lib/sync";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { registerPWA } from "@/lib/pwa";
 import { seedIfEmpty } from "@/lib/seed";
-import { Toaster } from "react-hot-toast";
+import { Toaster, toast } from "react-hot-toast";
 import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
 import { VoiceAssistant } from "@/components/voice/VoiceAssistant";
 import { WorkspaceGate } from "@/features/workspaces/components/WorkspaceGate";
+import { useTranslation } from "@/hooks/useTranslation";
 
 function LayoutInner({ children }: { children: React.ReactNode }) {
   const { setOnline, theme } = useAppStore();
   const { user, loading } = useAuth();
+  const { t: _ } = useTranslation();
   const pathname = usePathname();
 
   useEffect(() => {
@@ -28,12 +31,26 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        /* sin SW el offline parcial sigue funcionando vía cache HTTP */
-      });
-    }
-  }, []);
+    registerPWA((apply) => {
+      toast(
+        (t) => (
+          <div className="flex items-center gap-3">
+            <span className="flex-1">{_("pwa.updateAvailable")}</span>
+            <button
+              onClick={() => {
+                toast.dismiss(t.id);
+                apply();
+              }}
+              className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-500 transition-colors"
+            >
+              {_("pwa.update")}
+            </button>
+          </div>
+        ),
+        { duration: Infinity }
+      );
+    });
+  }, [_]);
 
   useEffect(() => {
     const unsub = useSyncStore.subscribe((state) => setOnline(state.online));

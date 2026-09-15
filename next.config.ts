@@ -67,8 +67,19 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
   output: "standalone",
   poweredByHeader: false,
-  async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders() }];
+async headers() {
+    return [
+      { source: "/(.*)", headers: securityHeaders() },
+      {
+        // El Service Worker debe revalidarse SIEMPRE contra la red (es un
+        // fichero sin hash cuyo cambio dispara la actualización de la PWA).
+        // "no-cache" permite guardarlo pero obliga a revalidarlo: sin esto,
+        // Safari/iOS puede servir una versión vieja de sw.js y la app nunca
+        // detecta las nuevas versiones publicadas.
+        source: "/sw.js",
+        headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }],
+      },
+    ];
   },
 };
 

@@ -12,11 +12,25 @@ import { useTranslation } from "@/hooks/useTranslation";
 
 export default function SettingsPage() {
   const { theme, setTheme, language, setLanguage, online } = useAppStore();
-  const { signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const { t: _ } = useTranslation();
   const sync = useSyncStore();
   const backend = "Supabase";
   const configured = isSupabaseConfigured();
+
+  const displayName = (() => {
+    if (!user) return "";
+    const meta = user.user_metadata as Record<string, unknown> | undefined;
+    const fullName = typeof meta?.full_name === "string" ? meta.full_name : "";
+    if (fullName.trim()) return fullName.trim();
+    const name = typeof meta?.name === "string" ? meta.name : "";
+    if (name.trim()) return name.trim();
+    const emailLocal = (user.email ?? "").split("@")[0];
+    if (emailLocal.trim()) return emailLocal.trim();
+    return _("settings.user");
+  })();
+
+  const avatarLetter = displayName ? displayName.charAt(0).toUpperCase() : "?";
 
   const handleLogout = async () => {
     if (!window.confirm(_("settings.logoutConfirm"))) return;
@@ -163,12 +177,23 @@ export default function SettingsPage() {
       <h1 className="text-xl font-bold">{_("settings.title")}</h1>
 
       <div className="flex items-center gap-3 p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/60">
-        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xl font-bold text-white">
-          U
+        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xl font-bold text-white shrink-0">
+          {loading ? <span className="animate-pulse">…</span> : avatarLetter}
         </div>
-        <div>
-          <p className="font-medium">{_("settings.user")}</p>
-          <p className="text-xs text-zinc-500">usuario@email.com</p>
+        <div className="min-w-0">
+          {loading ? (
+            <p className="font-medium">{_("settings.loadingUser")}</p>
+          ) : user ? (
+            <>
+              <p className="font-medium truncate">{displayName}</p>
+              {user.email && <p className="text-xs text-zinc-500 truncate">{user.email}</p>}
+            </>
+          ) : (
+            <>
+              <p className="font-medium">{_("settings.user")}</p>
+              <p className="text-xs text-zinc-500">{_("settings.notAuthenticated")}</p>
+            </>
+          )}
         </div>
         <div className="flex flex-col items-end gap-1 ml-auto">
           <div className={`px-3 py-1 rounded-full text-xs ${
