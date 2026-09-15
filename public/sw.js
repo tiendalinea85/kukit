@@ -1,4 +1,4 @@
-const CACHE_NAME = "zane-cache-v6";
+const CACHE_NAME = "zane-cache-v7";
 
 const STATIC_ASSETS = [
   "/",

@@ -48,10 +48,10 @@ export function TopBar() {
     <header className="fixed top-0 left-0 right-0 z-30 bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800/50 safe-area-top">
       {/* En desktop el header cubre el área tras el sidebar (256px), en móvil
           ocupa todo el ancho. Sin max-w-lg ni mx-auto en pantallas grandes. */}
-      <div className="px-4 py-3 lg:pl-[272px] lg:pr-6">
+      <div className="px-4 py-3 md:pl-[272px] md:pr-6">
         <div className="flex items-center gap-3">
-          {/* Hamburguesa: solo en móvil/tablet. En desktop el sidebar está fijo. */}
-          <button onClick={toggleSidebar} className="p-1.5 rounded-xl hover:bg-zinc-800 text-zinc-400 lg:hidden">
+          {/* Hamburguesa: solo en móvil. En desktop el sidebar está fijo. */}
+          <button onClick={toggleSidebar} className="p-1.5 rounded-xl hover:bg-zinc-800 text-zinc-400 md:hidden">
             <Menu size={22} />
           </button>
 

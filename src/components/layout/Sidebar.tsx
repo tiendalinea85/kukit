@@ -73,7 +73,7 @@ export function Sidebar() {
     <>
       <div className="flex items-center justify-between p-4 border-b border-zinc-800">
         <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Zane</span>
-        <button onClick={toggleSidebar} className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 lg:hidden">
+        <button onClick={toggleSidebar} className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 md:hidden">
           <X size={20} />
         </button>
       </div>
@@ -146,11 +146,11 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Desktop (>= 1024px): sidebar fija y siempre visible.
-          max-lg:hidden lo oculta solo en móvil/tablet para que no aparezcan
+      {/* Desktop (>= 768px): sidebar fija y siempre visible.
+          max-md:hidden lo oculta solo en móvil para que no aparezcan
           dos sidebars (este + el drawer). z-[60] > z-30 del TopBar y del
           contenido, pero por debajo de modales críticos. */}
-      <aside className="max-lg:hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800 z-[60] flex-col">
+      <aside className="max-md:hidden md:flex fixed left-0 top-0 bottom-0 w-64 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800 z-[60] flex-col">
         {sidebarContent}
       </aside>
 
@@ -162,7 +162,7 @@ export function Sidebar() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+              className="fixed inset-0 bg-black/50 z-40 md:hidden"
               onClick={toggleSidebar}
             />
             <motion.aside
@@ -170,7 +170,7 @@ export function Sidebar() {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed left-0 top-0 bottom-0 w-64 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800 z-50 flex flex-col lg:hidden"
+              className="fixed left-0 top-0 bottom-0 w-64 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800 z-50 flex flex-col md:hidden"
             >
               {sidebarContent}
             </motion.aside>

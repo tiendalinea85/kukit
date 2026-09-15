@@ -67,13 +67,13 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 
       {/* En desktop el contenido ocupa TODO el ancho tras el sidebar (256px),
           sin max-w-* ni mx-auto. En móvil padding normal con BottomNav. */}
-      <main className="min-h-screen w-full pt-[68px] pb-24 px-4 lg:pb-8 lg:pl-[272px] lg:pr-6">
+      <main className="min-h-screen w-full pt-[68px] pb-24 px-4 md:pb-8 md:pl-[272px] md:pr-6">
         <div className="w-full min-w-0">
           {children}
         </div>
       </main>
 
-      {/* BottomNav: solo móvil/tablet (lg:hidden), oculto en desktop. */}
+      {/* BottomNav: solo móvil (md:hidden), oculto en desktop/tablet. */}
       <BottomNav />
     </div>
   );
