@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { AlertCircle, Building2, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowLeft, Building2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -11,11 +11,12 @@ import { seedForWorkspace } from "@/lib/seed";
 
 interface Props {
   onCreated: (id: string) => void;
+  onCancel?: () => void;
 }
 
 const MODEL_KEYS = Object.keys(MODEL_MODULES) as BusinessModel[];
 
-export function WorkspaceSetup({ onCreated }: Props) {
+export function WorkspaceSetup({ onCreated, onCancel }: Props) {
   const { t } = useTranslation();
   const [name, setName] = useState("");
   const [model, setModel] = useState<BusinessModel>("general");
@@ -56,6 +57,12 @@ export function WorkspaceSetup({ onCreated }: Props) {
         className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6 space-y-6"
       >
         <div className="space-y-1">
+          {onCancel && (
+            <Button variant="ghost" size="sm" className="-ml-2 mb-1" onClick={onCancel}>
+              <ArrowLeft size={16} />
+              {t("workspace.back")}
+            </Button>
+          )}
           <div className="flex items-center gap-2">
             <Building2 size={22} className="text-purple-400" />
             <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">

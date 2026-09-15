@@ -48,6 +48,11 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
     closeWorkspaceSetup();
   };
 
+  const cancelCreation = () => {
+    setCreating(false);
+    closeWorkspaceSetup();
+  };
+
   if (!user) return <>{children}</>;
 
   if (loadingWorkspaces) {
@@ -61,14 +66,14 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
   const insideWorkspace = enteredId !== null && workspaces.some((w) => w.id === enteredId);
   if (insideWorkspace) {
     if (workspaceSetupOpen) {
-      return <WorkspaceSetup onCreated={created} />;
+      return <WorkspaceSetup onCreated={created} onCancel={cancelCreation} />;
     }
     return <>{children}</>;
   }
 
   const visible = workspaces.filter((w) => w.id !== "default");
   if (creating || visible.length === 0) {
-    return <WorkspaceSetup onCreated={created} />;
+    return <WorkspaceSetup onCreated={created} onCancel={cancelCreation} />;
   }
 
   return (
