@@ -1,4 +1,4 @@
-import type { Expense, ExpenseStatus, PaymentMethod } from "@/types";
+import type { Expense, ExpenseDetail, ExpenseDetailInput, ExpenseStatus, PaymentMethod } from "@/types";
 
 export const EXPENSE_STATUSES = ["pagado", "pendiente", "anulado"] as const satisfies readonly ExpenseStatus[];
 
@@ -23,6 +23,39 @@ export interface NewExpenseInput {
   notes?: string;
   receiptPhoto?: string;
   workspaceId?: string;
+}
+
+export function computeSubtotal(quantity: number, unitPrice: number): number {
+  return Math.round(quantity * unitPrice * 100) / 100;
+}
+
+export function computeExpenseTotal(details: ExpenseDetailInput[]): number {
+  return Math.round(
+    details.reduce((sum, d) => sum + computeSubtotal(d.quantity, d.unitPrice), 0) * 100,
+  ) / 100;
+}
+
+export function buildExpenseDetail(input: {
+  data: ExpenseDetailInput;
+  expenseId: string;
+  workspaceId: string;
+  now: string;
+}): ExpenseDetail {
+  const { data, expenseId, workspaceId, now } = input;
+  return {
+    id: crypto.randomUUID(),
+    workspaceId,
+    expenseId,
+    productId: data.productId,
+    code: data.code,
+    name: data.name,
+    color: data.color,
+    quantity: data.quantity,
+    unitPrice: data.unitPrice,
+    subtotal: computeSubtotal(data.quantity, data.unitPrice),
+    createdAt: now,
+    syncStatus: "pending",
+  };
 }
 
 export function canEditExpense(status: ExpenseStatus): boolean {

@@ -4,29 +4,49 @@ import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, Lock } from "lucide-react";
 import { ExpenseForm } from "@/features/expenses/components/ExpenseForm";
-import { updateExpense } from "@/features/expenses/services/expenseService";
+import { updateExpense, listExpenseDetails } from "@/features/expenses/services/expenseService";
+import { useExpenseProducts } from "@/features/expenses/hooks/useExpenseProducts";
 import { isVoided } from "@/features/expenses/domain/expenseRules";
 import { db } from "@/lib/db";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
 import type { ExpenseFormData } from "@/features/expenses/schemas/expenseSchema";
-import type { Expense } from "@/types";
+import type { Expense, ExpenseDetailInput } from "@/types";
 
 export default function EditExpensePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [expense, setExpense] = useState<Expense | null>(null);
+  const [details, setDetails] = useState<ExpenseDetailInput[]>([]);
+  const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { products } = useExpenseProducts();
 
   useEffect(() => {
-    db.expenses.get(id).then((e) => e && setExpense(e));
+    (async () => {
+      const e = await db.expenses.get(id);
+      if (!e) return;
+      setExpense(e);
+      const rows = await listExpenseDetails(id);
+      setDetails(
+        rows.map((d) => ({
+          productId: d.productId,
+          code: d.code,
+          name: d.name,
+          color: d.color,
+          quantity: d.quantity,
+          unitPrice: d.unitPrice,
+        })),
+      );
+      setReady(true);
+    })();
   }, [id]);
 
-  const handleSubmit = async (data: ExpenseFormData) => {
+  const handleSubmit = async (data: ExpenseFormData, detailInputs: ExpenseDetailInput[]) => {
     if (!expense) return;
     setLoading(true);
     try {
-      await updateExpense(expense.id, data);
+      await updateExpense(expense.id, data, detailInputs);
       toast.success("Gasto actualizado");
       router.push(`/expenses/${expense.id}`);
     } catch (err) {
@@ -37,7 +57,7 @@ export default function EditExpensePage() {
     }
   };
 
-  if (!expense) {
+  if (!expense || !ready) {
     return (
       <div className="flex items-center justify-center h-48">
         <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
@@ -79,6 +99,8 @@ export default function EditExpensePage() {
         onSubmit={handleSubmit}
         loading={loading}
         code={expense.code}
+        products={products}
+        defaultDetails={details}
         defaultValues={{
           description: expense.description,
           amount: expense.amount,

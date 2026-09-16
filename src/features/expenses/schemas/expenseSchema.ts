@@ -19,4 +19,15 @@ export const expenseSchema = z.object({
   receiptPhoto: z.string().optional(),
 });
 
+export const expenseDetailSchema = z.object({
+  productId: z.string().min(1, "Selecciona un producto"),
+  quantity: z.coerce
+    .number({ invalid_type_error: "Cantidad inválida" })
+    .positive("La cantidad debe ser mayor a 0"),
+  unitPrice: z.coerce
+    .number({ invalid_type_error: "Precio inválido" })
+    .min(0, "El precio no puede ser negativo"),
+});
+
 export type ExpenseFormData = z.infer<typeof expenseSchema>;
+export type ExpenseDetailFormData = z.infer<typeof expenseDetailSchema>;

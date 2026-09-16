@@ -7,7 +7,9 @@ import {
   updateExpense,
   voidExpense,
   deleteExpense,
+  listExpenseDetails,
 } from "./expenseService.ts";
+import type { ExpenseDetailInput } from "../../../types/index.ts";
 
 const validData = {
   description: "Recibo de luz",
@@ -20,8 +22,27 @@ const validData = {
   notes: "Agosto",
 };
 
+const detailLines: ExpenseDetailInput[] = [
+  {
+    productId: "p1",
+    code: "TEL-001",
+    name: "Rollo de tela",
+    color: "Negro",
+    quantity: 4,
+    unitPrice: 120,
+  },
+  {
+    productId: "p2",
+    code: "CIE-001",
+    name: "Cierres",
+    color: "",
+    quantity: 5,
+    unitPrice: 1.5,
+  },
+];
+
 beforeEach(async () => {
-  await db.expenses.clear();
+  await Promise.all([db.expenses.clear(), db.expenseDetails.clear()]);
 });
 
 describe("createExpense", () => {
@@ -84,6 +105,24 @@ describe("createExpense", () => {
       /categoría/i,
     );
   });
+
+  it("guarda detalles y calcula el total automáticamente", async () => {
+    const expense = await createExpense(validData, undefined, detailLines);
+    assert.equal(expense.amount, 487.5);
+    const saved = await listExpenseDetails(expense.id);
+    assert.equal(saved.length, 2);
+    assert.equal(saved[0].expenseId, expense.id);
+    assert.equal(saved[0].subtotal, 480);
+    assert.equal(saved[1].subtotal, 7.5);
+    assert.equal(saved[0].syncStatus, "pending");
+  });
+
+  it("sin detalles conserva el monto manual como amount", async () => {
+    const expense = await createExpense({ ...validData, amount: 99.99 });
+    assert.equal(expense.amount, 99.99);
+    const saved = await listExpenseDetails(expense.id);
+    assert.equal(saved.length, 0);
+  });
 });
 
 describe("updateExpense", () => {
@@ -98,6 +137,29 @@ describe("updateExpense", () => {
     assert.equal(updated!.description, "Agua potable");
     assert.equal(updated!.amount, 75);
     assert.equal(updated!.syncStatus, "pending");
+  });
+
+  it("reemplaza los detalles existentes (delete-all + reinsert)", async () => {
+    const expense = await createExpense(validData, undefined, detailLines);
+    const newLines: ExpenseDetailInput[] = [
+      { productId: "p3", code: "ELAS-001", name: "Cinta elástica", color: "Blanco", quantity: 6, unitPrice: 4 },
+    ];
+    await updateExpense(expense.id, { ...validData, amount: 0 }, newLines);
+    const updated = await db.expenses.get(expense.id);
+    assert.equal(updated!.amount, 24);
+    const saved = await listExpenseDetails(expense.id);
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].name, "Cinta elástica");
+    assert.equal(saved[0].quantity, 6);
+  });
+
+  it("vaciar detalles deja el monto manual", async () => {
+    const expense = await createExpense(validData, undefined, detailLines);
+    await updateExpense(expense.id, { ...validData, amount: 50 }, []);
+    const updated = await db.expenses.get(expense.id);
+    assert.equal(updated!.amount, 50);
+    const saved = await listExpenseDetails(expense.id);
+    assert.equal(saved.length, 0);
   });
 
   it("lanza error cuando el gasto no existe", async () => {
@@ -151,6 +213,13 @@ describe("deleteExpense", () => {
     const deleted = await db.expenses.get(expense.id);
     assert.equal(deleted!.deleted, true);
     assert.equal(deleted!.syncStatus, "pending");
+  });
+
+  it("elimina los detalles asociados", async () => {
+    const expense = await createExpense(validData, undefined, detailLines);
+    await deleteExpense(expense.id);
+    const saved = await listExpenseDetails(expense.id);
+    assert.equal(saved.length, 0);
   });
 
   it("lanza error cuando el gasto no existe (actualiza id inexistente silenciosamente)", async () => {

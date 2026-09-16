@@ -23,6 +23,7 @@ import { computeBackoffDelay } from "./backoff.ts";
 
 export const SYNC_ENTITY_TABLES = [
   "expenses",
+  "expenseDetails",
   "categories",
   "types",
   "investments",
@@ -192,6 +193,7 @@ const SYNC_PUSH_RANK: Record<string, number> = {
   breedingLots: 15,
   animals: 16,
   expenses: 20,
+  expenseDetails: 20.5,
   investments: 21,
   purchases: 22,
   sales: 23,

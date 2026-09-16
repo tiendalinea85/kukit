@@ -1,6 +1,7 @@
 import { getSupabase, getCurrentUser } from "./supabase.ts";
 import type {
   Expense,
+  ExpenseDetail,
   Category,
   Type,
   Investment,
@@ -84,6 +85,23 @@ function expenseToPayload(row: Record<string, unknown>, userId: string) {
     voided_at: row.voidedAt ?? null,
     created_at: asStr(row.createdAt),
     updated_at: asStr(row.updatedAt),
+    revision: asNum(row.revision, 1),
+  };
+}
+
+function expenseDetailToPayload(row: Record<string, unknown>, userId: string) {
+  return {
+    id: asStr(row.id),
+    user_id: userId,
+    expense_id: asStr(row.expenseId),
+    product_id: asStr(row.productId) || null,
+    code: asStr(row.code),
+    name: asStr(row.name),
+    color: asStr(row.color),
+    quantity: asNum(row.quantity),
+    unit_price: asNum(row.unitPrice),
+    subtotal: asNum(row.subtotal),
+    created_at: asStr(row.createdAt),
     revision: asNum(row.revision, 1),
   };
 }
@@ -282,6 +300,24 @@ function expenseFromRow(row: Record<string, unknown>): Expense {
     createdAt: asStr(row.created_at),
     updatedAt: asStr(row.updated_at),
     deleted: asBool(row.deleted),
+    syncStatus: "synced",
+    revision: asNum(row.revision, 1),
+  };
+}
+
+function expenseDetailFromRow(row: Record<string, unknown>): ExpenseDetail {
+  return {
+    id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    expenseId: asStr(row.expense_id),
+    productId: asStr(row.product_id),
+    code: asStr(row.code),
+    name: asStr(row.name),
+    color: asStr(row.color),
+    quantity: asNum(row.quantity),
+    unitPrice: asNum(row.unit_price),
+    subtotal: asNum(row.subtotal),
+    createdAt: asStr(row.created_at),
     syncStatus: "synced",
     revision: asNum(row.revision, 1),
   };
@@ -997,6 +1033,7 @@ const ENTITY_SPECS: EntitySpec[] = [
   { name: "customers", serverTable: "customers", order: 4, mode: "master", toPayload: customerToPayload, fromRow: customerFromRow },
   { name: "products", serverTable: "products", order: 5, mode: "master", toPayload: productToPayload, fromRow: productFromRow },
   { name: "expenses", serverTable: "expenses", order: 6, mode: "guarded", toPayload: expenseToPayload, fromRow: expenseFromRow },
+  { name: "expenseDetails", serverTable: "expense_details", order: 6.5, mode: "guarded", orderColumn: "created_at", toPayload: expenseDetailToPayload, fromRow: expenseDetailFromRow },
   { name: "investments", serverTable: "investments", order: 7, mode: "guarded", toPayload: investmentToPayload, fromRow: investmentFromRow },
   { name: "sales", serverTable: "sales", order: 8, mode: "guarded", toPayload: saleToPayload, fromRow: saleFromRow },
   { name: "saleDetails", serverTable: "sale_details", order: 9, mode: "guarded", orderColumn: "created_at", toPayload: saleDetailToPayload, fromRow: saleDetailFromRow },

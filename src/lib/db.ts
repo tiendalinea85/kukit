@@ -1,6 +1,7 @@
 import Dexie, { type Table } from "dexie";
 import type {
   Expense,
+  ExpenseDetail,
   Category,
   Type,
   Investment,
@@ -46,6 +47,7 @@ import type { InvoiceDraft } from "../features/invoice/domain/types.ts";
 
 class ZaneDB extends Dexie {
   expenses!: Table<Expense, string>;
+  expenseDetails!: Table<ExpenseDetail, string>;
   categories!: Table<Category, string>;
   types!: Table<Type, string>;
   investments!: Table<Investment, string>;
@@ -332,6 +334,16 @@ class ZaneDB extends Dexie {
         });
       }
     });
+
+    // GASTOS CON PARTIDAS: detalle por producto dentro de un gasto.
+    // Cada línea guarda el snapshot del producto (code, name, color) para
+    // conservar el historial si el producto se edita o elimina.
+    this.version(13).stores({
+      expenses:
+        "id, workspaceId, code, description, categoryId, date, createdAt, updatedAt, status, amount, deleted, syncStatus",
+      expenseDetails:
+        "id, workspaceId, expenseId, productId, createdAt, syncStatus",
+    });
   }
 }
 
@@ -340,6 +352,7 @@ export const db = new ZaneDB();
 export async function clearLocalData(): Promise<void> {
   await Promise.all([
     db.expenses.clear(),
+    db.expenseDetails.clear(),
     db.categories.clear(),
     db.types.clear(),
     db.investments.clear(),

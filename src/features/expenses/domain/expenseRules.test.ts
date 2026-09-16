@@ -8,6 +8,9 @@ import {
   canVoidExpense,
   isVoided,
   filterExpenses,
+  computeSubtotal,
+  computeExpenseTotal,
+  buildExpenseDetail,
 } from "./expenseRules.ts";
 import type { NewExpenseInput } from "./expenseRules.ts";
 
@@ -80,6 +83,64 @@ describe("status lifecycle", () => {
       "transferencia",
       "otro",
     ]);
+  });
+});
+
+describe("computeSubtotal", () => {
+  it("multiplies quantity by unit price", () => {
+    assert.equal(computeSubtotal(4, 120), 480);
+  });
+
+  it("rounds to 2 decimals", () => {
+    assert.equal(computeSubtotal(3, 10.333), 31);
+  });
+
+  it("avoids floating point errors", () => {
+    assert.equal(computeSubtotal(0.1, 0.2), 0.02);
+  });
+});
+
+describe("computeExpenseTotal", () => {
+  it("sums subtotals across detail lines", () => {
+    const total = computeExpenseTotal([
+      { productId: "p1", code: "TEL", name: "Tela", color: "", quantity: 4, unitPrice: 120 },
+      { productId: "p2", code: "CIE", name: "Cierres", color: "", quantity: 5, unitPrice: 1.5 },
+    ]);
+    assert.equal(total, 487.5);
+  });
+
+  it("returns 0 with no details", () => {
+    assert.equal(computeExpenseTotal([]), 0);
+  });
+
+  it("rounds the final total to 2 decimals", () => {
+    const total = computeExpenseTotal([
+      { productId: "p1", code: "A", name: "A", color: "", quantity: 1, unitPrice: 0.1 },
+      { productId: "p2", code: "B", name: "B", color: "", quantity: 1, unitPrice: 0.2 },
+    ]);
+    assert.equal(total, 0.3);
+  });
+});
+
+describe("buildExpenseDetail", () => {
+  it("computes subtotal and snapshots the product", () => {
+    const detail = buildExpenseDetail({
+      data: { productId: "p1", code: "TEL-001", name: "Rollo de tela", color: "Negro", quantity: 4, unitPrice: 120 },
+      expenseId: "exp-1",
+      workspaceId: "default",
+      now: "2026-08-14T10:00:00.000Z",
+    });
+    assert.equal(detail.expenseId, "exp-1");
+    assert.equal(detail.productId, "p1");
+    assert.equal(detail.code, "TEL-001");
+    assert.equal(detail.name, "Rollo de tela");
+    assert.equal(detail.color, "Negro");
+    assert.equal(detail.quantity, 4);
+    assert.equal(detail.unitPrice, 120);
+    assert.equal(detail.subtotal, 480);
+    assert.equal(detail.createdAt, "2026-08-14T10:00:00.000Z");
+    assert.equal(detail.syncStatus, "pending");
+    assert.ok(detail.id);
   });
 });
 

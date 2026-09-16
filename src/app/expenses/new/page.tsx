@@ -5,23 +5,26 @@ import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { ExpenseForm } from "@/features/expenses/components/ExpenseForm";
 import { createExpense } from "@/features/expenses/services/expenseService";
+import { useExpenseProducts } from "@/features/expenses/hooks/useExpenseProducts";
 import { generateExpenseCode } from "@/utils/code";
 import toast from "react-hot-toast";
 import type { ExpenseFormData } from "@/features/expenses/schemas/expenseSchema";
+import type { ExpenseDetailInput } from "@/types";
 
 export default function NewExpensePage() {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const { products } = useExpenseProducts();
 
   useEffect(() => {
     generateExpenseCode().then(setCode);
   }, []);
 
-  const handleSubmit = async (data: ExpenseFormData) => {
+  const handleSubmit = async (data: ExpenseFormData, details: ExpenseDetailInput[]) => {
     setLoading(true);
     try {
-      await createExpense(data, code);
+      await createExpense(data, code, details);
       toast.success("Gasto registrado exitosamente");
       router.push("/expenses");
     } catch {
@@ -39,7 +42,7 @@ export default function NewExpensePage() {
         </button>
         <h1 className="text-xl font-bold">Nuevo Gasto</h1>
       </div>
-      <ExpenseForm onSubmit={handleSubmit} loading={loading} code={code} />
+      <ExpenseForm onSubmit={handleSubmit} loading={loading} code={code} products={products} />
     </motion.div>
   );
 }

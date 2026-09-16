@@ -67,6 +67,31 @@ export interface Expense {
   revision?: number;
 }
 
+export interface ExpenseDetail {
+  id: string;
+  workspaceId: string;
+  expenseId: string;
+  productId: string;
+  code: string;
+  name: string;
+  color: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  createdAt: string;
+  syncStatus: SyncStatus;
+  revision?: number;
+}
+
+export interface ExpenseDetailInput {
+  productId: string;
+  code: string;
+  name: string;
+  color: string;
+  quantity: number;
+  unitPrice: number;
+}
+
 export interface Category {
   id: string;
   workspaceId: string;

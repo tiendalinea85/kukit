@@ -57,6 +57,12 @@ export function WorkspaceSetup({ onCreated, onCancel }: Props) {
         className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6 space-y-6"
       >
         <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Building2 size={22} className="text-purple-400" />
+            <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              Zane
+            </span>
+          </div>
           {onCancel && (
             <button
               type="button"
@@ -68,12 +74,6 @@ export function WorkspaceSetup({ onCreated, onCancel }: Props) {
               {t("workspace.back")}
             </button>
           )}
-          <div className="flex items-center gap-2 pt-1">
-            <Building2 size={22} className="text-purple-400" />
-            <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Zane
-            </span>
-          </div>
           <h1 className="text-xl font-semibold text-zinc-100">{t("workspace.setupTitle")}</h1>
           <p className="text-sm text-zinc-400">{t("workspace.setupSubtitle")}</p>
         </div>

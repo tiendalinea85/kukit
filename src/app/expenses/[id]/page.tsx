@@ -5,13 +5,13 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Edit2, Trash2, Ban } from "lucide-react";
 import { db } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/utils/format";
-import { voidExpense, deleteExpense } from "@/features/expenses/services/expenseService";
+import { voidExpense, deleteExpense, listExpenseDetails } from "@/features/expenses/services/expenseService";
 import { canEditExpense, canVoidExpense, isVoided } from "@/features/expenses/domain/expenseRules";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import type { Expense, Category } from "@/types";
+import type { Expense, ExpenseDetail, Category } from "@/types";
 
 const paymentMethodLabels: Record<string, string> = {
   efectivo: "Efectivo",
@@ -34,6 +34,7 @@ export default function ExpenseDetailPage() {
   const router = useRouter();
   const [expense, setExpense] = useState<Expense | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
+  const [details, setDetails] = useState<ExpenseDetail[]>([]);
   const [voidOpen, setVoidOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -43,6 +44,7 @@ export default function ExpenseDetailPage() {
       setExpense(e);
       db.categories.get(e.categoryId).then((c) => c && setCategory(c));
     });
+    listExpenseDetails(id).then(setDetails);
   }, [id]);
 
   if (!expense) {
@@ -142,6 +144,43 @@ export default function ExpenseDetailPage() {
               className="w-full rounded-xl border border-zinc-700/50 cursor-pointer"
               onClick={() => window.open(expense.receiptPhoto, "_blank")}
             />
+          </div>
+        )}
+
+        {details.length > 0 && (
+          <div>
+            <p className="text-sm font-medium text-zinc-400 mb-2">Detalle del gasto</p>
+            <div className="rounded-xl border border-zinc-800 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-zinc-800/40 text-zinc-500 text-xs uppercase tracking-wide">
+                    <th className="text-left font-medium px-3 py-2">Producto</th>
+                    <th className="text-right font-medium px-3 py-2">Cant.</th>
+                    <th className="text-right font-medium px-3 py-2">P. Unit.</th>
+                    <th className="text-right font-medium px-3 py-2">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/60">
+                  {details.map((d) => (
+                    <tr key={d.id}>
+                      <td className="px-3 py-2">
+                        <p className="text-zinc-200 font-medium">{d.name}</p>
+                        <p className="text-xs text-zinc-500">{d.code}{d.color ? ` · ${d.color}` : ""}</p>
+                      </td>
+                      <td className="px-3 py-2 text-right text-zinc-300">{d.quantity}</td>
+                      <td className="px-3 py-2 text-right text-zinc-300">{formatCurrency(d.unitPrice)}</td>
+                      <td className="px-3 py-2 text-right font-medium text-zinc-200">{formatCurrency(d.subtotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-zinc-800/40">
+                    <td colSpan={3} className="px-3 py-2 text-right text-sm text-zinc-400 font-medium">Total</td>
+                    <td className="px-3 py-2 text-right font-bold text-purple-400">{formatCurrency(expense.amount)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
         )}
       </div>

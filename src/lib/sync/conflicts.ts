@@ -102,6 +102,7 @@ export function isRegisteredOperation(entity: string): boolean {
     "purchases",
     "purchaseDetails",
     "expenses",
+    "expenseDetails",
     "investments",
     "inventoryMovements",
     "productionOrders",

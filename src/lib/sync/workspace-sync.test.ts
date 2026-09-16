@@ -642,10 +642,10 @@ describe("canonicalStringify stability", () => {
 });
 
 describe("SYNC_ENTITY_TABLES completeness", () => {
-  it("includes all 34 entity tables", () => {
-    assert.equal(SYNC_ENTITY_TABLES.length, 34);
+  it("includes all 35 entity tables", () => {
+    assert.equal(SYNC_ENTITY_TABLES.length, 35);
     const expected = [
-      "expenses", "categories", "types", "investments", "investmentCategories",
+      "expenses", "expenseDetails", "categories", "types", "investments", "investmentCategories",
       "customers", "products", "inventoryMovements", "sales", "saleDetails",
       "purchases", "purchaseDetails",
       "garments", "sizes", "garmentColors", "materials", "productionOrders", "productionMaterials",

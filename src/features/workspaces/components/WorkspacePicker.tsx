@@ -1,6 +1,6 @@
 "use client";
 import { motion } from "framer-motion";
-import { Building2, Check, ChevronRight, LayoutGrid, Plus } from "lucide-react";
+import { ArrowLeft, Building2, Check, ChevronRight, LayoutGrid, Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
@@ -8,9 +8,11 @@ import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 interface Props {
   onEnter: (id: string) => void;
   onCreate: () => void;
+  /** Opcional: si no se entrega, el botón "Volver" no se muestra. */
+  onBack?: () => void;
 }
 
-export function WorkspacePicker({ onEnter, onCreate }: Props) {
+export function WorkspacePicker({ onEnter, onCreate, onBack }: Props) {
   const { t } = useTranslation();
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const getWorkspaceCategory = useWorkspaceStore((s) => s.getWorkspaceCategory);
@@ -26,6 +28,18 @@ export function WorkspacePicker({ onEnter, onCreate }: Props) {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6 space-y-6"
       >
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label={t("workspace.back")}
+            className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-100 transition-colors -ml-2 px-2 py-1.5"
+          >
+            <ArrowLeft size={18} />
+            <span>{t("workspace.back")}</span>
+          </button>
+        )}
+
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <LayoutGrid size={22} className="text-purple-400" />

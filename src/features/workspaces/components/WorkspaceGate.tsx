@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useAppStore } from "@/stores/useAppStore";
@@ -6,103 +7,262 @@ import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { WorkspaceSetup } from "./WorkspaceSetup";
 import { WorkspacePicker } from "./WorkspacePicker";
 
-export function WorkspaceGate({ children }: { children: React.ReactNode }) {
+export function WorkspaceGate({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user } = useAuth();
-  const workspaceSetupOpen = useAppStore((s) => s.workspaceSetupOpen);
-  const closeWorkspaceSetup = useAppStore((s) => s.closeWorkspaceSetup);
-  const workspaces = useWorkspaceStore((s) => s.workspaces);
-  const loadingWorkspaces = useWorkspaceStore((s) => s.loadingWorkspaces);
-  const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
-  const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
 
+  const workspaceSetupOpen = useAppStore(
+    (state) => state.workspaceSetupOpen
+  );
+  const closeWorkspaceSetup = useAppStore(
+    (state) => state.closeWorkspaceSetup
+  );
+
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const loadingWorkspaces = useWorkspaceStore(
+    (state) => state.loadingWorkspaces
+  );
+  const activeWorkspaceId = useWorkspaceStore(
+    (state) => state.activeWorkspaceId
+  );
+  const setActiveWorkspace = useWorkspaceStore(
+    (state) => state.setActiveWorkspace
+  );
+  const loadWorkspaces = useWorkspaceStore(
+    (state) => state.loadWorkspaces
+  );
+
+  /**
+   * Workspace al que el usuario ya entró.
+   */
   const [enteredId, setEnteredId] = useState<string | null>(null);
-  // "creating" = el usuario pulsó explícitamente "+ Crear nuevo espacio".
+
+  /**
+   * true únicamente cuando el usuario pulsa
+   * "Crear nuevo espacio".
+   */
   const [creating, setCreating] = useState(false);
-  // "formDismissed" = el usuario pulsó Volver en el formulario. Evita bucles:
-  // tras volver se muestra el listado (o su estado vacío) en lugar de reabrir
-  // el formulario automáticamente.
+
+  /**
+   * Evita que un usuario nuevo vuelva automáticamente
+   * al formulario después de pulsar "Volver".
+   */
   const [formDismissed, setFormDismissed] = useState(false);
 
-  // Al entrar (o cambiar de usuario): bajar LOS workspaces de ESTE usuario
-  // desde Supabase (fuente de verdad) y reiniciar la sesión de navegación.
+  /**
+   * ============================================================
+   * CARGAR WORKSPACES DEL USUARIO
+   * ============================================================
+   */
   useEffect(() => {
     setEnteredId(null);
     setCreating(false);
     setFormDismissed(false);
-    if (user) {
-      loadWorkspaces(user.id).catch(() => {});
-    }
+
+    if (!user) return;
+
+    loadWorkspaces(user.id).catch(() => {
+      // El store controla el estado de carga/error.
+    });
   }, [user, loadWorkspaces]);
 
-  // Auto-entrar al workspace activo persistido y que siga perteneciendo al
-  // usuario (continuidad en el mismo dispositivo). En un dispositivo nuevo se
-  // muestra el listado con los workspaces sincronizados.
+  /**
+   * ============================================================
+   * RESTAURAR WORKSPACE ACTIVO
+   * ============================================================
+   *
+   * Si existe un workspace activo y pertenece realmente
+   * al usuario actual, entrar automáticamente.
+   */
   useEffect(() => {
-    if (!user || enteredId) return;
-    const visible = workspaces.filter((w) => w.id !== "default");
-    if (visible.length === 0 || loadingWorkspaces) return;
-    const activeId = useWorkspaceStore.getState().activeWorkspaceId;
-    if (activeId && visible.some((w) => w.id === activeId)) {
-      setEnteredId(activeId);
+    if (!user || enteredId !== null || loadingWorkspaces) {
+      return;
     }
-  }, [user, workspaces, loadingWorkspaces, enteredId]);
 
-  const created = (id: string) => {
+    const visibleWorkspaces = workspaces.filter(
+      (workspace) => workspace.id !== "default"
+    );
+
+    if (visibleWorkspaces.length === 0) {
+      return;
+    }
+
+    if (
+      activeWorkspaceId &&
+      visibleWorkspaces.some(
+        (workspace) => workspace.id === activeWorkspaceId
+      )
+    ) {
+      setEnteredId(activeWorkspaceId);
+    }
+  }, [
+    user,
+    workspaces,
+    loadingWorkspaces,
+    activeWorkspaceId,
+    enteredId,
+  ]);
+
+  /**
+   * ============================================================
+   * WORKSPACE CREADO
+   * ============================================================
+   */
+  const handleCreated = (id: string) => {
     setActiveWorkspace(id);
     setEnteredId(id);
+
     setCreating(false);
     setFormDismissed(false);
+
     closeWorkspaceSetup();
   };
 
-  // Volver desde el formulario de creación:
-  // - si llegó desde el listado (pulsó "+ Crear") -> regresa al listado.
-  // - si es un usuario nuevo sin workspaces -> regresa al listado vacío
-  //   (destino seguro definido por la app: no reabre el formulario y no crea
-  //   nada de forma automática).
-  const dismissSetup = () => {
+  /**
+   * ============================================================
+   * VOLVER DESDE WORKSPACE SETUP
+   * ============================================================
+   */
+  const handleCancelSetup = () => {
     setCreating(false);
     setFormDismissed(true);
+
     closeWorkspaceSetup();
   };
 
-  if (!user) return <>{children}</>;
+  /**
+   * ============================================================
+   * USUARIO NO AUTENTICADO
+   * ============================================================
+   */
+  if (!user) {
+    return <>{children}</>;
+  }
 
+  /**
+   * ============================================================
+   * CARGANDO WORKSPACES
+   * ============================================================
+   */
   if (loadingWorkspaces) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+        <div
+          className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin"
+          aria-label="Cargando espacios de trabajo"
+        />
       </div>
     );
   }
 
-  const insideWorkspace = enteredId !== null && workspaces.some((w) => w.id === enteredId);
+  /**
+   * ============================================================
+   * WORKSPACES VISIBLES
+   * ============================================================
+   *
+   * Nunca mostrar el workspace interno "default".
+   */
+  const visibleWorkspaces = workspaces.filter(
+    (workspace) => workspace.id !== "default"
+  );
+
+  const hasWorkspaces = visibleWorkspaces.length > 0;
+
+  /**
+   * ============================================================
+   * ¿YA ESTÁ DENTRO DE UN WORKSPACE?
+   * ============================================================
+   */
+  const insideWorkspace =
+    enteredId !== null &&
+    visibleWorkspaces.some(
+      (workspace) => workspace.id === enteredId
+    );
+
+  /**
+   * Una vez dentro del workspace, mostrar la aplicación.
+   *
+   * workspaceSetupOpen (p. ej. "Nuevo espacio de trabajo" desde
+   * Sidebar/TopBar) NO debe sacar al usuario de la aplicación:
+   * se muestra el formulario como overlay encima de la app.
+   */
   if (insideWorkspace) {
     if (workspaceSetupOpen) {
-      return <WorkspaceSetup onCreated={created} onCancel={dismissSetup} />;
+      return (
+        <>
+          {children}
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <WorkspaceSetup
+              onCreated={handleCreated}
+              onCancel={handleCancelSetup}
+            />
+          </div>
+        </>
+      );
     }
     return <>{children}</>;
   }
 
-  const visible = workspaces.filter((w) => w.id !== "default");
-  const hasWorkspaces = visible.length > 0;
+  /**
+   * ============================================================
+   * MOSTRAR WORKSPACE SETUP
+   * ============================================================
+   *
+   * Casos:
+   *
+   * 1. Usuario nuevo sin workspaces.
+   * 2. Usuario pulsó "Crear nuevo".
+   * 3. Alguna parte de la aplicación abrió explícitamente
+   *    workspaceSetupOpen.
+   *
+   * formDismissed evita reabrir el formulario automáticamente
+   * después de pulsar "Volver".
+   */
+  const shouldShowSetup =
+    creating ||
+    workspaceSetupOpen ||
+    (!hasWorkspaces && !formDismissed);
 
-  // El formulario solo se muestra cuando:
-  // - usuario nuevo sin workspaces (primera vez en la app), o
-  // - el usuario pulsó explícitamente "+ Crear nuevo espacio".
-  // Si el usuario ya pulsó Volver (formDismissed) se muestra la lista de sus
-  // workspaces (o el estado vacío) como destino seguro, sin bucles.
-  if (creating || (!hasWorkspaces && !formDismissed)) {
-    return <WorkspaceSetup onCreated={created} onCancel={dismissSetup} />;
+  if (shouldShowSetup) {
+    return (
+      <WorkspaceSetup
+        onCreated={handleCreated}
+        onCancel={handleCancelSetup}
+      />
+    );
   }
 
+  /**
+   * ============================================================
+   * WORKSPACE PICKER
+   * ============================================================
+   *
+   * El usuario:
+   *
+   * - selecciona un workspace existente
+   * - o pulsa "Crear nuevo espacio"
+   */
   return (
     <WorkspacePicker
       onEnter={(id) => {
+        const exists = visibleWorkspaces.some(
+          (workspace) => workspace.id === id
+        );
+
+        if (!exists) return;
+
         setActiveWorkspace(id);
         setEnteredId(id);
+        setFormDismissed(false);
       }}
-      onCreate={() => setCreating(true)}
+      onCreate={() => {
+        setFormDismissed(false);
+        setCreating(true);
+      }}
     />
   );
 }
+
