@@ -58,12 +58,17 @@ export function WorkspaceSetup({ onCreated, onCancel }: Props) {
       >
         <div className="space-y-1">
           {onCancel && (
-            <Button variant="ghost" size="sm" className="-ml-2 mb-1" onClick={onCancel}>
-              <ArrowLeft size={16} />
+            <button
+              type="button"
+              onClick={onCancel}
+              aria-label={t("workspace.back")}
+              className="flex items-center gap-2 -mx-2 px-3 py-2.5 text-sm font-medium text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/70 active:bg-zinc-800 rounded-xl transition-colors"
+            >
+              <ArrowLeft size={18} />
               {t("workspace.back")}
-            </Button>
+            </button>
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pt-1">
             <Building2 size={22} className="text-purple-400" />
             <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
               Zane

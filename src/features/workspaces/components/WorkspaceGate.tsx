@@ -16,13 +16,19 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
   const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
 
   const [enteredId, setEnteredId] = useState<string | null>(null);
+  // "creating" = el usuario pulsó explícitamente "+ Crear nuevo espacio".
   const [creating, setCreating] = useState(false);
+  // "formDismissed" = el usuario pulsó Volver en el formulario. Evita bucles:
+  // tras volver se muestra el listado (o su estado vacío) en lugar de reabrir
+  // el formulario automáticamente.
+  const [formDismissed, setFormDismissed] = useState(false);
 
   // Al entrar (o cambiar de usuario): bajar LOS workspaces de ESTE usuario
   // desde Supabase (fuente de verdad) y reiniciar la sesión de navegación.
   useEffect(() => {
     setEnteredId(null);
     setCreating(false);
+    setFormDismissed(false);
     if (user) {
       loadWorkspaces(user.id).catch(() => {});
     }
@@ -45,11 +51,18 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
     setActiveWorkspace(id);
     setEnteredId(id);
     setCreating(false);
+    setFormDismissed(false);
     closeWorkspaceSetup();
   };
 
-  const cancelCreation = () => {
+  // Volver desde el formulario de creación:
+  // - si llegó desde el listado (pulsó "+ Crear") -> regresa al listado.
+  // - si es un usuario nuevo sin workspaces -> regresa al listado vacío
+  //   (destino seguro definido por la app: no reabre el formulario y no crea
+  //   nada de forma automática).
+  const dismissSetup = () => {
     setCreating(false);
+    setFormDismissed(true);
     closeWorkspaceSetup();
   };
 
@@ -66,14 +79,21 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
   const insideWorkspace = enteredId !== null && workspaces.some((w) => w.id === enteredId);
   if (insideWorkspace) {
     if (workspaceSetupOpen) {
-      return <WorkspaceSetup onCreated={created} onCancel={cancelCreation} />;
+      return <WorkspaceSetup onCreated={created} onCancel={dismissSetup} />;
     }
     return <>{children}</>;
   }
 
   const visible = workspaces.filter((w) => w.id !== "default");
-  if (creating || visible.length === 0) {
-    return <WorkspaceSetup onCreated={created} onCancel={cancelCreation} />;
+  const hasWorkspaces = visible.length > 0;
+
+  // El formulario solo se muestra cuando:
+  // - usuario nuevo sin workspaces (primera vez en la app), o
+  // - el usuario pulsó explícitamente "+ Crear nuevo espacio".
+  // Si el usuario ya pulsó Volver (formDismissed) se muestra la lista de sus
+  // workspaces (o el estado vacío) como destino seguro, sin bucles.
+  if (creating || (!hasWorkspaces && !formDismissed)) {
+    return <WorkspaceSetup onCreated={created} onCancel={dismissSetup} />;
   }
 
   return (

@@ -76,12 +76,15 @@ export function Sidebar() {
     return isModuleEnabled(mod);
   });
 
-  const nav = (
+  // NAV compartido. "onNavigate" se inyecta según el contexto:
+  // - drawer móvil -> cerrar el sidebar (toggleSidebar)
+  // - sidebar desktop -> sin efecto (isSidebarOpen NO depende de desktop)
+  const renderNav = (onNavigate?: () => void) => (
     <nav className="flex-1 p-3 space-y-1 overflow-y-auto mt-2">
       {visibleLinks.map((link) => {
         const active = pathname === link.href;
         return (
-          <Link key={link.href} href={link.href} onClick={toggleSidebar}
+          <Link key={link.href} href={link.href} onClick={onNavigate}
             className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all ${
               active ? "bg-purple-600/20 text-purple-400" : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
             }`}
@@ -94,7 +97,7 @@ export function Sidebar() {
     </nav>
   );
 
-  const workspaceDropdown = (
+  const renderWorkspaceDropdown = (onNavigate?: () => void) => (
     <div className="relative px-3 pb-2">
       <button
         onClick={() => setWorkspaceOpen((v) => !v)}
@@ -128,7 +131,7 @@ export function Sidebar() {
             ))}
             <li className="border-t border-zinc-700/60 mt-1 pt-1">
               <button
-                onClick={() => { setWorkspaceOpen(false); toggleSidebar(); openWorkspaceSetup(); }}
+                onClick={() => { setWorkspaceOpen(false); onNavigate?.(); openWorkspaceSetup(); }}
                 className="w-full text-left px-3 py-2 text-sm text-purple-400 hover:text-purple-300 hover:bg-purple-600/10 flex items-center gap-2 transition-colors"
               >
                 <Plus size={14} />
@@ -157,8 +160,8 @@ export function Sidebar() {
       */}
       <aside className="zane-desktop-sidebar">
         {brand(null)}
-        {nav}
-        {workspaceDropdown}
+        {renderNav()}
+        {renderWorkspaceDropdown()}
         {footer}
       </aside>
 
@@ -189,8 +192,8 @@ export function Sidebar() {
                   <X size={20} />
                 </button>,
               )}
-              {nav}
-              {workspaceDropdown}
+              {renderNav(toggleSidebar)}
+              {renderWorkspaceDropdown(toggleSidebar)}
               {footer}
             </motion.aside>
           </>
