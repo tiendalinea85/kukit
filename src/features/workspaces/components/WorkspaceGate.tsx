@@ -26,7 +26,7 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
     if (user) {
       loadWorkspaces(user.id).catch(() => {});
     }
-  }, [user?.id]);
+  }, [user, loadWorkspaces]);
 
   // Auto-entrar al workspace activo persistido y que siga perteneciendo al
   // usuario (continuidad en el mismo dispositivo). En un dispositivo nuevo se
@@ -39,7 +39,7 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
     if (activeId && visible.some((w) => w.id === activeId)) {
       setEnteredId(activeId);
     }
-  }, [user?.id, workspaces, loadingWorkspaces, enteredId]);
+  }, [user, workspaces, loadingWorkspaces, enteredId]);
 
   const created = (id: string) => {
     setActiveWorkspace(id);

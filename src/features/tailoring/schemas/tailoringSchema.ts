@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRODUCTION_STATUSES, MATERIAL_UNITS } from "../domain/tailoringRules";
+import { MATERIAL_UNITS } from "../domain/tailoringRules";
 
 export const garmentSchema = z.object({
   name: z

@@ -13,7 +13,7 @@ import {
   Trash2,
   Ban,
 } from "lucide-react";
-import { useGarments, useProductionOrders, useSizes, useColors, useMaterials } from "@/features/tailoring/hooks/useTailoring";
+import { useGarments, useProductionOrders } from "@/features/tailoring/hooks/useTailoring";
 import { filterProductionOrders, canVoidProduction } from "@/features/tailoring/domain/tailoringRules";
 import { deleteGarment, voidProductionOrder, deleteProductionOrder } from "@/features/tailoring/services/tailoringService";
 import { SizeManager } from "@/features/tailoring/components/SizeManager";
@@ -62,9 +62,6 @@ export default function TailoringPage() {
 
   const { garments, loading: loadingGarments } = useGarments();
   const { orders, loading: loadingOrders } = useProductionOrders();
-  const { sizes, loading: loadingSizes } = useSizes();
-  const { colors, loading: loadingColors } = useColors();
-  const { materials, loading: loadingMaterials } = useMaterials();
 
   const filteredGarments = useMemo(() => {
     if (!search) return garments;

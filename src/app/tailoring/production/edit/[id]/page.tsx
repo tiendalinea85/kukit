@@ -12,15 +12,6 @@ import toast from "react-hot-toast";
 import type { ProductionOrderFormData } from "@/features/tailoring/schemas/tailoringSchema";
 import type { ProductionOrder, ProductionMaterial } from "@/types/modules";
 
-interface MaterialRow {
-  id: string;
-  materialId: string;
-  materialName: string;
-  quantity: number;
-  unitCost: number;
-  totalCost: number;
-}
-
 export default function EditProductionOrderPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -41,7 +32,7 @@ export default function EditProductionOrderPage() {
     });
   }, [id]);
 
-  const handleSubmit = async (data: ProductionOrderFormData, _materials: MaterialRow[]) => {
+  const handleSubmit = async (data: ProductionOrderFormData) => {
     if (!order) return;
     setLoading(true);
     try {

@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { partCompatibilitySchema, type PartCompatibilityFormData } from "../schemas/autopartsSchema";
-import { useAutoParts, useVehicleModels, useVehicleBrands } from "../hooks/useAutoparts";
+import { useAutoParts, useVehicleModels } from "../hooks/useAutoparts";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -19,7 +19,7 @@ export function CompatibilityForm({ onSubmit, defaultValues, loading }: Props) {
   const { models } = useVehicleModels();
   const [selectedModelId, setSelectedModelId] = useState(defaultValues?.modelId || "");
 
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<PartCompatibilityFormData>({
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<PartCompatibilityFormData>({
     resolver: zodResolver(partCompatibilitySchema) as Resolver<PartCompatibilityFormData>,
     defaultValues: {
       partId: defaultValues?.partId || "",

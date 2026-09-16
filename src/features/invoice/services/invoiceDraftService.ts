@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import type { InvoiceDraft, InvoiceDraftStatus, InvoiceDraftTarget } from "../domain/types";
+import type { InvoiceDraft, InvoiceDraftTarget } from "../domain/types";
 import type { OcrResult } from "../schemas/ocrSchema";
 
 function now(): string {

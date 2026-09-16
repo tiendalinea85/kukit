@@ -17,7 +17,7 @@ import {
 import { computeBackoffDelay, DEFAULT_BACKOFF } from "./backoff.ts";
 import { classifySyncError } from "./errors.ts";
 import { compareVersions, resolveConflict, isAppendOnly, isRegisteredOperation } from "./conflicts.ts";
-import type { SyncTransportEntity, OutboxOperation } from "../../types/sync.ts";
+import type { SyncTransportEntity } from "../../types/sync.ts";
 
 beforeEach(async () => {
   await db.syncOutbox.clear();

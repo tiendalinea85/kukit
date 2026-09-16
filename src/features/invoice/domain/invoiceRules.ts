@@ -13,10 +13,7 @@ export function canConfirmDraft(draft: InvoiceDraft): boolean {
   return draft.status === "extracted" && draft.ocrResult !== null;
 }
 
-export function ocrResultToPurchaseHeader(
-  ocr: OcrResult,
-  draft: InvoiceDraft,
-): PurchaseFormData {
+export function ocrResultToPurchaseHeader(ocr: OcrResult): PurchaseFormData {
   const today = new Date().toISOString().split("T")[0];
   return {
     supplier: ocr.supplier || "",
@@ -38,10 +35,7 @@ export function ocrResultToPurchaseDetails(ocr: OcrResult): PurchaseDetailInput[
   }));
 }
 
-export function ocrResultToExpenseData(
-  ocr: OcrResult,
-  draft: InvoiceDraft,
-): Partial<ExpenseFormData> {
+export function ocrResultToExpenseData(ocr: OcrResult): Partial<ExpenseFormData> {
   const today = new Date().toISOString().split("T")[0];
   const now = new Date();
   const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;

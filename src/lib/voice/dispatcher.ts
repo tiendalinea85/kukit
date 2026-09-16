@@ -78,8 +78,7 @@ function buildSummaryText(
 }
 
 async function handleAddExpense(
-  intent: AddExpenseIntent,
-  language: "es" | "en"
+  intent: AddExpenseIntent
 ): Promise<VoiceActionResult> {
   const categories = await db.categories.toArray();
 
@@ -124,8 +123,7 @@ async function handleQueryReport(
 }
 
 async function handleDeleteExpense(
-  intent: DeleteExpenseIntent,
-  language: "es" | "en"
+  intent: DeleteExpenseIntent
 ): Promise<VoiceActionResult> {
   const all = await db.expenses.toArray();
   const active = all.filter((e) => e.deleted !== true);
@@ -177,11 +175,11 @@ export async function dispatchVoiceIntent(
 ): Promise<VoiceActionResult> {
   switch (intent.intent) {
     case "add_expense":
-      return handleAddExpense(intent, ctx.language);
+      return handleAddExpense(intent);
     case "query_report":
       return handleQueryReport(intent, ctx.language);
     case "delete_expense":
-      return handleDeleteExpense(intent, ctx.language);
+      return handleDeleteExpense(intent);
     case "navigate": {
       const target = resolveTarget(intent.target);
       ctx.router?.push(target);

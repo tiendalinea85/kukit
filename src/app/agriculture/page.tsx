@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useCrops, useFarmLots, useAgroInputs, useApplications, useLabors, useHarvests } from "@/features/agriculture/hooks/useAgriculture";
 import { filterCrops, filterHarvests, filterLabors } from "@/features/agriculture/domain/agricultureRules";
 import { formatDate, formatCurrency } from "@/utils/format";
-import { db } from "@/lib/db";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Pagination } from "@/components/ui/Pagination";

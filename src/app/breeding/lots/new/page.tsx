@@ -9,7 +9,6 @@ import { breedingLotSchema, type BreedingLotFormData } from "@/features/breeding
 import { createBreedingLot } from "@/features/breeding/services/breedingService";
 import { generateBreedingLotCode } from "@/utils/code";
 import { useSpecies } from "@/features/breeding/hooks/useBreeding";
-import { SPECIES_CATEGORY_LABELS } from "@/features/breeding/domain/breedingRules";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";

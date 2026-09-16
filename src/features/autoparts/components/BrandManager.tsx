@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Plus, Pencil, Trash2, Globe } from "lucide-react";
 import { useVehicleBrands } from "../hooks/useAutoparts";
 import { createVehicleBrand, updateVehicleBrand, deleteVehicleBrand } from "../services/autopartsService";
-import { vehicleBrandSchema, type VehicleBrandFormData } from "../schemas/autopartsSchema";
+import { vehicleBrandSchema } from "../schemas/autopartsSchema";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";

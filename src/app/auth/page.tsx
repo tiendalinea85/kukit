@@ -72,16 +72,18 @@ export default function AuthPage() {
 
   const demo = !isSupabaseConfigured() && process.env.NODE_ENV !== "production";
 
+  const cooldownActive = cooldownLeft > 0;
+
   // Cuenta atrás del cooldown tras un 429 (rate limit de Supabase). Al llegar
   // a 0 se vuelve a habilitar el botón sin recargar la página.
   useEffect(() => {
-    if (cooldownLeft <= 0) return;
+    if (!cooldownActive) return;
     const id = setInterval(() => {
       const left = Math.ceil((cooldownUntilRef.current - Date.now()) / 1000);
       setCooldownLeft(left <= 0 ? 0 : left);
     }, 1000);
     return () => clearInterval(id);
-  }, [cooldownLeft > 0]);
+  }, [cooldownActive]);
 
   const switchMode = (next: Mode) => {
     setMode(next);

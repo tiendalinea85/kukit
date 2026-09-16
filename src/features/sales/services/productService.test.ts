@@ -112,8 +112,8 @@ describe("getProductStock", () => {
 
 describe("listProductsWithStock", () => {
   it("retorna productos no eliminados con su stock", async () => {
-    const p1 = await createProduct({ code: "PRD-001", name: "Tejido", initialStock: 20 });
-    const p2 = await createProduct({ code: "PRD-002", name: "Seda", initialStock: 15 });
+    await createProduct({ code: "PRD-001", name: "Tejido", initialStock: 20 });
+    await createProduct({ code: "PRD-002", name: "Seda", initialStock: 15 });
     const list = await listProductsWithStock();
     assert.equal(list.length, 2);
     const tejido = list.find((p) => p.code === "PRD-001")!;

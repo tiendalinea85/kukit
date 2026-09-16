@@ -76,8 +76,7 @@ describe("canConfirmDraft", () => {
 
 describe("ocrResultToPurchaseHeader", () => {
   it("mapea supplier, date, invoiceNumber a notes", () => {
-    const draft = makeDraft();
-    const header = ocrResultToPurchaseHeader(sampleOcr, draft);
+    const header = ocrResultToPurchaseHeader(sampleOcr);
     assert.equal(header.supplier, "Ferretería Central");
     assert.equal(header.date, "2026-08-10");
     assert.equal(header.notes, "Factura N° FAC-001");
@@ -85,16 +84,14 @@ describe("ocrResultToPurchaseHeader", () => {
 
   it("usa la fecha de hoy cuando date está ausente", () => {
     const ocrNoDate = { ...sampleOcr, date: undefined };
-    const draft = makeDraft();
-    const header = ocrResultToPurchaseHeader(ocrNoDate, draft);
+    const header = ocrResultToPurchaseHeader(ocrNoDate);
     const today = new Date().toISOString().split("T")[0];
     assert.equal(header.date, today);
   });
 
   it("retorna notes vacío cuando invoiceNumber está ausente", () => {
     const ocrNoInvoice = { ...sampleOcr, invoiceNumber: undefined };
-    const draft = makeDraft();
-    const header = ocrResultToPurchaseHeader(ocrNoInvoice, draft);
+    const header = ocrResultToPurchaseHeader(ocrNoInvoice);
     assert.equal(header.notes, "");
   });
 });
@@ -115,28 +112,24 @@ describe("ocrResultToPurchaseDetails", () => {
 describe("ocrResultToExpenseData", () => {
   it("calcula total desde items cuando ocr.total falta", () => {
     const ocrNoTotal = { ...sampleOcr, total: undefined };
-    const draft = makeDraft();
-    const expense = ocrResultToExpenseData(ocrNoTotal, draft);
+    const expense = ocrResultToExpenseData(ocrNoTotal);
     assert.equal(expense.amount, 10 * 0.5 + 20 * 0.3);
   });
 
   it("genera description desde supplier + invoiceNumber", () => {
-    const draft = makeDraft();
-    const expense = ocrResultToExpenseData(sampleOcr, draft);
+    const expense = ocrResultToExpenseData(sampleOcr);
     assert.equal(expense.description, "Factura Ferretería Central N° FAC-001");
   });
 
   it("genera description solo con invoiceNumber cuando supplier falta", () => {
     const ocrNoSupplier = { ...sampleOcr, supplier: undefined };
-    const draft = makeDraft();
-    const expense = ocrResultToExpenseData(ocrNoSupplier, draft);
+    const expense = ocrResultToExpenseData(ocrNoSupplier);
     assert.ok(expense.description!.includes("FAC-001"));
   });
 
   it("usa la fecha de hoy cuando date está ausente", () => {
     const ocrNoDate = { ...sampleOcr, date: undefined };
-    const draft = makeDraft();
-    const expense = ocrResultToExpenseData(ocrNoDate, draft);
+    const expense = ocrResultToExpenseData(ocrNoDate);
     const today = new Date().toISOString().split("T")[0];
     assert.equal(expense.date, today);
   });

@@ -1,9 +1,9 @@
 "use client";
 import { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Search, Plus, Users, Bug, Box, Wheat, Heart, Factory, Pencil, Trash2 } from "lucide-react";
 import { useSpecies, useAnimals, useBreedingLots, useFeedings, useReproductions, useLivestockProductions } from "@/features/breeding/hooks/useBreeding";
-import { filterAnimals, filterFeedings, ANIMAL_STATUS_LABELS, ANIMAL_GENDER_LABELS, FEED_TYPE_LABELS, REPRO_EVENT_LABELS, PRODUCTION_TYPE_LABELS, SPECIES_CATEGORY_LABELS } from "@/features/breeding/domain/breedingRules";
+import { filterAnimals, filterFeedings, ANIMAL_STATUS_LABELS, ANIMAL_GENDER_LABELS, FEED_TYPE_LABELS, REPRO_EVENT_LABELS, PRODUCTION_TYPE_LABELS } from "@/features/breeding/domain/breedingRules";
 import { deleteSpecies, deleteBreedingLot, deleteAnimal, deleteFeeding, deleteReproduction, deleteLivestockProduction } from "@/features/breeding/services/breedingService";
 import { SpeciesManager } from "@/features/breeding/components/SpeciesManager";
 import { BreedingLotManager } from "@/features/breeding/components/BreedingLotManager";

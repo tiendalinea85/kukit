@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { createVehicleBrand } from "@/features/autoparts/services/autopartsService";
-import { vehicleBrandSchema, type VehicleBrandFormData } from "@/features/autoparts/schemas/autopartsSchema";
+import { vehicleBrandSchema } from "@/features/autoparts/schemas/autopartsSchema";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import toast from "react-hot-toast";

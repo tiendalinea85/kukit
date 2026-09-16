@@ -7,7 +7,6 @@ import { deleteMaterial } from "../services/tailoringService";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { formatCurrency } from "@/utils/format";
-import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 interface Props {
@@ -18,7 +17,6 @@ export function MaterialList({ onAdd }: Props) {
   const { materials, loading } = useMaterials();
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
-  const router = useRouter();
 
   const filtered = materials.filter((m) => {
     const haystack = `${m.code} ${m.name} ${m.unit}`.toLowerCase();

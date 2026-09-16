@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { breedingLotSchema, type BreedingLotFormData } from "../schemas/breedingSchema";
-import { SPECIES_CATEGORIES, SPECIES_CATEGORY_LABELS } from "../domain/breedingRules";
 import { createBreedingLot, updateBreedingLot, deleteBreedingLot } from "../services/breedingService";
 import { useBreedingLots, useSpecies } from "../hooks/useBreeding";
 import { Button } from "@/components/ui/Button";
@@ -43,7 +42,6 @@ export function BreedingLotManager() {
             onSave={async (data) => {
               setSaving(true);
               try {
-                const speciesName = speciesMap[data.speciesId] || "";
                 if (editTarget) {
                   await updateBreedingLot(editTarget.id, data);
                   toast.success("Lote actualizado");
