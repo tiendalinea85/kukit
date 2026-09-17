@@ -111,10 +111,11 @@ describe("createExpense", () => {
     assert.equal(expense.amount, 487.5);
     const saved = await listExpenseDetails(expense.id);
     assert.equal(saved.length, 2);
-    assert.equal(saved[0].expenseId, expense.id);
-    assert.equal(saved[0].subtotal, 480);
-    assert.equal(saved[1].subtotal, 7.5);
-    assert.equal(saved[0].syncStatus, "pending");
+    const bySubtotal = [...saved].sort((a, b) => a.subtotal - b.subtotal);
+    assert.equal(bySubtotal[0].subtotal, 7.5);
+    assert.equal(bySubtotal[1].subtotal, 480);
+    assert.ok(saved.every((d) => d.expenseId === expense.id));
+    assert.ok(saved.every((d) => d.syncStatus === "pending"));
   });
 
   it("sin detalles conserva el monto manual como amount", async () => {

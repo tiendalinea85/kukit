@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { db } from "@/lib/db";
+import { ensureDefaultCategories } from "@/lib/defaultCategories";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Pagination } from "@/components/ui/Pagination";
@@ -21,7 +22,10 @@ export default function CategoriesPage() {
   const [editing, setEditing] = useState<Category | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const load = () => db.categories.toArray().then(setCategories);
+  const load = async () => {
+    await ensureDefaultCategories();
+    db.categories.toArray().then(setCategories);
+  };
   useEffect(() => { load(); }, []);
 
   const paged = useMemo(() => {

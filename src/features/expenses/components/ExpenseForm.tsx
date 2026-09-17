@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
 import { db } from "@/lib/db";
+import { ensureDefaultCategories } from "@/lib/defaultCategories";
 import { quickCreateProduct } from "../services/expenseService";
 import { generateProductCode } from "@/utils/code";
 import { formatCurrency } from "@/utils/format";
@@ -75,7 +76,10 @@ export function ExpenseForm({
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    db.categories.toArray().then(setCategories);
+    (async () => {
+      await ensureDefaultCategories();
+      db.categories.toArray().then(setCategories);
+    })();
   }, []);
 
   const defaultDate = new Date().toISOString().split("T")[0];
