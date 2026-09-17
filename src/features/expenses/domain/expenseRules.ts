@@ -53,6 +53,7 @@ export function buildExpenseDetail(input: {
     quantity: data.quantity,
     unitPrice: data.unitPrice,
     subtotal: computeSubtotal(data.quantity, data.unitPrice),
+    deleted: false,
     createdAt: now,
     syncStatus: "pending",
   };

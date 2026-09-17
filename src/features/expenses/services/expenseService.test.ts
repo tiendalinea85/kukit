@@ -139,7 +139,7 @@ describe("updateExpense", () => {
     assert.equal(updated!.syncStatus, "pending");
   });
 
-  it("reemplaza los detalles existentes (delete-all + reinsert)", async () => {
+  it("reemplaza los detalles (soft-delete de las líneas viejas + insert de las nuevas)", async () => {
     const expense = await createExpense(validData, undefined, detailLines);
     const newLines: ExpenseDetailInput[] = [
       { productId: "p3", code: "ELAS-001", name: "Cinta elástica", color: "Blanco", quantity: 6, unitPrice: 4 },
@@ -151,6 +151,16 @@ describe("updateExpense", () => {
     assert.equal(saved.length, 1);
     assert.equal(saved[0].name, "Cinta elástica");
     assert.equal(saved[0].quantity, 6);
+    assert.equal(saved[0].deleted, false);
+    // Las líneas anteriores NO se borran: quedan como tombstones sincronizables.
+    const all = await db.expenseDetails.where("expenseId").equals(expense.id).toArray();
+    assert.equal(all.length, 3);
+    const oldOnes = all.filter((d) => d.name !== "Cinta elástica");
+    assert.equal(oldOnes.length, 2);
+    for (const d of oldOnes) {
+      assert.equal(d.deleted, true);
+      assert.equal(d.syncStatus, "pending");
+    }
   });
 
   it("vaciar detalles deja el monto manual", async () => {
@@ -215,11 +225,19 @@ describe("deleteExpense", () => {
     assert.equal(deleted!.syncStatus, "pending");
   });
 
-  it("elimina los detalles asociados", async () => {
+  it("soft-deletea los detalles asociados (tombstone sincronizable)", async () => {
     const expense = await createExpense(validData, undefined, detailLines);
     await deleteExpense(expense.id);
     const saved = await listExpenseDetails(expense.id);
     assert.equal(saved.length, 0);
+    // Las líneas persisten como tombstones pending para que el Sync Engine
+    // propague deleted=true al servidor (sin DELETE físico).
+    const all = await db.expenseDetails.where("expenseId").equals(expense.id).toArray();
+    assert.equal(all.length, detailLines.length);
+    for (const d of all) {
+      assert.equal(d.deleted, true);
+      assert.equal(d.syncStatus, "pending");
+    }
   });
 
   it("lanza error cuando el gasto no existe (actualiza id inexistente silenciosamente)", async () => {

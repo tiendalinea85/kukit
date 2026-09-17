@@ -79,8 +79,14 @@ export async function updateExpense(
       updatedAt: now,
       syncStatus: "pending" as const,
     });
-    // Patrón de reemplazo: se borran las líneas existentes y se reinsertan.
-    await db.expenseDetails.where("expenseId").equals(id).delete();
+    // Soft-delete: las líneas anteriores se marcan deleted=true y quedan en
+    // "pending" para que el Sync Engine propague el tombstone al servidor.
+    // (Un DELETE físico impediría que el servidor se entere del borrado y
+    //  resucitaría las líneas huérfanas en otros dispositivos.)
+    await db.expenseDetails
+      .where("expenseId")
+      .equals(id)
+      .modify({ deleted: true, syncStatus: "pending" as const });
     if (detailRows.length > 0) await db.expenseDetails.bulkAdd(detailRows);
   });
 }
@@ -100,7 +106,12 @@ export async function voidExpense(id: string): Promise<void> {
 
 export async function deleteExpense(id: string): Promise<void> {
   await db.transaction("rw", db.expenses, db.expenseDetails, async () => {
-    await db.expenseDetails.where("expenseId").equals(id).delete();
+    // Soft-delete de las líneas: el tombstone se propaga por el Sync Engine
+    // (deleted=true) en lugar de un DELETE físico que el servidor nunca vería.
+    await db.expenseDetails
+      .where("expenseId")
+      .equals(id)
+      .modify({ deleted: true, syncStatus: "pending" as const });
     await db.expenses.update(id, {
       deleted: true,
       syncStatus: "pending" as const,
@@ -109,7 +120,8 @@ export async function deleteExpense(id: string): Promise<void> {
 }
 
 export async function listExpenseDetails(expenseId: string): Promise<ExpenseDetail[]> {
-  return db.expenseDetails.where("expenseId").equals(expenseId).toArray();
+  const all = await db.expenseDetails.where("expenseId").equals(expenseId).toArray();
+  return all.filter((d) => !d.deleted);
 }
 
 export async function quickCreateProduct(data: {

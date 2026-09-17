@@ -140,6 +140,7 @@ describe("buildExpenseDetail", () => {
     assert.equal(detail.subtotal, 480);
     assert.equal(detail.createdAt, "2026-08-14T10:00:00.000Z");
     assert.equal(detail.syncStatus, "pending");
+    assert.equal(detail.deleted, false);
     assert.ok(detail.id);
   });
 });

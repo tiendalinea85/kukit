@@ -78,6 +78,7 @@ export interface ExpenseDetail {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  deleted: boolean;
   createdAt: string;
   syncStatus: SyncStatus;
   revision?: number;

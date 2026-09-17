@@ -101,6 +101,7 @@ function expenseDetailToPayload(row: Record<string, unknown>, userId: string) {
     quantity: asNum(row.quantity),
     unit_price: asNum(row.unitPrice),
     subtotal: asNum(row.subtotal),
+    deleted: asBool(row.deleted),
     created_at: asStr(row.createdAt),
     revision: asNum(row.revision, 1),
   };
@@ -317,6 +318,7 @@ function expenseDetailFromRow(row: Record<string, unknown>): ExpenseDetail {
     quantity: asNum(row.quantity),
     unitPrice: asNum(row.unit_price),
     subtotal: asNum(row.subtotal),
+    deleted: asBool(row.deleted),
     createdAt: asStr(row.created_at),
     syncStatus: "synced",
     revision: asNum(row.revision, 1),
