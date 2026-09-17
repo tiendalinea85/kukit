@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { expenseSchema, type ExpenseFormData } from "../schemas/expenseSchema";
@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
 import { db } from "@/lib/db";
 import { quickCreateProduct } from "../services/expenseService";
+import { generateProductCode } from "@/utils/code";
 import { formatCurrency } from "@/utils/format";
 import toast from "react-hot-toast";
 import type { Category, ExpenseDetailInput, Product } from "@/types";
@@ -67,7 +68,9 @@ export function ExpenseForm({
   const [productModal, setProductModal] = useState(false);
   const [newCode, setNewCode] = useState("");
   const [newName, setNewName] = useState("");
+  const [codeTouched, setCodeTouched] = useState(false);
   const [creatingProduct, setCreatingProduct] = useState(false);
+  const codeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -157,6 +160,28 @@ export function ExpenseForm({
     setUnitPrice("");
   };
 
+  const openProductModal = () => {
+    setNewCode("");
+    setNewName("");
+    setCodeTouched(false);
+    setProductModal(true);
+  };
+
+  const handleNameChange = (value: string) => {
+    setNewName(value);
+    if (codeTouched) return;
+    if (codeTimerRef.current) clearTimeout(codeTimerRef.current);
+    codeTimerRef.current = setTimeout(() => {
+      void (async () => {
+        if (!value.trim()) {
+          setNewCode("");
+          return;
+        }
+        setNewCode(await generateProductCode(value.trim()));
+      })();
+    }, 400);
+  };
+
   const handleCreateProduct = async () => {
     if (!newCode.trim() || !newName.trim()) {
       toast.error("Código y nombre son obligatorios");
@@ -225,7 +250,7 @@ export function ExpenseForm({
             </select>
             <button
               type="button"
-              onClick={() => setProductModal(true)}
+              onClick={openProductModal}
               title="Crear nuevo producto"
               className="shrink-0 rounded-xl bg-zinc-700/60 hover:bg-zinc-700 flex items-center justify-center px-3 text-zinc-300"
             >
@@ -348,8 +373,21 @@ export function ExpenseForm({
 
       <Modal open={productModal} onClose={() => setProductModal(false)} title="Nuevo Producto">
         <div className="space-y-4">
-          <Input label="Código" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="Ej: TEL-001" />
-          <Input label="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ej: Rollo de tela" />
+          <Input
+            label="Nombre"
+            value={newName}
+            onChange={(e) => handleNameChange(e.target.value)}
+            placeholder="Ej: Rollo de tela"
+          />
+          <Input
+            label="Código (automático, puedes editarlo)"
+            value={newCode}
+            onChange={(e) => {
+              setCodeTouched(true);
+              setNewCode(e.target.value);
+            }}
+            placeholder="Se genera desde el nombre"
+          />
           <Button type="button" loading={creatingProduct} className="w-full" onClick={handleCreateProduct}>
             Crear Producto
           </Button>

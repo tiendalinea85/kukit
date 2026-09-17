@@ -56,6 +56,20 @@ describe("createConnectionMonitor", () => {
     mon.stop();
   });
 
+  it("heartbeat OK declara online aunque navigator reporte offline (iOS PWA)", async () => {
+    const fetchImpl = makeFetch(() => new Response(null, { status: 200 }));
+    const mon = createConnectionMonitor({
+      navigatorOnline: () => false,
+      heartbeatUrl: "https://api.example/health",
+      fetchImpl,
+      heartbeatTimeoutMs: 100,
+    });
+    mon.start();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(mon.getState().online, true);
+    mon.stop();
+  });
+
   it("respuesta no-OK del heartbeat declara offline", async () => {
     const fetchImpl = makeFetch(() => new Response(null, { status: 500 }));
     const mon = createConnectionMonitor({

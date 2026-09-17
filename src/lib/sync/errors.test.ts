@@ -51,6 +51,15 @@ describe("classifySyncError", () => {
     assert.ok(!isRetryableError(info));
   });
 
+  it("clasifica 404 como server retryable (auto-reparación)", () => {
+    const info = classifySyncError({
+      status: 404,
+      message: 'relation "expense_details" does not exist',
+    });
+    assert.equal(info.type, "server");
+    assert.ok(isRetryableError(info));
+  });
+
   it("detecta mensajes de duplicado como validation", () => {
     const info = classifySyncError(new Error("duplicate key value violates unique constraint"));
     assert.equal(info.type, "validation");

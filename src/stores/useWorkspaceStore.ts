@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { getCurrentUser, getSupabase } from "@/lib/supabase";
 import { fetchWorkspacesForUser, insertWorkspace } from "@/lib/workspace-sync";
+import { isOffline, withTimeout } from "@/lib/net";
 
 export type BusinessModel =
   | "tailoring"
@@ -143,14 +144,32 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       // Fuente de verdad: Supabase. Reemplaza la lista en memoria con la del
       // usuario y conserva el workspace activo persistido solo si le pertenece.
+      // Offline-First: con cache local del mismo usuario, entra de inmediato
+      // sin red (clave: la app instalada en iOS no debe quedar en spinner).
       loadWorkspaces: async (userId) => {
         const prevActive = get().activeWorkspaceId;
+        const cache = get().workspaces;
+        const cachedFor = get().loadedForUserId;
+
+        if (isOffline() && cachedFor === userId && cache.length > 0) {
+          const active = cache.some((w) => w.id === prevActive) ? prevActive : cache[0].id;
+          set({ loadingWorkspaces: false, activeWorkspaceId: active });
+          return;
+        }
+
         set({ loadingWorkspaces: true, loadedForUserId: userId });
         try {
-          const next = await fetchWorkspacesForUser(userId);
+          const next = await withTimeout(fetchWorkspacesForUser(userId));
           const activeWorkspaceId = next.some((w) => w.id === prevActive) ? prevActive : null;
           set({ workspaces: next, activeWorkspaceId, loadingWorkspaces: false });
         } catch (err) {
+          // Sin red o con timeout: usar la cache local del mismo usuario en
+          // lugar de colgar la UI (spinner a pantalla completa en iOS).
+          if (cachedFor === userId && cache.length > 0) {
+            const active = cache.some((w) => w.id === prevActive) ? prevActive : cache[0].id;
+            set({ loadingWorkspaces: false, activeWorkspaceId: active });
+            return;
+          }
           set({ loadingWorkspaces: false });
           throw err;
         }
@@ -203,12 +222,18 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
     }),
     {
-      // Solo el workspace activo se persiste localmente (preferencia del
-      // dispositivo). La lista de workspaces SIEMPRE viene de Supabase.
+      // La lista de workspaces se cachea localmente (última versión conocida)
+      // para poder entrar sin red (Offline-First). El workspace activo se
+      // persiste como preferencia del dispositivo. Al estar online, loadWorkspaces
+      // reemplaza siempre la cache con lo que venga de Supabase.
       name: "zane-workspaces",
-      version: 2,
-      migrate: () => ({ activeWorkspaceId: null }),
-      partialize: (s) => ({ activeWorkspaceId: s.activeWorkspaceId }),
+      version: 3,
+      migrate: () => ({ activeWorkspaceId: null, workspaces: [], loadedForUserId: null }),
+      partialize: (s) => ({
+        activeWorkspaceId: s.activeWorkspaceId,
+        workspaces: s.workspaces,
+        loadedForUserId: s.loadedForUserId,
+      }),
     },
   ),
 );

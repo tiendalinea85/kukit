@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { isOffline, withTimeout } from "./net";
 
 let _supabase: SupabaseClient | null = null;
 let _currentUser: User | null = null;
@@ -43,8 +44,25 @@ export async function getCurrentUser(): Promise<User | null> {
   if (_currentUser) return _currentUser;
   const sb = getSupabase();
   if (!sb) return null;
-  const { data } = await sb.auth.getUser();
-  _currentUser = data?.user ?? null;
+
+  // Offline-First: si no hay red, usar la sesión cacheada localmente
+  // (persistSession) SIN llamadas de red. Si no hay sesión local, devuelve
+  // null y AuthProvider cae al fallback (mock local), nunca a un spinner.
+  if (isOffline()) {
+    const { data } = await sb.auth.getSession();
+    _currentUser = data.session?.user ?? null;
+    return _currentUser;
+  }
+
+  try {
+    const { data } = await withTimeout(sb.auth.getUser());
+    _currentUser = data?.user ?? null;
+  } catch {
+    // Red lenta / "online" reportado pero sin internet real: no colgar la UI,
+    // usar la sesión local cacheada como fallback.
+    const { data } = await sb.auth.getSession();
+    _currentUser = data.session?.user ?? null;
+  }
   return _currentUser;
 }
 

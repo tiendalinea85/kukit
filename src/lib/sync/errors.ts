@@ -72,6 +72,12 @@ export function classifySyncError(err: unknown, opts: ClassifyOptions = { offlin
     if (httpStatus === 409 || message.toLowerCase().includes("conflict")) {
       return { type: "conflict", message: "Conflicto de versión: el registro cambió en otro dispositivo", retryable: false };
     }
+    if (httpStatus === 404) {
+      // El recurso no existe en el servidor (p. ej. la tabla no está creada o
+      // la ruta del endpoint cambió). Es transitorio: se reintenta con backoff
+      // para auto-repararse cuando el backend esté listo (Offline-First).
+      return { type: "server", message: `El servidor no encontró el recurso (404): ${message}`, retryable: true };
+    }
     if (httpStatus >= 400 && httpStatus < 500) {
       return { type: "validation", message: `El servidor rechazó el registro: ${message}`, retryable: false };
     }

@@ -54,7 +54,12 @@ export function createConnectionMonitor(options: ConnectionMonitorOptions = {}):
 
   function state(): ConnectionState {
     const base = navigatorOnline();
-    const online = base && heartbeatOk !== false;
+    // En la app instalada (iOS PWA) `navigator.onLine` puede reportar offline
+    // aunque haya internet (y viceversa). El heartbeat HTTP es la fuente de
+    // verdad: si el navegador dice offline pero el heartbeat responde OK,
+    // se considera online; si el heartbeat falla, offline (aunque navigator
+    // siga diciendo online).
+    const online = heartbeatOk === false ? false : base || heartbeatOk === true;
     return { online, checkedAt, latencyMs };
   }
 
@@ -87,13 +92,20 @@ export function createConnectionMonitor(options: ConnectionMonitorOptions = {}):
   }
 
   function onNetworkEvent(): void {
-    if (!navigatorOnline()) {
+    // Re-evaluar con un heartbeat (no confiar en navigator.onLine: en iOS
+    // PWA los eventos online/offline pueden no dispararse o reportar mal).
+    heartbeatOk = null;
+    void heartbeat();
+    emit();
+  }
+
+  function onVisibilityChange(): void {
+    // iOS PWA suspende timers en background; al volver al foreground se
+    // re-evalúa la conexión con un heartbeat para reanudar la sincronización.
+    const state = typeof document !== "undefined" ? document.visibilityState : "visible";
+    if (state === "visible" || state === undefined) {
       heartbeatOk = null;
-    }
-    if (navigatorOnline()) {
       void heartbeat();
-    } else {
-      emit();
     }
   }
 
@@ -103,6 +115,10 @@ export function createConnectionMonitor(options: ConnectionMonitorOptions = {}):
       if (typeof window !== "undefined") {
         window.addEventListener("online", onNetworkEvent);
         window.addEventListener("offline", onNetworkEvent);
+        window.addEventListener("pageshow", onVisibilityChange);
+      }
+      if (typeof document !== "undefined") {
+        document.addEventListener("visibilitychange", onVisibilityChange);
       }
       if (heartbeatUrl && fetchImpl) {
         interval = setInterval(() => void heartbeat(), intervalMs);
@@ -118,6 +134,10 @@ export function createConnectionMonitor(options: ConnectionMonitorOptions = {}):
       if (typeof window !== "undefined") {
         window.removeEventListener("online", onNetworkEvent);
         window.removeEventListener("offline", onNetworkEvent);
+        window.removeEventListener("pageshow", onVisibilityChange);
+      }
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibilityChange);
       }
     },
     getState: state,
