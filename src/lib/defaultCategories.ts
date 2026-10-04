@@ -15,10 +15,13 @@ let seeding: Promise<boolean> | null = null;
 
 export async function seedCategoriesIfEmpty(userId: string | null): Promise<boolean> {
   if (!userId) return false;
-  const count = await db.categories.count();
+  const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? "default";
+
+  // El conteo es por workspace: con el conteo global, un workspace nuevo se
+  // quedaba sin catálogo porque el primero ya tenía filas.
+  const count = await db.categories.where("workspaceId").equals(workspaceId).count();
   if (count > 0) return false;
 
-  const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? "default";
   const now = new Date().toISOString();
 
   await db.categories.bulkAdd(

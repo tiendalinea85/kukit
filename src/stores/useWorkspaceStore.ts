@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { getCurrentUser, getSupabase } from "@/lib/supabase";
+import { getCurrentUser, getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { fetchWorkspacesForUser, insertWorkspace } from "@/lib/workspace-sync";
 import { isOffline, withTimeout } from "@/lib/net";
 
@@ -23,6 +23,12 @@ export interface Workspace {
   modules: string[];
   categoryId: string;
   createdAt: string;
+  /**
+   * Creado solo en local: el INSERT en Supabase falló o no había sesión
+   * (offline, login mock). No propagarlo a otros dispositivos ni perderlo al
+   * recargar: loadWorkspaces reintenta el push y limpia la marca.
+   */
+  pendingSync?: boolean;
 }
 
 export type CreateWorkspaceInput = Pick<Workspace, "name" | "model" | "modules" | "categoryId">;
@@ -78,7 +84,7 @@ interface WorkspaceState {
   enableModule: (workspaceId: string, moduleKey: string) => void;
   disableModule: (workspaceId: string, moduleKey: string) => void;
 
-  loadWorkspaces: (userId: string) => Promise<void>;
+  loadWorkspaces: (userId?: string | null) => Promise<void>;
   createWorkspace: (input: CreateWorkspaceInput) => Promise<Workspace>;
   resetWorkspaces: () => void;
 
@@ -142,8 +148,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           ),
         })),
 
-      // Fuente de verdad: Supabase. Reemplaza la lista en memoria con la del
-      // usuario y conserva el workspace activo persistido solo si le pertenece.
+      // Fuente de verdad: Supabase. La lista en memoria se compone con la del
+      // usuario (los pendientes se suben, no se descartan) y conserva el
+      // workspace activo persistido solo si le pertenece.
       // Offline-First: con cache local del mismo usuario, entra de inmediato
       // sin red (clave: la app instalada en iOS no debe quedar en spinner).
       loadWorkspaces: async (userId) => {
@@ -157,11 +164,37 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           return;
         }
 
+        // Sin userId no hay consulta posible (sesión no resuelta, login mock o
+        // Supabase sin configurar). Conservar la lista local: reemplazarla por
+        // un [] hacía desaparecer los workspaces del usuario en cada recarga.
+        if (!userId || !isSupabaseConfigured()) {
+          set({ loadingWorkspaces: false });
+          return;
+        }
+
         set({ loadingWorkspaces: true, loadedForUserId: userId });
         try {
           const next = await withTimeout(fetchWorkspacesForUser(userId));
-          const activeWorkspaceId = next.some((w) => w.id === prevActive) ? prevActive : null;
-          set({ workspaces: next, activeWorkspaceId, loadingWorkspaces: false });
+
+          // Los workspaces creados sin sesión quedan solo en local. Se suben
+          // ahora que hay red y usuario; los que fallan se conservan en la lista
+          // (no se descartan) y se reintentan en la próxima carga.
+          const remoteIds = new Set(next.map((w) => w.id));
+          const unsynced: Workspace[] = [];
+          const confirmed: Workspace[] = [];
+          for (const w of cache) {
+            if (!w.pendingSync || remoteIds.has(w.id)) continue;
+            try {
+              await insertWorkspace(w, userId);
+              confirmed.push({ ...w, pendingSync: false });
+            } catch {
+              unsynced.push(w);
+            }
+          }
+
+          const merged = [...next, ...unsynced, ...confirmed];
+          const activeWorkspaceId = merged.some((w) => w.id === prevActive) ? prevActive : null;
+          set({ workspaces: merged, activeWorkspaceId, loadingWorkspaces: false });
         } catch (err) {
           // Sin red o con timeout: usar la cache local del mismo usuario en
           // lugar de colgar la UI (spinner a pantalla completa en iOS).
@@ -187,15 +220,24 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           createdAt: new Date().toISOString(),
         };
 
+        // Offline-First: el workspace existe localmente aunque el INSERT
+        // remoto no sea posible. Antes se omitía en silencio y el workspace
+        // desaparecía al recargar (solo vivía en memoria).
+        let pendingSync = true;
         const sb = getSupabase();
         const user = await getCurrentUser();
         if (sb && user) {
-          await insertWorkspace(ws, user.id);
+          try {
+            await insertWorkspace(ws, user.id);
+            pendingSync = false;
+          } catch {
+            // Red caída o RLS: se reintentará en la próxima loadWorkspaces.
+          }
         }
 
-        set((s) => ({ workspaces: [...s.workspaces, ws] }));
+        set((s) => ({ workspaces: [...s.workspaces, { ...ws, pendingSync }] }));
         set({ activeWorkspaceId: id });
-        return ws;
+        return { ...ws, pendingSync };
       },
 
       resetWorkspaces: () =>

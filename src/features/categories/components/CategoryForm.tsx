@@ -2,22 +2,24 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { categorySchema, type CategoryFormData } from "../schemas/categorySchema";
+import { CATEGORY_COLORS, CATEGORY_ICONS, DEFAULT_CATEGORY_COLOR, DEFAULT_CATEGORY_ICON } from "../domain/categoryRules";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
-const colors = ["#ef4444","#f97316","#eab308","#22c55e","#06b6d4","#3b82f6","#8b5cf6","#ec4899","#78716c","#a8a29e"];
-const iconOptions = ["🛒","🚗","💡","🏥","📚","🛍️","📊","🎯","👤","📦"];
+const colors = CATEGORY_COLORS;
+const iconOptions = CATEGORY_ICONS;
 
 interface Props {
   onSubmit: (data: CategoryFormData) => Promise<void>;
   defaultValues?: CategoryFormData;
   loading?: boolean;
+  submitLabel?: string;
 }
 
-export function CategoryForm({ onSubmit, defaultValues, loading }: Props) {
+export function CategoryForm({ onSubmit, defaultValues, loading, submitLabel }: Props) {
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
-    defaultValues: defaultValues || { name: "", color: "#8b5cf6", icon: "📦" },
+    defaultValues: defaultValues || { name: "", color: DEFAULT_CATEGORY_COLOR, icon: DEFAULT_CATEGORY_ICON },
   });
 
   const selectedColor = watch("color");
@@ -55,7 +57,7 @@ export function CategoryForm({ onSubmit, defaultValues, loading }: Props) {
       </div>
 
       <Button type="submit" loading={loading} className="w-full">
-        {defaultValues ? "Actualizar" : "Crear"} Categoría
+        {submitLabel ?? `${defaultValues ? "Actualizar" : "Crear"} Categoría`}
       </Button>
     </form>
   );

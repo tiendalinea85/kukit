@@ -2,67 +2,66 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus, Pencil, Trash2 } from "lucide-react";
-import { db } from "@/lib/db";
 import { ensureDefaultCategories } from "@/lib/defaultCategories";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Pagination } from "@/components/ui/Pagination";
 import { CategoryForm } from "@/features/categories/components/CategoryForm";
+import { createCategory, updateCategory, deleteCategory } from "@/features/categories/services/categoryService";
+import { useCategories } from "@/features/categories/hooks/useCategories";
 import toast from "react-hot-toast";
 import type { CategoryFormData } from "@/features/categories/schemas/categorySchema";
 import type { Category } from "@/types";
-import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 
 const PAGE_SIZE = 25;
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { categories } = useCategories();
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const load = async () => {
-    await ensureDefaultCategories();
-    db.categories.toArray().then(setCategories);
-  };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void ensureDefaultCategories(); }, []);
 
+  const totalPages = Math.max(1, Math.ceil(categories.length / PAGE_SIZE));
   const paged = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
     return categories.slice(start, start + PAGE_SIZE);
   }, [categories, page]);
 
+  // Tras borrar o renombrar, la página actual puede quedar fuera de rango.
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
   const handleSubmit = async (data: CategoryFormData) => {
     setLoading(true);
     try {
       if (editing) {
-        await db.categories.update(editing.id, { ...data, syncStatus: "pending" });
+        await updateCategory(editing.id, data);
         toast.success("Categoría actualizada");
       } else {
-        await db.categories.add({
-          id: crypto.randomUUID(),
-          workspaceId: useWorkspaceStore.getState().activeWorkspaceId ?? "default",
-          ...data,
-          createdAt: new Date().toISOString(),
-          syncStatus: "pending",
-        });
+        await createCategory(data);
         toast.success("Categoría creada");
       }
       setModalOpen(false);
       setEditing(null);
-      load();
-    } catch {
-      toast.error("Error al guardar");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar la categoría");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    await db.categories.delete(id);
-    toast.success("Categoría eliminada");
-    load();
+  const handleDelete = async (c: Category) => {
+    if (!confirm(`¿Eliminar la categoría "${c.name}"?`)) return;
+    try {
+      await deleteCategory(c.id);
+      toast.success("Categoría eliminada");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar la categoría");
+    }
   };
 
   return (
@@ -92,7 +91,7 @@ export default function CategoriesPage() {
               <button onClick={() => { setEditing(c); setModalOpen(true); }} className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300">
                 <Pencil size={14} />
               </button>
-              <button onClick={() => handleDelete(c.id)} className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-red-400">
+              <button onClick={() => handleDelete(c)} className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-red-400">
                 <Trash2 size={14} />
               </button>
             </div>

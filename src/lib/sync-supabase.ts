@@ -44,6 +44,9 @@ interface EntitySpec {
   order: number;
   mode: PushMode;
   orderColumn?: "updated_at" | "created_at";
+  // Campos que el servidor no almacena: el pull debe conservarlos al aplicar
+  // una fila remota encima de la local.
+  localOnlyFields?: string[];
   toPayload: (row: Record<string, unknown>, userId: string) => Record<string, unknown>;
   fromRow: (row: Record<string, unknown>) => unknown;
 }
@@ -173,14 +176,18 @@ function customerToPayload(row: Record<string, unknown>, userId: string) {
   };
 }
 
-function productToPayload(row: Record<string, unknown>, userId: string) {
+export function productToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
     code: asStr(row.code),
     name: asStr(row.name),
     color: asStr(row.color),
-    category_id: asStr(row.categoryId) || null,
+    // `categoryId` NO se envía: `public.products` del Supabase desplegado no
+    // tiene la columna `category_id` y PostgREST rechaza el payload entero
+    // (PGRST204) antes de insertar. El campo es local (Dexie) y se conserva en
+    // el pull vía `localOnlyFields`; si algún día el servidor vuelve a exponer la
+    // columna, se reincorpora aquí.
     deleted: asBool(row.deleted),
     created_at: asStr(row.createdAt),
     updated_at: asStr(row.updatedAt),
@@ -1033,7 +1040,7 @@ const ENTITY_SPECS: EntitySpec[] = [
   { name: "types", serverTable: "types", order: 2, mode: "master", toPayload: typeToPayload, fromRow: typeFromRow },
   { name: "investmentCategories", serverTable: "investment_categories", order: 3, mode: "master", toPayload: investmentCategoryToPayload, fromRow: investmentCategoryFromRow },
   { name: "customers", serverTable: "customers", order: 4, mode: "master", toPayload: customerToPayload, fromRow: customerFromRow },
-  { name: "products", serverTable: "products", order: 5, mode: "master", toPayload: productToPayload, fromRow: productFromRow },
+  { name: "products", serverTable: "products", order: 5, mode: "master", localOnlyFields: ["categoryId"], toPayload: productToPayload, fromRow: productFromRow },
   { name: "expenses", serverTable: "expenses", order: 6, mode: "guarded", toPayload: expenseToPayload, fromRow: expenseFromRow },
   { name: "expenseDetails", serverTable: "expense_details", order: 6.5, mode: "guarded", orderColumn: "created_at", toPayload: expenseDetailToPayload, fromRow: expenseDetailFromRow },
   { name: "investments", serverTable: "investments", order: 7, mode: "guarded", toPayload: investmentToPayload, fromRow: investmentFromRow },
@@ -1081,6 +1088,7 @@ export function buildSupabaseTransport(): SyncTransportEntity[] {
     name: spec.name,
     serverTable: spec.serverTable,
     order: spec.order,
+    localOnlyFields: spec.localOnlyFields,
     async push(op: OutboxOperation): Promise<SyncErrorInfo | null> {
       return pushOp(spec, op);
     },

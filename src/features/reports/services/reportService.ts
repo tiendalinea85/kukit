@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { listCategories } from "@/features/categories/services/categoryService";
 import { normalizeText } from "@/utils/text";
 import type { Category, PeriodFilter, Expense } from "@/types";
 
@@ -79,7 +80,7 @@ export async function queryExpensesReport(options: {
     options.workspaceId
       ? db.expenses.where("workspaceId").equals(options.workspaceId).toArray()
       : db.expenses.toArray(),
-    db.categories.toArray(),
+    listCategories(options.workspaceId),
   ]);
 
   let filtered = all.filter((e) => e.deleted !== true);

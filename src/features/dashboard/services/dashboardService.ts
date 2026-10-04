@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { format, startOfWeek, subDays } from "date-fns";
 import { computeStockById } from "@/features/sales/domain/stockRules";
+import { listCategories } from "@/features/categories/services/categoryService";
 import type { Product, Category, Sale, SaleDetail } from "@/types";
 
 // Dashboard 100% offline: todas las agregaciones se resuelven desde IndexedDB
@@ -112,7 +113,7 @@ export async function loadDashboard(workspaceId?: string): Promise<DashboardData
     filterByWorkspace(await db.expenses.toArray()),
     filterByWorkspace(await db.investments.toArray()),
     filterByWorkspace(await db.products.toArray()),
-    db.categories.toArray(),
+    listCategories(workspaceId),
     db.inventoryMovements.toArray(),
     Promise.all([
       countPending("expenses"),

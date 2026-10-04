@@ -1,15 +1,19 @@
 "use client";
 import { forwardRef } from "react";
+import { Plus } from "lucide-react";
 
 interface Props extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
   options: { value: string; label: string }[];
   placeholder?: string;
+  /** Abre el alta rápida de la entidad elegible (p. ej. nueva categoría). */
+  onNew?: () => void;
+  newLabel?: string;
 }
 
 export const Select = forwardRef<HTMLSelectElement, Props>(
-  ({ label, error, options, placeholder, className = "", ...props }, ref) => (
+  ({ label, error, options, placeholder, onNew, newLabel, className = "", ...props }, ref) => (
     <div className="space-y-1.5">
       {label && <label className="text-sm font-medium text-zinc-400">{label}</label>}
       <select
@@ -22,6 +26,15 @@ export const Select = forwardRef<HTMLSelectElement, Props>(
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
+      {onNew && (
+        <button
+          type="button"
+          onClick={onNew}
+          className="inline-flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+        >
+          <Plus size={12} /> {newLabel ?? "Nueva"}
+        </button>
+      )}
       {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   )

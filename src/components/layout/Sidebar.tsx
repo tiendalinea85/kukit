@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { X, Home, PlusCircle, List, Briefcase, Tag, Type, BarChart3, Settings, Trash2, ReceiptText, Users, Package, ShoppingBag, Truck, Scissors, Wheat, Car, Egg, ChevronDown, Building2, Plus } from "lucide-react";
 import { useAppStore } from "@/stores/useAppStore";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
+import { QuickCategoryModal } from "@/features/categories/components/QuickCategoryModal";
 
 const ALWAYS_SHOW = new Set(["/", "/reports", "/settings", "/trash"]);
 
@@ -50,6 +51,13 @@ function getModuleForHref(href: string): string | undefined {
   return undefined;
 }
 
+// Acciones que abren un modal en vez de navegar. Viven aparte de `links`
+// porque no son rutas: no deben marcarse como activas ni entrar en
+// MODULE_LINKS; se gatean por `module` explícito.
+const actions = [
+  { id: "new-category", label: "Nueva Categoría", icon: Plus, module: "categories", after: "/categories" },
+] as const;
+
 const brand = (right: React.ReactNode) => (
   <div className="flex items-center justify-between p-4 border-b border-zinc-800">
     <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Zane</span>
@@ -61,6 +69,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, toggleSidebar, openWorkspaceSetup } = useAppStore();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [newCategoryOpen, setNewCategoryOpen] = useState(false);
 
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
@@ -76,6 +85,12 @@ export function Sidebar() {
     return isModuleEnabled(mod);
   });
 
+  const visibleActions = actions.filter((a) => isModuleEnabled(a.module));
+
+  const openAction = (id: (typeof actions)[number]["id"]) => {
+    if (id === "new-category") setNewCategoryOpen(true);
+  };
+
   // NAV compartido. "onNavigate" se inyecta según el contexto:
   // - drawer móvil -> cerrar el sidebar (toggleSidebar)
   // - sidebar desktop -> sin efecto (isSidebarOpen NO depende de desktop)
@@ -84,14 +99,24 @@ export function Sidebar() {
       {visibleLinks.map((link) => {
         const active = pathname === link.href;
         return (
-          <Link key={link.href} href={link.href} onClick={onNavigate}
-            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all ${
-              active ? "bg-purple-600/20 text-purple-400" : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-            }`}
-          >
-            <link.icon size={18} />
-            {link.label}
-          </Link>
+          <div key={link.href}>
+            <Link href={link.href} onClick={onNavigate}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all ${
+                active ? "bg-purple-600/20 text-purple-400" : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+              }`}
+            >
+              <link.icon size={18} />
+              {link.label}
+            </Link>
+            {visibleActions.filter((a) => a.after === link.href).map((a) => (
+              <button key={a.id} onClick={() => { openAction(a.id); onNavigate?.(); }}
+                className="flex w-full items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-all"
+              >
+                <a.icon size={18} />
+                {a.label}
+              </button>
+            ))}
+          </div>
         );
       })}
     </nav>
@@ -199,6 +224,9 @@ export function Sidebar() {
           </>
         )}
       </AnimatePresence>
+
+      {/* Una sola instancia para desktop y móvil: `renderNav` se llama dos veces. */}
+      <QuickCategoryModal open={newCategoryOpen} onClose={() => setNewCategoryOpen(false)} />
     </>
   );
 }

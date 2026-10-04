@@ -28,6 +28,20 @@ function pendingLike(status: string | undefined): boolean {
   return status === "pending" || status === "syncing" || status === "failed" || status === "conflict";
 }
 
+// Campos que el servidor no almacena: llegan vacíos en la fila remota y, sin
+// esto, la sobrescritura los borraría de la base local.
+function localOnlyFields(
+  local: Record<string, unknown>,
+  fields: string[] | undefined,
+): Record<string, unknown> {
+  if (!fields?.length) return {};
+  const kept: Record<string, unknown> = {};
+  for (const field of fields) {
+    if (local[field] !== undefined) kept[field] = local[field];
+  }
+  return kept;
+}
+
 async function tableOf(entity: string): Promise<
   { get(id: string): Promise<unknown>; put(row: unknown): Promise<unknown>; update(id: string, changes: Record<string, unknown>): Promise<number> } | null
 > {
@@ -100,7 +114,11 @@ export async function runPull(
         } else {
           const res = resolveConflict(local, row as { updatedAt?: string; revision?: number }, false);
           if (res.resolution === "keep_remote") {
-            await table.put({ ...row, syncStatus: "synced" });
+            await table.put({
+              ...row,
+              ...localOnlyFields(local, entity.localOnlyFields),
+              syncStatus: "synced",
+            });
             result.updated++;
           }
         }

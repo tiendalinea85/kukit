@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { TopBar } from "./TopBar";
 import { BottomNav } from "./BottomNav";
@@ -8,12 +9,18 @@ import { useAppStore } from "@/stores/useAppStore";
 import { startSyncEngine, stopSyncEngine, useSyncStore } from "@/lib/sync";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { registerPWA } from "@/lib/pwa";
-import { seedIfEmpty } from "@/lib/seed";
 import { Toaster, toast } from "react-hot-toast";
 import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
-import { VoiceAssistant } from "@/components/voice/VoiceAssistant";
 import { WorkspaceGate } from "@/features/workspaces/components/WorkspaceGate";
 import { useTranslation } from "@/hooks/useTranslation";
+
+// El asistente solo se necesita cuando el usuario abre el micrófono. Importado
+// estáticamente metía recharts (2 MB) en el grafo de módulos de TODAS las rutas,
+// incluida /auth, que compilar 3000 módulos solo para pintar un login.
+const VoiceAssistant = dynamic(
+  () => import("@/components/voice/VoiceAssistant").then((m) => m.VoiceAssistant),
+  { ssr: false }
+);
 
 function LayoutInner({ children }: { children: React.ReactNode }) {
   const { setOnline, theme } = useAppStore();
@@ -23,7 +30,9 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
-      seedIfEmpty();
+      // import() diferido: seed.ts arrastra las reglas de dominio de todas las
+      // features y solo hace falta tras el primer montaje sin Supabase.
+      void import("@/lib/seed").then((m) => m.seedIfEmpty());
       return;
     }
     startSyncEngine();
@@ -101,7 +110,10 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
       {isAuthPage ? (
         <div className="min-h-screen bg-zinc-950">{children}</div>
       ) : (
-        <WorkspaceGate>{appChrome}</WorkspaceGate>
+        <WorkspaceGate>
+          {appChrome}
+          <VoiceAssistant />
+        </WorkspaceGate>
       )}
       <Toaster
         position="top-center"
@@ -110,7 +122,6 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
           duration: 3000,
         }}
       />
-      <VoiceAssistant />
     </>
   );
 }

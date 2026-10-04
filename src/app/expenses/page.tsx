@@ -1,14 +1,14 @@
 "use client";
-import { Suspense, useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Search, Edit2, Trash2, Ban, CalendarRange, LayoutList, LayoutGrid } from "lucide-react";
 import { useExpenses } from "@/features/expenses/hooks/useExpenses";
+import { useCategories } from "@/features/categories/hooks/useCategories";
 import { useAppStore } from "@/stores/useAppStore";
 import { useTranslation } from "@/hooks/useTranslation";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { filterExpenses, canEditExpense, canVoidExpense } from "@/features/expenses/domain/expenseRules";
-import { db } from "@/lib/db";
 import type { TranslationPath } from "@/lib/translations";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -23,7 +23,7 @@ function ExpensesContent() {
   const searchParams = useSearchParams();
   const q = searchParams.get("q") || "";
   const { expenses, loading, remove, voidById } = useExpenses();
-  const [categories, setCategories] = useState<Record<string, Category>>({});
+  const { categories: categoryList } = useCategories();
   const [search, setSearch] = useState(q);
   const [filterCategory, setFilterCategory] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
@@ -34,13 +34,11 @@ function ExpensesContent() {
   const { viewMode, setViewMode } = useAppStore();
   const { t: _ } = useTranslation();
 
-  useEffect(() => {
-    db.categories.toArray().then((arr) => {
-      const map: Record<string, Category> = {};
-      arr.forEach((c) => { map[c.id] = c; });
-      setCategories(map);
-    });
-  }, []);
+  const categories = useMemo(() => {
+    const map: Record<string, Category> = {};
+    categoryList.forEach((c) => { map[c.id] = c; });
+    return map;
+  }, [categoryList]);
 
   const categoryNames = useMemo(() => {
     const map: Record<string, string> = {};

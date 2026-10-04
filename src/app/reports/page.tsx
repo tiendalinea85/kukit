@@ -1,32 +1,28 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { BarChart3, PieChart, TrendingUp, Calendar, Printer, FileSpreadsheet, Share2 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart as RPieChart, Pie, Cell, LineChart, Line,
 } from "recharts";
-import { db } from "@/lib/db";
 import { useExpenses } from "@/features/expenses/hooks/useExpenses";
+import { useCategories } from "@/features/categories/hooks/useCategories";
 import { PERIODS as periods, getDateRange } from "@/features/reports/services/reportService";
 import { formatCurrency } from "@/utils/format";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
-import type { Category, PeriodFilter, Expense } from "@/types";
+import type { PeriodFilter, Expense } from "@/types";
 
 const CHART_COLORS = ["#a855f7","#ec4899","#f97316","#eab308","#22c55e","#06b6d4","#3b82f6","#78716c"];
 
 export default function ReportsPage() {
   const { expenses } = useExpenses();
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { categories } = useCategories();
   const [period, setPeriod] = useState<PeriodFilter>("month");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [chartType, setChartType] = useState<"bar" | "pie" | "line">("bar");
-
-  useEffect(() => {
-    db.categories.toArray().then(setCategories);
-  }, []);
 
   const filtered = useMemo(() => {
     if (period === "custom" && customStart && customEnd) {

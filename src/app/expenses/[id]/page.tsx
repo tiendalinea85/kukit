@@ -6,6 +6,7 @@ import { ArrowLeft, Edit2, Trash2, Ban } from "lucide-react";
 import { db } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { voidExpense, deleteExpense, listExpenseDetails } from "@/features/expenses/services/expenseService";
+import { listCategories } from "@/features/categories/services/categoryService";
 import { canEditExpense, canVoidExpense, isVoided } from "@/features/expenses/domain/expenseRules";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -42,10 +43,18 @@ export default function ExpenseDetailPage() {
     db.expenses.get(id).then((e) => {
       if (!e) return;
       setExpense(e);
-      db.categories.get(e.categoryId).then((c) => c && setCategory(c));
     });
     listExpenseDetails(id).then(setDetails);
   }, [id]);
+
+  // La categoría se resuelve dentro del workspace activo: un id de otra cuenta
+  // no debe poder mostrar su nombre en el detalle.
+  useEffect(() => {
+    if (!expense?.categoryId) return;
+    listCategories().then((rows) => {
+      setCategory(rows.find((c) => c.id === expense.categoryId) ?? null);
+    });
+  }, [expense?.categoryId]);
 
   if (!expense) {
     return (

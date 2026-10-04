@@ -25,6 +25,7 @@ import { formatCurrency } from "@/utils/format";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { ExpenseForm } from "@/features/expenses/components/ExpenseForm";
+import { useCategories } from "@/features/categories/hooks/useCategories";
 import { createExpense } from "@/features/expenses/services/expenseService";
 import type { ExpenseFormData } from "@/features/expenses/schemas/expenseSchema";
 import type { Category, Type } from "@/types";
@@ -83,6 +84,7 @@ export function VoiceAssistant() {
   const [action, setAction] = useState<VoiceActionResult | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [types, setTypes] = useState<Type[]>([]);
+  const { categories: workspaceCategories } = useCategories();
   const [saving, setSaving] = useState(false);
 
   const confirmModeRef = useRef(false);
@@ -129,10 +131,15 @@ export function VoiceAssistant() {
 
   useEffect(() => {
     setMounted(true);
-    db.categories.toArray().then(setCategories).catch(() => setCategories([]));
     db.types.toArray().then(setTypes).catch(() => setTypes([]));
     return () => cancel();
   }, [cancel]);
+
+  // El catálogo que propone el asistente debe ser el del workspace activo: el
+  // que escucha el micrófono es el mismo que ve la PWA.
+  useEffect(() => {
+    setCategories(workspaceCategories);
+  }, [workspaceCategories]);
 
   const handleModalClose = useCallback(() => {
     confirmModeRef.current = false;

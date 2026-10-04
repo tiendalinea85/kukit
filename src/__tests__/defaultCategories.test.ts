@@ -37,3 +37,15 @@ test("seedCategoriesIfEmpty sin usuario no crea nada", async () => {
   assert.equal(seeded, false);
   assert.equal(await db.categories.count(), 0);
 });
+
+test("seedCategoriesIfEmpty siembra un workspace nuevo aunque el otro tenga categorías", async () => {
+  useWorkspaceStore.setState({ activeWorkspaceId: "ws-uno" });
+  assert.equal(await seedCategoriesIfEmpty("user-1"), true);
+
+  useWorkspaceStore.setState({ activeWorkspaceId: "ws-dos" });
+  assert.equal(await seedCategoriesIfEmpty("user-1"), true);
+
+  const rows = await db.categories.toArray();
+  assert.equal(rows.length, DEFAULT_CATEGORIES.length * 2);
+  assert.equal(rows.filter((r) => r.workspaceId === "ws-dos").length, DEFAULT_CATEGORIES.length);
+});

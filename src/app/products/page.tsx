@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus, Pencil, Trash2, Package, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -8,18 +8,17 @@ import { Input } from "@/components/ui/Input";
 import { ProductForm } from "@/features/sales/components/ProductForm";
 import { createProduct, updateProduct, deleteProduct, adjustStock } from "@/features/sales/services/productService";
 import { useProducts } from "@/features/sales/hooks/useProducts";
-import { db } from "@/lib/db";
+import { useCategories } from "@/features/categories/hooks/useCategories";
 import toast from "react-hot-toast";
 import type { ProductWithStockFormData } from "@/features/sales/schemas/productSchema";
 import type { ProductWithStock } from "@/features/sales/services/productService";
 import { Pagination } from "@/components/ui/Pagination";
-import type { Category } from "@/types";
 
 const PAGE_SIZE = 25;
 
 export default function ProductsPage() {
   const { products } = useProducts();
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { categories } = useCategories();
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ProductWithStock | null>(null);
@@ -29,10 +28,6 @@ export default function ProductsPage() {
   const [adjustDelta, setAdjustDelta] = useState("");
   const [adjustNotes, setAdjustNotes] = useState("");
   const [adjustLoading, setAdjustLoading] = useState(false);
-
-  useEffect(() => {
-    db.categories.toArray().then(setCategories);
-  }, []);
 
   const paged = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;

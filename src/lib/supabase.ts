@@ -4,6 +4,10 @@ import { isOffline, withTimeout } from "./net";
 
 let _supabase: SupabaseClient | null = null;
 let _currentUser: User | null = null;
+// Distingue "todavía no he resuelto quién es el usuario" de "no hay sesión":
+// sin esta bandera, onAuthStateChange notificaba un null síncrono al suscribirse
+// y AuthProvider expulsaba a /auth en cada carga antes de resolver la sesión.
+let _userResolved = false;
 let _authListeners: Array<(user: User | null) => void> = [];
 let _authUnsub: (() => void) | null = null;
 
@@ -41,9 +45,12 @@ export function getSupabase(): SupabaseClient | null {
 }
 
 export async function getCurrentUser(): Promise<User | null> {
-  if (_currentUser) return _currentUser;
+  if (_userResolved) return _currentUser;
   const sb = getSupabase();
-  if (!sb) return null;
+  if (!sb) {
+    _userResolved = true;
+    return null;
+  }
 
   // Offline-First: si no hay red, usar la sesión cacheada localmente
   // (persistSession) SIN llamadas de red. Si no hay sesión local, devuelve
@@ -51,6 +58,7 @@ export async function getCurrentUser(): Promise<User | null> {
   if (isOffline()) {
     const { data } = await sb.auth.getSession();
     _currentUser = data.session?.user ?? null;
+    _userResolved = true;
     return _currentUser;
   }
 
@@ -63,18 +71,22 @@ export async function getCurrentUser(): Promise<User | null> {
     const { data } = await sb.auth.getSession();
     _currentUser = data.session?.user ?? null;
   }
+  _userResolved = true;
   return _currentUser;
 }
 
 export function onAuthStateChange(callback: (user: User | null) => void): () => void {
   _authListeners.push(callback);
-  if (_currentUser !== undefined) callback(_currentUser);
+  // Solo se replica el estado si ya se resolvió: notificar un null " provisional"
+  // provocaba un ciclo logout→login en cada recarga de la PWA.
+  if (_userResolved) callback(_currentUser);
 
   if (!_authUnsub) {
     const sb = getSupabase();
     if (sb) {
       const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
         _currentUser = session?.user ?? null;
+        _userResolved = true;
         _authListeners.forEach((cb) => cb(_currentUser));
       });
       _authUnsub = () => sub.subscription.unsubscribe();

@@ -110,6 +110,12 @@ export interface SyncTransportEntity {
   name: string;
   serverTable: string;
   order: number;
+  /**
+   * Campos que existen solo en la base local (el servidor no los almacena). El
+   * pull los conserva al aplicar una fila remota encima de la local, para no
+   * borrar datos que el servidor nunca recibió.
+   */
+  localOnlyFields?: string[];
   push(op: OutboxOperation): Promise<SyncErrorInfo | null>;
   pull(sinceIso: string): Promise<{
     rows: Array<Record<string, unknown>>;

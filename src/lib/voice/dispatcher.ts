@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { t } from "@/lib/translations";
 import { normalizeText } from "@/utils/text";
+import { listCategories } from "@/features/categories/services/categoryService";
 import {
   queryExpensesReport,
   type ReportQueryResult,
@@ -80,7 +81,7 @@ function buildSummaryText(
 async function handleAddExpense(
   intent: AddExpenseIntent
 ): Promise<VoiceActionResult> {
-  const categories = await db.categories.toArray();
+  const categories = await listCategories();
 
   const categoryName = intent.category;
   const category = categoryName

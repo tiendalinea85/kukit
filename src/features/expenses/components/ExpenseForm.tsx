@@ -12,10 +12,12 @@ import { Modal } from "@/components/ui/Modal";
 import { db } from "@/lib/db";
 import { ensureDefaultCategories } from "@/lib/defaultCategories";
 import { quickCreateProduct } from "../services/expenseService";
+import { useCategories } from "@/features/categories/hooks/useCategories";
+import { QuickCategoryModal } from "@/features/categories/components/QuickCategoryModal";
 import { generateProductCode } from "@/utils/code";
 import { formatCurrency } from "@/utils/format";
 import toast from "react-hot-toast";
-import type { Category, ExpenseDetailInput, Product } from "@/types";
+import type { ExpenseDetailInput, Product } from "@/types";
 
 const paymentMethodLabels: Record<string, string> = {
   efectivo: "Efectivo",
@@ -58,7 +60,6 @@ export function ExpenseForm({
   loading,
   code,
 }: Props) {
-  const [categories, setCategories] = useState<Category[]>([]);
   const [mounted, setMounted] = useState(false);
 
   const [details, setDetails] = useState<ExpenseDetailInput[]>(defaultDetails ?? []);
@@ -67,6 +68,8 @@ export function ExpenseForm({
   const [unitPrice, setUnitPrice] = useState("");
   const [lineError, setLineError] = useState("");
   const [productModal, setProductModal] = useState(false);
+  const [categoryModal, setCategoryModal] = useState(false);
+  const { categories } = useCategories();
   const [newCode, setNewCode] = useState("");
   const [newName, setNewName] = useState("");
   const [codeTouched, setCodeTouched] = useState(false);
@@ -75,12 +78,9 @@ export function ExpenseForm({
 
   useEffect(() => { setMounted(true); }, []);
 
-  useEffect(() => {
-    (async () => {
-      await ensureDefaultCategories();
-      db.categories.toArray().then(setCategories);
-    })();
-  }, []);
+  // Las categorías por defecto se siembran una vez; el listado llega por
+  // `useCategories` (liveQuery, filtrado por el workspace activo).
+  useEffect(() => { void ensureDefaultCategories(); }, []);
 
   const defaultDate = new Date().toISOString().split("T")[0];
   const defaultTime = new Date().toTimeString().slice(0, 5);
@@ -222,6 +222,7 @@ export function ExpenseForm({
   if (!mounted) return null;
 
   return (
+    <>
     <form onSubmit={handleSubmit(submit)} className="space-y-4">
       {code && (
         <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-800/40 border border-zinc-700/50">
@@ -332,6 +333,8 @@ export function ExpenseForm({
         <Select label="Categoría" {...register("categoryId")} error={errors.categoryId?.message}
           placeholder="Seleccionar"
           options={categories.map((c) => ({ value: c.id, label: `${c.icon} ${c.name}` }))}
+          onNew={() => setCategoryModal(true)}
+          newLabel="Nueva categoría"
         />
       </div>
 
@@ -398,5 +401,13 @@ export function ExpenseForm({
         </div>
       </Modal>
     </form>
+
+    {/* Fuera del `<form>`: un formulario no puede anidar otro. */}
+    <QuickCategoryModal
+      open={categoryModal}
+      onClose={() => setCategoryModal(false)}
+      onCreated={(category) => setValue("categoryId", category.id, { shouldValidate: true })}
+    />
+    </>
   );
 }
