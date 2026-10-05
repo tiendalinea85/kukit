@@ -5,6 +5,7 @@ import asyncpg
 
 TABLES: dict[str, str] = {
     "category": "categories",
+    "custom_icon": "custom_icons",
     "product": "products",
     "purchase": "purchases",
     "purchase_item": "purchase_items",
@@ -26,6 +27,10 @@ TABLES: dict[str, str] = {
 COLUMNS: dict[str, frozenset[str]] = {
     "categories": frozenset(
         {"id", "name", "color", "icon", "deleted", "created_at", "updated_at",
+         "sync_status", "workspace_id"}
+    ),
+    "custom_icons": frozenset(
+        {"id", "name", "data_url", "deleted", "created_at", "updated_at",
          "sync_status", "workspace_id"}
     ),
     "products": frozenset(

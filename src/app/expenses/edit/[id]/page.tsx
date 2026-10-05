@@ -4,10 +4,14 @@ import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, Lock } from "lucide-react";
 import { ExpenseForm } from "@/features/expenses/components/ExpenseForm";
-import { updateExpense, listExpenseDetails } from "@/features/expenses/services/expenseService";
+import {
+  getExpenseById,
+  updateExpense,
+  listExpenseDetails,
+} from "@/features/expenses/services/expenseService";
 import { useExpenseProducts } from "@/features/expenses/hooks/useExpenseProducts";
 import { isVoided } from "@/features/expenses/domain/expenseRules";
-import { db } from "@/lib/db";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
 import type { ExpenseFormData } from "@/features/expenses/schemas/expenseSchema";
@@ -16,15 +20,18 @@ import type { Expense, ExpenseDetailInput } from "@/types";
 export default function EditExpensePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const [expense, setExpense] = useState<Expense | null>(null);
   const [details, setDetails] = useState<ExpenseDetailInput[]>([]);
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const { products } = useExpenseProducts();
 
+  // Editar exige que el gasto pertenezca al workspace activo.
   useEffect(() => {
+    if (!activeWorkspaceId) return;
     (async () => {
-      const e = await db.expenses.get(id);
+      const e = await getExpenseById(id);
       if (!e) return;
       setExpense(e);
       const rows = await listExpenseDetails(id);
@@ -40,7 +47,7 @@ export default function EditExpensePage() {
       );
       setReady(true);
     })();
-  }, [id]);
+  }, [id, activeWorkspaceId]);
 
   const handleSubmit = async (data: ExpenseFormData, detailInputs: ExpenseDetailInput[]) => {
     if (!expense) return;

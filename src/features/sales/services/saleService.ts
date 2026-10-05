@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { buildSale, buildSaleDetail, canEditSale, computeSaleTotal, isConfirmed } from "../domain/saleRules";
 import { missingStock, computeStockById } from "../domain/stockRules";
 import { generateSaleCode } from "@/utils/code";
-import type { InventoryMovement, Sale } from "@/types";
+import type { InventoryMovement, Sale, SaleDetail } from "@/types";
 import type { SaleFormData } from "../schemas/saleSchema";
 import type { SaleDetailInput } from "../domain/saleRules";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
@@ -13,6 +13,26 @@ function getWorkspaceId(): string {
 
 function now(): string {
   return new Date().toISOString();
+}
+
+// El id es clave primaria: sin este filtro, el id de una venta de otro
+// workspace permitiria confirmarla, editarla o anularla.
+async function getActiveSale(id: string): Promise<Sale> {
+  const sale = await db.sales.get(id);
+  if (!sale || sale.workspaceId !== getWorkspaceId()) {
+    throw new Error("Venta no encontrada");
+  }
+  return sale;
+}
+
+export async function getSaleById(id: string): Promise<Sale | null> {
+  const sale = await db.sales.get(id);
+  return sale && sale.workspaceId === getWorkspaceId() ? sale : null;
+}
+
+export async function listSaleDetails(saleId: string): Promise<SaleDetail[]> {
+  const rows = await db.saleDetails.where("saleId").equals(saleId).toArray();
+  return rows.filter((d) => d.workspaceId === getWorkspaceId());
 }
 
 export interface SaleData {
@@ -52,14 +72,18 @@ export async function createSale(data: SaleData, options?: { confirm?: boolean }
 
 // Confirmar: pendiente -> confirmada. Genera movimientos SALIDA de inventario.
 export async function confirmSale(id: string): Promise<Sale> {
-  const sale = await db.sales.get(id);
-  if (!sale) throw new Error("Venta no encontrada");
+  const sale = await getActiveSale(id);
   if (sale.status !== "pendiente") throw new Error("Solo se pueden confirmar ventas pendientes");
 
   const details = await db.saleDetails.where("saleId").equals(id).toArray();
   if (details.length === 0) throw new Error("La venta no tiene detalle de productos");
 
-  const movements = await db.inventoryMovements.toArray();
+  // El stock disponible es el del workspace de la venta: sumando movimientos de
+  // otros espacios de trabajo se podrían confirmar ventas sin existencias.
+  const movements = await db.inventoryMovements
+    .where("workspaceId")
+    .equals(sale.workspaceId)
+    .toArray();
   const stockById = computeStockById(movements);
   const missing = missingStock(
     details.map((d) => ({ productId: d.productId, label: d.code, quantity: d.quantity })),
@@ -97,8 +121,7 @@ async function applyOutboundMovements(sale: Sale): Promise<void> {
 }
 
 export async function updateSale(id: string, data: SaleData): Promise<void> {
-  const existing = await db.sales.get(id);
-  if (!existing) throw new Error("Venta no encontrada");
+  const existing = await getActiveSale(id);
   if (!canEditSale(existing.status)) {
     throw new Error("Solo las ventas pendientes pueden editarse");
   }
@@ -124,8 +147,7 @@ export async function updateSale(id: string, data: SaleData): Promise<void> {
 // Anular: si estaba confirmada, revierte el inventario con movimientos de
 // ENTRADA de compensación (el historial de SALIDA se conserva).
 export async function voidSale(id: string): Promise<void> {
-  const existing = await db.sales.get(id);
-  if (!existing) throw new Error("Venta no encontrada");
+  const existing = await getActiveSale(id);
   if (existing.status === "anulada") throw new Error("La venta ya está anulada");
 
   const wasConfirmed = isConfirmed(existing);
@@ -158,6 +180,7 @@ export async function voidSale(id: string): Promise<void> {
 }
 
 export async function deleteSale(id: string): Promise<void> {
+  await getActiveSale(id);
   await db.sales.update(id, {
     deleted: true,
     updatedAt: now(),

@@ -1,13 +1,15 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload } from "lucide-react";
 import { ensureDefaultCategories } from "@/lib/defaultCategories";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Pagination } from "@/components/ui/Pagination";
+import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { CategoryForm } from "@/features/categories/components/CategoryForm";
 import { createCategory, updateCategory, deleteCategory } from "@/features/categories/services/categoryService";
+import { importCustomIcons } from "@/features/categories/services/customIconService";
 import { useCategories } from "@/features/categories/hooks/useCategories";
 import toast from "react-hot-toast";
 import type { CategoryFormData } from "@/features/categories/schemas/categorySchema";
@@ -21,6 +23,8 @@ export default function CategoriesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const setInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => { void ensureDefaultCategories(); }, []);
 
@@ -54,6 +58,22 @@ export default function CategoriesPage() {
     }
   };
 
+  const handleImport = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setImporting(true);
+    try {
+      const { imported, skipped } = await importCustomIcons(Array.from(files));
+      if (imported === 0) toast.error("No se importó ningún icono nuevo");
+      else if (skipped > 0) toast.success(`${imported} iconos importados, ${skipped} omitidos`);
+      else toast.success(`${imported} iconos importados`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo importar el set");
+    } finally {
+      setImporting(false);
+      if (setInput.current) setInput.current.value = "";
+    }
+  };
+
   const handleDelete = async (c: Category) => {
     if (!confirm(`¿Eliminar la categoría "${c.name}"?`)) return;
     try {
@@ -68,9 +88,16 @@ export default function CategoriesPage() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Categorías</h1>
-        <Button size="sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
-          <Plus size={16} /> Nueva
-        </Button>
+        <div className="flex gap-2">
+          <input ref={setInput} type="file" multiple accept="image/*,.json" className="hidden"
+            onChange={(e) => void handleImport(e.target.files)} />
+          <Button size="sm" variant="secondary" loading={importing} onClick={() => setInput.current?.click()}>
+            <Upload size={16} /> Importar iconos
+          </Button>
+          <Button size="sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
+            <Plus size={16} /> Nueva
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -80,7 +107,7 @@ export default function CategoriesPage() {
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ backgroundColor: c.color + "20" }}>
-                {c.icon}
+                <CategoryIcon icon={c.icon} />
               </div>
               <div>
                 <p className="font-medium text-zinc-200">{c.name}</p>

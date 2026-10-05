@@ -8,6 +8,7 @@ import {
 } from "@/features/reports/services/reportService";
 import type { PeriodFilter } from "@/types";
 import type { Expense } from "@/types";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import type { ExpenseFormData } from "@/features/expenses/schemas/expenseSchema";
 import type {
   VoiceIntent,
@@ -126,7 +127,10 @@ async function handleQueryReport(
 async function handleDeleteExpense(
   intent: DeleteExpenseIntent
 ): Promise<VoiceActionResult> {
-  const all = await db.expenses.toArray();
+  const workspaceId = useWorkspaceStore.getState().activeWorkspaceId;
+  const all = workspaceId
+    ? await db.expenses.where("workspaceId").equals(workspaceId).toArray()
+    : [];
   const active = all.filter((e) => e.deleted !== true);
   const needle = normalizeText(intent.reference);
 

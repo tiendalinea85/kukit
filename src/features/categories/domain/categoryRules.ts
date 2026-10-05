@@ -21,18 +21,97 @@ export const CATEGORY_COLORS = [
   "#a8a29e",
 ] as const;
 
-export const CATEGORY_ICONS = [
-  "🛒",
-  "🚗",
-  "💡",
-  "🏥",
-  "📚",
-  "🛍️",
-  "📊",
-  "🎯",
-  "👤",
-  "📦",
-] as const;
+export interface CategoryIconGroup {
+  label: string;
+  /** Términos de búsqueda que no aparecen en `label` (sin acentos, minúsculas). */
+  keywords: string;
+  icons: readonly string[];
+}
+
+// Catálogo agrupado por dominio: en una lista plana de ~180 iconos no se
+// encuentra nada, así que el selector los muestra por secciones con buscador.
+export const CATEGORY_ICON_GROUPS: readonly CategoryIconGroup[] = [
+  {
+    label: "Generales",
+    keywords: "documento archivo carpeta papel registro",
+    icons: ["📁", "📦", "📋", "📄", "🗂️", "🗃️", "📌", "📎", "🏷️", "🔖", "🧾", "🗓️"],
+  },
+  {
+    label: "Dinero y bancos",
+    keywords: "efectivo billete tarjeta credito banco cajero cambio contabilidad",
+    icons: ["💰", "💵", "💳", "🏦", "💱", "🧮", "📊", "📈", "💹", "🪙", "🏧", "💸"],
+  },
+  {
+    label: "Hogar y servicios",
+    keywords: "casa vivienda alquiler luz agua internet limpieza mantenimiento",
+    icons: ["🏠", "🏢", "🏘️", "🛋️", "🛏️", "🚿", "🧺", "💡", "🔌", "🔑", "🧹", "🪑"],
+  },
+  {
+    label: "Transporte",
+    keywords: "carro moto gasolina gasolina vehiculo viaje transporte parqueadero",
+    icons: ["🚗", "🚕", "🚌", "🚚", "🛵", "🏍️", "🚲", "🛴", "⛽", "🅿️", "🛞", "🗺️"],
+  },
+  {
+    label: "Comercio y ventas",
+    keywords: "tienda compra venta cliente proveedor negocio comercio",
+    icons: ["🛒", "🛍️", "🏪", "🏬", "💼", "🤝", "📤", "📥", "🪧", "✉️", "🛎️", "💴"],
+  },
+  {
+    label: "Alimentación",
+    keywords: "comida comida mercado restaura pan carne fruta verdura cafeteria",
+    icons: ["🍎", "🍞", "🥩", "🥦", "🧀", "☕", "🍽️", "🍔", "🧂", "🫙", "🥛", "🍰"],
+  },
+  {
+    label: "Salud",
+    keywords: "salud medico farmacia hospital dental examen lenses",
+    icons: ["🏥", "💊", "🩺", "🦷", "👓", "🧪", "💉", "🩹", "🧴", "🚑", "🛡️", "🧘"],
+  },
+  {
+    label: "Educación",
+    keywords: "estudio educacion formacion capacitacion cursos libros",
+    icons: ["📚", "📖", "✏️", "🎓", "🎨", "🎵", "🔬", "📐", "🗣️", "🧠", "🎲", "🧩"],
+  },
+  {
+    label: "Taller de confección",
+    keywords: "taller costura ropa prenda tela corte moda bordado",
+    icons: ["🧵", "🧶", "🧷", "✂️", "🪡", "👗", "👖", "🧥", "👔", "👢", "🧦", "🧱"],
+  },
+  {
+    label: "Agricultura",
+    keywords: "agricultura campo cultivo finca cosecha plantacion riego",
+    icons: ["🌱", "🌽", "🌿", "🌻", "🌾", "🚜", "🪴", "🌰", "🧑‍🌾", "🏕️", "💧", "☀️"],
+  },
+  {
+    label: "Repuestos y taller mecánico",
+    keywords: "repuesto autoparts mecanico motor taller herramienta pieza",
+    icons: ["🔧", "🔩", "⚙️", "🛠️", "🧰", "🛢️", "🔋", "🧊", "🪛", "🔗", "🧲", "🏎️"],
+  },
+  {
+    label: "Crianza",
+    keywords: "crianza animal ganado vaca gallina cerdos aves pesca",
+    icons: ["🐄", "🐖", "🐑", "🐐", "🐔", "🥚", "🐟", "🐝", "🦜", "🐢", "🪣", "🕊️"],
+  },
+  {
+    label: "Trabajo y personal",
+    keywords: "personal empleados sueldos nomina capacitacion oficina",
+    icons: ["👤", "👥", "🧑‍💼", "⏱️", "📅", "📃", "🗝️", "📨", "🖇️", "🥼", "🧤", "🧑‍🏫"],
+  },
+  {
+    label: "Tecnología",
+    keywords: "tecnologia software internet computador telefono equipos",
+    icons: ["🖥️", "💻", "📱", "⌨️", "🖨️", "🖱️", "💾", "📡", "⚡", "🔭", "🎥", "📷"],
+  },
+  {
+    label: "Otros",
+    keywords: "otros varios pendiente pendiente reservado nuevo eliminado",
+    icons: ["⭐", "🏆", "🎁", "🎯", "🔥", "⚠️", "❓", "🗑️", "♻️", "🔄", "🆕", "✅"],
+  },
+];
+
+/** Todos los iconos del catálogo, en orden y sin repetidos. */
+export const CATEGORY_ICONS: readonly string[] = [
+  ...new Set(CATEGORY_ICON_GROUPS.flatMap((g) => g.icons)),
+];
 
 export const DEFAULT_CATEGORY_COLOR = "#8b5cf6";
 export const DEFAULT_CATEGORY_ICON = "📦";
@@ -82,6 +161,25 @@ export function suggestCategoryStyle(
       CATEGORY_ICONS.find((i) => !usedIcons.has(i)) ??
       CATEGORY_ICONS[existing.length % CATEGORY_ICONS.length],
   };
+}
+
+/**
+ * Grupos de iconos que casan con la búsqueda. Un query vacío devuelve el
+ * catálogo completo. Solo se busca por el nombre del grupo y sus sinónimos:
+ * los emoji no tienen nombre legible y mantener uno por icono sería una tabla
+ * inmanejable.
+ */
+export function filterCategoryIconGroups(query: string): readonly CategoryIconGroup[] {
+  const q = normalizeText(query.trim());
+  if (!q) return CATEGORY_ICON_GROUPS;
+  return CATEGORY_ICON_GROUPS.filter((g) =>
+    normalizeText(`${g.label} ${g.keywords}`).includes(q),
+  );
+}
+
+/** Sección a la que pertenece un icono, para resaltar dónde está. */
+export function findCategoryIconGroup(icon: string): CategoryIconGroup | undefined {
+  return CATEGORY_ICON_GROUPS.find((g) => g.icons.includes(icon));
 }
 
 export function buildCategory(input: {

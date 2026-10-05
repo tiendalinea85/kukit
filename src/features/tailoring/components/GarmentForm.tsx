@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { useCategories } from "@/features/categories/hooks/useCategories";
 import { QuickCategoryModal } from "@/features/categories/components/QuickCategoryModal";
+import { iconText } from "@/features/categories/domain/customIconRules";
 
 interface Props {
   onSubmit: (data: GarmentFormData) => Promise<void>;
@@ -53,7 +54,7 @@ export function GarmentForm({ onSubmit, defaultValues, loading, code }: Props) {
       <div className="grid grid-cols-2 gap-3">
         <Select label="Categoría" {...register("categoryId")} error={errors.categoryId?.message}
           placeholder="Seleccionar"
-          options={categories.map((c) => ({ value: c.id, label: `${c.icon} ${c.name}` }))}
+          options={categories.map((c) => ({ value: c.id, label: `${iconText(c.icon)} ${c.name}` }))}
           onNew={() => setCategoryModal(true)}
           newLabel="Nueva categoría"
         />

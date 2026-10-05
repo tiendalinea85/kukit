@@ -16,6 +16,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import type { Investment, InvestmentCategory } from "@/types";
+import { iconText } from "@/features/categories/domain/customIconRules";
 
 const PAGE_SIZE = 25;
 
@@ -113,7 +114,7 @@ function InvestmentsContent() {
         {allCategories.map((c) => (
           <button key={c.id} onClick={() => setFilterCategory(c.id)}
             className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${filterCategory === c.id ? "bg-purple-600 text-white" : "bg-zinc-800 text-zinc-400"}`}
-          >{c.icon} {c.name}</button>
+          >{iconText(c.icon)} {c.name}</button>
         ))}
       </div>
 
@@ -182,7 +183,7 @@ function InvestmentsContent() {
               </div>
 
               <div className="flex items-center gap-3 text-xs text-zinc-500">
-                <span>{categories[inv.categoryId]?.icon} {categories[inv.categoryId]?.name || _("investments.withoutCategory")}</span>
+                <span>{iconText(categories[inv.categoryId]?.icon)} {categories[inv.categoryId]?.name || _("investments.withoutCategory")}</span>
                 {inv.supplier && <span className="truncate">{inv.supplier}</span>}
                 <span>{formatDate(inv.date)}</span>
               </div>
@@ -225,7 +226,7 @@ function InvestmentsContent() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-zinc-200 truncate">{inv.name}</p>
                   <div className="flex items-center gap-2 text-xs text-zinc-600 mt-0.5">
-                    <span>{categories[inv.categoryId]?.icon} {categories[inv.categoryId]?.name || _("investments.withoutCategory")}</span>
+                    <span>{iconText(categories[inv.categoryId]?.icon)} {categories[inv.categoryId]?.name || _("investments.withoutCategory")}</span>
                     <span>{formatDate(inv.date)}</span>
                   </div>
                 </div>

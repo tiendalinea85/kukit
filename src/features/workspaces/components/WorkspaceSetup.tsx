@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/Select";
 import { useTranslation } from "@/hooks/useTranslation";
 import { MODEL_MODULES, WORKSPACE_CATEGORIES, useWorkspaceStore, type BusinessModel } from "@/stores/useWorkspaceStore";
 import { seedForWorkspace } from "@/lib/seed";
+import { iconText } from "@/features/categories/domain/customIconRules";
 
 interface Props {
   onCreated: (id: string) => void;
@@ -99,7 +100,7 @@ export function WorkspaceSetup({ onCreated, onCancel }: Props) {
             label={t("workspace.categoryLabel")}
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            options={WORKSPACE_CATEGORIES.map((c) => ({ value: c.id, label: `${c.icon} ${c.name}` }))}
+            options={WORKSPACE_CATEGORIES.map((c) => ({ value: c.id, label: `${iconText(c.icon)} ${c.name}` }))}
           />
 
           <div className="rounded-xl bg-zinc-800/40 border border-zinc-800 px-4 py-3">

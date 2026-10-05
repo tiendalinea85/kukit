@@ -17,11 +17,6 @@ import type {
 } from "../types/index.ts";
 import type { OutboxOperation, SyncErrorInfo, SyncTransportEntity } from "../types/sync.ts";
 import { classifySyncError } from "./sync/errors.ts";
-import { useWorkspaceStore } from "../stores/useWorkspaceStore.ts";
-
-function defaultWorkspaceId(): string {
-  return useWorkspaceStore.getState().activeWorkspaceId || "default";
-}
 
 // TRANSPORTE: refleja las tablas locales (Dexie) en Supabase.
 //
@@ -75,6 +70,7 @@ function expenseToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
+    workspace_id: asStr(row.workspaceId) || null,
     code: asStr(row.code),
     description: asStr(row.description),
     amount: asNum(row.amount),
@@ -110,10 +106,25 @@ function expenseDetailToPayload(row: Record<string, unknown>, userId: string) {
   };
 }
 
+function customIconToPayload(row: Record<string, unknown>, userId: string) {
+  return {
+    id: asStr(row.id),
+    user_id: userId,
+    workspace_id: asStr(row.workspaceId),
+    name: asStr(row.name),
+    data_url: asStr(row.dataUrl),
+    deleted: asBool(row.deleted),
+    created_at: asStr(row.createdAt),
+    updated_at: asStr(row.updatedAt),
+    revision: asNum(row.revision, 1),
+  };
+}
+
 function categoryToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
+    workspace_id: asStr(row.workspaceId) || null,
     name: asStr(row.name),
     color: asStr(row.color, "#8b5cf6"),
     icon: asStr(row.icon, "📦"),
@@ -125,6 +136,7 @@ function typeToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
+    workspace_id: asStr(row.workspaceId) || null,
     name: asStr(row.name),
     created_at: asStr(row.createdAt),
   };
@@ -134,6 +146,7 @@ function investmentToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
+    workspace_id: asStr(row.workspaceId) || null,
     name: asStr(row.name),
     value: asNum(row.value),
     category_id: asStr(row.categoryId) || null,
@@ -154,6 +167,7 @@ function investmentCategoryToPayload(row: Record<string, unknown>, userId: strin
   return {
     id: asStr(row.id),
     user_id: userId,
+    workspace_id: asStr(row.workspaceId) || null,
     name: asStr(row.name),
     color: asStr(row.color, "#6366f1"),
     icon: asStr(row.icon, "📦"),
@@ -165,6 +179,7 @@ function customerToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
+    workspace_id: asStr(row.workspaceId) || null,
     name: asStr(row.name),
     phone: asStr(row.phone),
     address: asStr(row.address),
@@ -180,6 +195,7 @@ export function productToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
+    workspace_id: asStr(row.workspaceId) || null,
     code: asStr(row.code),
     name: asStr(row.name),
     color: asStr(row.color),
@@ -199,6 +215,7 @@ function movementToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
+    workspace_id: asStr(row.workspaceId) || null,
     product_id: asStr(row.productId),
     type: asStr(row.type),
     quantity: asNum(row.quantity),
@@ -213,6 +230,7 @@ function saleToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
+    workspace_id: asStr(row.workspaceId) || null,
     code: asStr(row.code),
     customer_id: asStr(row.customerId) || null,
     date: asStr(row.date),
@@ -233,6 +251,7 @@ function saleDetailToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
+    workspace_id: asStr(row.workspaceId) || null,
     sale_id: asStr(row.saleId),
     product_id: asStr(row.productId) || null,
     code: asStr(row.code),
@@ -250,6 +269,7 @@ function purchaseToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
+    workspace_id: asStr(row.workspaceId) || null,
     code: asStr(row.code),
     supplier: asStr(row.supplier),
     date: asStr(row.date),
@@ -270,6 +290,7 @@ function purchaseDetailToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
+    workspace_id: asStr(row.workspaceId) || null,
     purchase_id: asStr(row.purchaseId),
     product_id: asStr(row.productId) || null,
     code: asStr(row.code),
@@ -290,7 +311,7 @@ function purchaseDetailToPayload(row: Record<string, unknown>, userId: string) {
 function expenseFromRow(row: Record<string, unknown>): Expense {
   return {
     id: asStr(row.id),
-    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    workspaceId: asStr(row.workspace_id),
     code: asStr(row.code),
     description: asStr(row.description),
     amount: asNum(row.amount),
@@ -316,7 +337,7 @@ function expenseFromRow(row: Record<string, unknown>): Expense {
 function expenseDetailFromRow(row: Record<string, unknown>): ExpenseDetail {
   return {
     id: asStr(row.id),
-    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    workspaceId: asStr(row.workspace_id),
     expenseId: asStr(row.expense_id),
     productId: asStr(row.product_id),
     code: asStr(row.code),
@@ -332,10 +353,24 @@ function expenseDetailFromRow(row: Record<string, unknown>): ExpenseDetail {
   };
 }
 
+function customIconFromRow(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: asStr(row.id),
+    workspaceId: asStr(row.workspace_id),
+    name: asStr(row.name),
+    dataUrl: asStr(row.data_url),
+    createdAt: asStr(row.created_at),
+    updatedAt: asStr(row.updated_at),
+    deleted: asBool(row.deleted),
+    syncStatus: "synced" as const,
+    revision: asNum(row.revision, 1),
+  };
+}
+
 function categoryFromRow(row: Record<string, unknown>): Category {
   return {
     id: asStr(row.id),
-    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    workspaceId: asStr(row.workspace_id),
     name: asStr(row.name),
     color: asStr(row.color, "#8b5cf6"),
     icon: asStr(row.icon, "📦"),
@@ -347,7 +382,7 @@ function categoryFromRow(row: Record<string, unknown>): Category {
 function typeFromRow(row: Record<string, unknown>): Type {
   return {
     id: asStr(row.id),
-    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    workspaceId: asStr(row.workspace_id),
     name: asStr(row.name),
     createdAt: asStr(row.created_at),
     syncStatus: "synced",
@@ -357,7 +392,7 @@ function typeFromRow(row: Record<string, unknown>): Type {
 function investmentFromRow(row: Record<string, unknown>): Investment {
   return {
     id: asStr(row.id),
-    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    workspaceId: asStr(row.workspace_id),
     name: asStr(row.name),
     value: asNum(row.value),
     categoryId: asStr(row.category_id),
@@ -382,7 +417,7 @@ function investmentFromRow(row: Record<string, unknown>): Investment {
 function investmentCategoryFromRow(row: Record<string, unknown>): InvestmentCategory {
   return {
     id: asStr(row.id),
-    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    workspaceId: asStr(row.workspace_id),
     name: asStr(row.name),
     color: asStr(row.color, "#6366f1"),
     icon: asStr(row.icon, "📦"),
@@ -394,7 +429,7 @@ function investmentCategoryFromRow(row: Record<string, unknown>): InvestmentCate
 function customerFromRow(row: Record<string, unknown>): Customer {
   return {
     id: asStr(row.id),
-    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    workspaceId: asStr(row.workspace_id),
     name: asStr(row.name),
     phone: asStr(row.phone),
     address: asStr(row.address),
@@ -410,7 +445,7 @@ function customerFromRow(row: Record<string, unknown>): Customer {
 function productFromRow(row: Record<string, unknown>): Product {
   return {
     id: asStr(row.id),
-    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    workspaceId: asStr(row.workspace_id),
     code: asStr(row.code),
     name: asStr(row.name),
     color: asStr(row.color),
@@ -426,7 +461,7 @@ function productFromRow(row: Record<string, unknown>): Product {
 function movementFromRow(row: Record<string, unknown>): InventoryMovement {
   return {
     id: asStr(row.id),
-    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    workspaceId: asStr(row.workspace_id),
     productId: asStr(row.product_id),
     type: normalizeStatus(
       row.type,
@@ -456,7 +491,7 @@ function movementFromRow(row: Record<string, unknown>): InventoryMovement {
 function saleFromRow(row: Record<string, unknown>): Sale {
   return {
     id: asStr(row.id),
-    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    workspaceId: asStr(row.workspace_id),
     code: asStr(row.code),
     customerId: asStr(row.customer_id),
     date: asStr(row.date),
@@ -481,7 +516,7 @@ function saleFromRow(row: Record<string, unknown>): Sale {
 function saleDetailFromRow(row: Record<string, unknown>): SaleDetail {
   return {
     id: asStr(row.id),
-    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    workspaceId: asStr(row.workspace_id),
     saleId: asStr(row.sale_id),
     productId: asStr(row.product_id),
     code: asStr(row.code),
@@ -499,7 +534,7 @@ function saleDetailFromRow(row: Record<string, unknown>): SaleDetail {
 function purchaseFromRow(row: Record<string, unknown>): Purchase {
   return {
     id: asStr(row.id),
-    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    workspaceId: asStr(row.workspace_id),
     code: asStr(row.code),
     supplier: asStr(row.supplier),
     date: asStr(row.date),
@@ -524,7 +559,7 @@ function purchaseFromRow(row: Record<string, unknown>): Purchase {
 function purchaseDetailFromRow(row: Record<string, unknown>): PurchaseDetail {
   return {
     id: asStr(row.id),
-    workspaceId: asStr(row.workspace_id, defaultWorkspaceId()),
+    workspaceId: asStr(row.workspace_id),
     purchaseId: asStr(row.purchase_id),
     productId: asStr(row.product_id),
     code: asStr(row.code),
@@ -1036,6 +1071,9 @@ function livestockProductionFromRow(row: Record<string, unknown>): Record<string
 // ---------------------------------------------------------------------------
 
 const ENTITY_SPECS: EntitySpec[] = [
+  // Los iconos propios se descargan antes que las categorías: el set es maestro
+  // y las categorías pueden venir con un icono propio ya copiado dentro.
+  { name: "customIcons", serverTable: "custom_icons", order: 0.5, mode: "master", toPayload: customIconToPayload, fromRow: customIconFromRow },
   { name: "categories", serverTable: "categories", order: 1, mode: "master", toPayload: categoryToPayload, fromRow: categoryFromRow },
   { name: "types", serverTable: "types", order: 2, mode: "master", toPayload: typeToPayload, fromRow: typeFromRow },
   { name: "investmentCategories", serverTable: "investment_categories", order: 3, mode: "master", toPayload: investmentCategoryToPayload, fromRow: investmentCategoryFromRow },
@@ -1098,6 +1136,40 @@ export function buildSupabaseTransport(): SyncTransportEntity[] {
   }));
 }
 
+// Tablas cuyo `workspace_id` el servidor todavía no conoce (migración 00010 sin
+// aplicar): PostgREST rechaza el payload entero (PGRST204). Se reintenta sin la
+// columna y la tabla se marca para no volver a insistir en cada operación.
+const tablesWithoutWorkspaceColumn = new Set<string>();
+
+function isMissingWorkspaceColumn(error: unknown): boolean {
+  const message = String((error as { message?: unknown } | null)?.message ?? "").toLowerCase();
+  return message.includes("pgrst204") || message.includes("could not find the 'workspace_id' column");
+}
+
+async function writeWith(
+  table: string,
+  payload: Record<string, unknown>,
+  send: (body: Record<string, unknown>) => PromiseLike<{ error: unknown }>,
+): Promise<unknown | null> {
+  const withoutWorkspace = (): Record<string, unknown> => {
+    const rest = { ...payload };
+    delete rest.workspace_id;
+    return rest;
+  };
+  const body = tablesWithoutWorkspaceColumn.has(table) ? withoutWorkspace() : payload;
+
+  const first = await send(body);
+  if (!first.error || !("workspace_id" in body)) return first.error ?? null;
+
+  if (tablesWithoutWorkspaceColumn.has(table) || !isMissingWorkspaceColumn(first.error)) {
+    return first.error;
+  }
+
+  tablesWithoutWorkspaceColumn.add(table);
+  const retry = await send(withoutWorkspace());
+  return retry.error ?? null;
+}
+
 async function pushOp(spec: EntitySpec, op: OutboxOperation): Promise<SyncErrorInfo | null> {
   const sb = getSupabase();
   if (!sb) return { type: "network", message: "Supabase no configurado", retryable: true };
@@ -1114,10 +1186,9 @@ async function pushOp(spec: EntitySpec, op: OutboxOperation): Promise<SyncErrorI
 
     if (spec.mode === "append") {
       // Movimientos de inventario: INSERT idempotente, nunca se actualizan.
-      const { error } = await sb.from(spec.serverTable).upsert(payload, {
-        onConflict: "id",
-        ignoreDuplicates: true,
-      });
+      const error = await writeWith(spec.serverTable, payload, (body) =>
+        sb.from(spec.serverTable).upsert(body, { onConflict: "id", ignoreDuplicates: true }),
+      );
       return error ? classifySyncError(error) : null;
     }
 
@@ -1139,23 +1210,22 @@ async function pushOp(spec: EntitySpec, op: OutboxOperation): Promise<SyncErrorI
             retryable: false,
           };
         }
-        const { error: updErr } = await sb
-          .from(spec.serverTable)
-          .update(payload)
-          .eq("id", op.entityId);
+        const updErr = await writeWith(spec.serverTable, payload, (body) =>
+          sb.from(spec.serverTable).update(body).eq("id", op.entityId),
+        );
         return updErr ? classifySyncError(updErr) : null;
       }
 
-      const { error: insErr } = await sb
-        .from(spec.serverTable)
-        .upsert(payload, { onConflict: "id", ignoreDuplicates: true });
+      const insErr = await writeWith(spec.serverTable, payload, (body) =>
+        sb.from(spec.serverTable).upsert(body, { onConflict: "id", ignoreDuplicates: true }),
+      );
       return insErr ? classifySyncError(insErr) : null;
     }
 
     // Master data: upsert idempotente por id.
-    const { error } = await sb
-      .from(spec.serverTable)
-      .upsert(payload, { onConflict: "id", ignoreDuplicates: false });
+    const error = await writeWith(spec.serverTable, payload, (body) =>
+      sb.from(spec.serverTable).upsert(body, { onConflict: "id", ignoreDuplicates: false }),
+    );
     return error ? classifySyncError(error) : null;
   } catch (err) {
     return classifySyncError(err);

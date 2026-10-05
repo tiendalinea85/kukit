@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Search, Edit2, Trash2, Ban, CalendarRange, LayoutList, LayoutGrid, ReceiptText, Plus, CheckCircle2 } from "lucide-react";
 import { useSales } from "@/features/sales/hooks/useSales";
 import { useAppStore } from "@/stores/useAppStore";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { filterSales, canEditSale, canVoidSale, SALE_STATUSES } from "@/features/sales/domain/saleRules";
 import { db } from "@/lib/db";
@@ -31,6 +32,7 @@ function SalesContent() {
   const searchParams = useSearchParams();
   const q = searchParams.get("q") || "";
   const { sales, loading, voidById, remove } = useSales();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const [customers, setCustomers] = useState<Record<string, Customer>>({});
   const [detailsBySale, setDetailsBySale] = useState<Record<string, SaleDetail[]>>({});
   const [search, setSearch] = useState(q);
@@ -43,21 +45,25 @@ function SalesContent() {
   const [page, setPage] = useState(1);
   const { viewMode, setViewMode } = useAppStore();
 
-  useEffect(() => {
-    db.customers.toArray().then((arr) => {
+  // Clientes y líneas solo del workspace activo: el nombre del cliente y el
+// detalle de una venta no pueden venir de otro espacio de trabajo.
+useEffect(() => {
+    if (!activeWorkspaceId) return;
+    db.customers.where("workspaceId").equals(activeWorkspaceId).toArray().then((arr) => {
       const map: Record<string, Customer> = {};
       arr.filter((c) => !c.deleted).forEach((c) => { map[c.id] = c; });
       setCustomers(map);
     });
-  }, []);
+  }, [activeWorkspaceId]);
 
   useEffect(() => {
-    db.saleDetails.toArray().then((arr) => {
+    if (!activeWorkspaceId) return;
+    db.saleDetails.where("workspaceId").equals(activeWorkspaceId).toArray().then((arr) => {
       const map: Record<string, SaleDetail[]> = {};
       arr.forEach((d) => { (map[d.saleId] ??= []).push(d); });
       setDetailsBySale(map);
     });
-  }, []);
+  }, [activeWorkspaceId]);
 
   const enriched = useMemo(() => {
     return sales.map((s) => ({

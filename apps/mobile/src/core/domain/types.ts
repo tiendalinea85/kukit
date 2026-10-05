@@ -278,6 +278,7 @@ export interface Sale {
 
 export type EntityType =
   | 'category'
+  | 'custom_icon'
   | 'product'
   | 'purchase'
   | 'purchase_item'

@@ -16,6 +16,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import type { Expense, Category } from "@/types";
+import { iconText } from "@/features/categories/domain/customIconRules";
 
 const PAGE_SIZE = 25;
 
@@ -111,7 +112,7 @@ function ExpensesContent() {
         {allCategories.map((c) => (
           <button key={c.id} onClick={() => setFilterCategory(c.id)}
             className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${filterCategory === c.id ? "bg-purple-600 text-white" : "bg-zinc-800 text-zinc-400"}`}
-          >{c.icon} {c.name}</button>
+          >{iconText(c.icon)} {c.name}</button>
         ))}
       </div>
 
@@ -180,7 +181,7 @@ function ExpensesContent() {
               </div>
 
               <div className="flex items-center gap-3 text-xs text-zinc-500">
-                <span>{categories[expense.categoryId]?.icon} {categories[expense.categoryId]?.name || _("expenses.withoutCategory")}</span>
+                <span>{iconText(categories[expense.categoryId]?.icon)} {categories[expense.categoryId]?.name || _("expenses.withoutCategory")}</span>
                 <span className="capitalize">{expense.paymentMethod.replace("_", " ")}</span>
                 <span>{formatDate(expense.date)}</span>
               </div>
@@ -226,7 +227,7 @@ function ExpensesContent() {
                     <p className="text-sm font-medium text-zinc-200 truncate">{expense.description}</p>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-zinc-600 mt-0.5">
-                    <span>{categories[expense.categoryId]?.icon} {categories[expense.categoryId]?.name || _("expenses.withoutCategory")}</span>
+                    <span>{iconText(categories[expense.categoryId]?.icon)} {categories[expense.categoryId]?.name || _("expenses.withoutCategory")}</span>
                     <span>{formatDate(expense.date)}</span>
                   </div>
                 </div>

@@ -98,9 +98,25 @@ export interface Category {
   workspaceId: string;
   name: string;
   color: string;
+  /** Emoji corto del catálogo o, si es propio, un data URL PNG. */
   icon: string;
   createdAt: string;
   syncStatus: SyncStatus;
+}
+
+// Set de iconos propios reutilizables del workspace. `dataUrl` es un PNG
+// redimensionado: la categoría que lo usa copia el valor a `Category.icon`
+// para no obligar a las pantallas a resolver ids.
+export interface CustomIcon {
+  id: string;
+  workspaceId: string;
+  name: string;
+  dataUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  deleted: boolean;
+  syncStatus: SyncStatus;
+  revision?: number;
 }
 
 export interface Type {

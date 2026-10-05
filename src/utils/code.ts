@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 
 export async function generateExpenseCode(): Promise<string> {
   const last = await db.expenses.orderBy("code").last();
@@ -139,7 +140,10 @@ export function buildProductAbbreviation(name: string): string {
  */
 export async function generateProductCode(name: string): Promise<string> {
   const prefix = `${buildProductAbbreviation(name)}-`;
-  const products = await db.products.toArray();
+  const products = await db.products
+    .where("workspaceId")
+    .equals(useWorkspaceStore.getState().activeWorkspaceId ?? "default")
+    .toArray();
   let max = 0;
   for (const p of products) {
     if (typeof p.code === "string" && p.code.startsWith(prefix)) {

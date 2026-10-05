@@ -2,6 +2,7 @@
 import { motion } from "framer-motion";
 import { ArrowLeft, Building2, Check, ChevronRight, LayoutGrid, Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 
@@ -72,7 +73,11 @@ export function WorkspacePicker({ onEnter, onCreate, onBack }: Props) {
                     }
                   >
                     <span className="flex items-center justify-center w-11 h-11 rounded-xl bg-purple-600/15 border border-purple-600/25 text-xl shrink-0">
-                      {cat?.icon ?? <Building2 size={20} className="text-purple-400" />}
+                      {cat ? (
+                        <CategoryIcon icon={cat.icon} />
+                      ) : (
+                        <Building2 size={20} className="text-purple-400" />
+                      )}
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-medium text-zinc-100 truncate">{w.name}</span>

@@ -12,6 +12,7 @@ import {
   listActiveDrafts,
 } from "./invoiceDraftService.ts";
 import { db } from "@/lib/db";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import type { OcrResult } from "../schemas/ocrSchema.ts";
 
 const photoBase64 = "data:image/jpeg;base64,/9j/4AAQ";
@@ -204,5 +205,43 @@ describe("ciclo de vida completo", () => {
 
     const active = await listActiveDrafts();
     assert.equal(active.length, 0);
+  });
+});
+
+describe("aislamiento entre workspaces", () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({ activeWorkspaceId: "default" });
+  });
+
+  it("no expone ni modifica borradores de otro workspace", async () => {
+    const draft = await createDraft(photoBase64);
+    useWorkspaceStore.setState({ activeWorkspaceId: "otro" });
+
+    assert.equal(await getDraft(draft.id), undefined);
+    assert.deepEqual(await listActiveDrafts(), []);
+    await assert.rejects(() => updateDraftOcr(draft.id, sampleOcr), /no encontrado/i);
+    await assert.rejects(() => setDraftTarget(draft.id, "expense"), /no encontrado/i);
+    await assert.rejects(() => confirmDraft(draft.id), /no encontrado/i);
+    await assert.rejects(() => discardDraft(draft.id), /no encontrado/i);
+    await assert.rejects(() => deleteDraft(draft.id), /no encontrado/i);
+
+    const row = await db.invoiceDrafts.get(draft.id);
+    assert.equal(row!.status, "captured");
+  });
+
+  it("conserva los borradores sin workspace asignandolos al espacio activo", async () => {
+    await db.invoiceDrafts.add({
+      id: "legacy",
+      photoBase64,
+      status: "captured",
+      target: null,
+      ocrResult: null,
+      extractedAt: null,
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+    });
+    const active = await listActiveDrafts();
+    assert.equal(active.length, 1);
+    assert.equal(active[0].id, "legacy");
   });
 });

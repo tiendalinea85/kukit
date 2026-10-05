@@ -70,14 +70,21 @@ async function queryConfirmedSales(dateFrom: string, dateTo: string, workspaceId
   return sales.filter((s) => !s.deleted && s.status === SALE_STATUS_INDEXED);
 }
 
-async function countPending(tableName: string): Promise<number> {
+// Los pendientes se cuentan solo del workspace activo: mezclar el contador
+// mostraría datos de otros espacios de trabajo.
+async function countPending(tableName: string, workspaceId?: string): Promise<number> {
   try {
     const table = db[tableName as keyof typeof db];
     if (typeof table === "object" && table && typeof (table as { where?: unknown }).where === "function") {
-      return await (table as unknown as { where(key: string): { equals(v: string): { count(): Promise<number> } } })
-        .where("syncStatus")
-        .equals("pending")
-        .count();
+      const collection = (table as unknown as {
+        where(key: string): {
+          equals(v: string): {
+            filter(fn: (row: { workspaceId?: string }) => boolean): { count(): Promise<number> };
+          };
+        };
+      }).where("syncStatus").equals("pending");
+      if (!workspaceId) return 0;
+      return await collection.filter((row) => row.workspaceId === workspaceId).count();
     }
   } catch {
     // Tabla o índice no disponible: se ignora.
@@ -114,20 +121,20 @@ export async function loadDashboard(workspaceId?: string): Promise<DashboardData
     filterByWorkspace(await db.investments.toArray()),
     filterByWorkspace(await db.products.toArray()),
     listCategories(workspaceId),
-    db.inventoryMovements.toArray(),
+    filterByWorkspace(await db.inventoryMovements.toArray()),
     Promise.all([
-      countPending("expenses"),
-      countPending("categories"),
-      countPending("types"),
-      countPending("investments"),
-      countPending("investmentCategories"),
-      countPending("customers"),
-      countPending("products"),
-      countPending("inventoryMovements"),
-      countPending("sales"),
-      countPending("saleDetails"),
-      countPending("purchases"),
-      countPending("purchaseDetails"),
+      countPending("expenses", workspaceId),
+      countPending("categories", workspaceId),
+      countPending("types", workspaceId),
+      countPending("investments", workspaceId),
+      countPending("investmentCategories", workspaceId),
+      countPending("customers", workspaceId),
+      countPending("products", workspaceId),
+      countPending("inventoryMovements", workspaceId),
+      countPending("sales", workspaceId),
+      countPending("saleDetails", workspaceId),
+      countPending("purchases", workspaceId),
+      countPending("purchaseDetails", workspaceId),
     ]).then((counts) => counts.reduce((s, c) => s + c, 0)),
   ]);
 

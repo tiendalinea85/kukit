@@ -39,6 +39,57 @@ function getWorkspaceId(): string {
   return id;
 }
 
+// `id` es clave primaria: sin comprobar el workspace, un id de otro espacio de
+// trabajo editaba, anulaba o borraba filas ajenas. Mismo error para no revelar
+// su existencia. También valida las FK (especie, lote) referenciadas al escribir.
+async function getActiveSpecies(id: string): Promise<Species> {
+  const species = await db.species.get(id);
+  if (!species || species.workspaceId !== getWorkspaceId()) {
+    throw new Error("Especie no encontrada en este espacio de trabajo");
+  }
+  return species;
+}
+
+async function getActiveAnimal(id: string): Promise<Animal> {
+  const animal = await db.animals.get(id);
+  if (!animal || animal.workspaceId !== getWorkspaceId()) {
+    throw new Error("Animal no encontrado en este espacio de trabajo");
+  }
+  return animal;
+}
+
+async function getActiveBreedingLot(id: string): Promise<BreedingLot> {
+  const lot = await db.breedingLots.get(id);
+  if (!lot || lot.workspaceId !== getWorkspaceId()) {
+    throw new Error("Lote no encontrado en este espacio de trabajo");
+  }
+  return lot;
+}
+
+async function getActiveFeeding(id: string): Promise<Feeding> {
+  const feeding = await db.feedings.get(id);
+  if (!feeding || feeding.workspaceId !== getWorkspaceId()) {
+    throw new Error("Alimentación no encontrada en este espacio de trabajo");
+  }
+  return feeding;
+}
+
+async function getActiveReproduction(id: string): Promise<Reproduction> {
+  const reproduction = await db.reproductions.get(id);
+  if (!reproduction || reproduction.workspaceId !== getWorkspaceId()) {
+    throw new Error("Reproducción no encontrada en este espacio de trabajo");
+  }
+  return reproduction;
+}
+
+async function getActiveLivestockProduction(id: string): Promise<LivestockProduction> {
+  const production = await db.livestockProductions.get(id);
+  if (!production || production.workspaceId !== getWorkspaceId()) {
+    throw new Error("Producción ganadera no encontrada en este espacio de trabajo");
+  }
+  return production;
+}
+
 export async function createSpecies(data: SpeciesFormData): Promise<Species> {
   const now = new Date().toISOString();
   const workspaceId = getWorkspaceId();
@@ -49,8 +100,7 @@ export async function createSpecies(data: SpeciesFormData): Promise<Species> {
 }
 
 export async function updateSpecies(id: string, data: SpeciesFormData): Promise<void> {
-  const existing = await db.species.get(id);
-  if (!existing) throw new Error("Especie no encontrada");
+  await getActiveSpecies(id);
 
   await db.species.update(id, {
     name: data.name.trim(),
@@ -62,6 +112,7 @@ export async function updateSpecies(id: string, data: SpeciesFormData): Promise<
 }
 
 export async function deleteSpecies(id: string): Promise<void> {
+  await getActiveSpecies(id);
   await db.species.update(id, {
     deleted: true,
     syncStatus: "pending" as const,
@@ -77,18 +128,18 @@ export async function createAnimal(
   const finalCode = code || (await generateAnimalCode());
   const now = new Date().toISOString();
   const workspaceId = getWorkspaceId();
+  // Antes de crear: un lote o una especie ajenos contaminarían el workspace activo.
+  await getActiveSpecies(data.speciesId);
+  const lot = await getActiveBreedingLot(data.lotId);
   const animal = buildAnimal({ data: { ...data, speciesName, lotName }, code: finalCode, now });
   animal.workspaceId = workspaceId;
   await db.animals.add(animal);
 
-  const lot = await db.breedingLots.get(data.lotId);
-  if (lot) {
-    await db.breedingLots.update(data.lotId, {
-      currentCount: (lot.currentCount ?? 0) + 1,
-      updatedAt: now,
-      syncStatus: "pending" as const,
-    });
-  }
+  await db.breedingLots.update(data.lotId, {
+    currentCount: (lot.currentCount ?? 0) + 1,
+    updatedAt: now,
+    syncStatus: "pending" as const,
+  });
 
   return animal;
 }
@@ -99,13 +150,14 @@ export async function updateAnimal(
   speciesName: string,
   lotName: string
 ): Promise<void> {
-  const existing = await db.animals.get(id);
-  if (!existing) throw new Error("Animal no encontrado");
+  const existing = await getActiveAnimal(id);
   if (!canEditAnimal(existing)) throw new Error("No se puede editar este animal");
 
+  await getActiveSpecies(data.speciesId);
+
   if (existing.lotId !== data.lotId) {
-    const oldLot = await db.breedingLots.get(existing.lotId);
-    if (oldLot && oldLot.currentCount > 0) {
+    const oldLot = await getActiveBreedingLot(existing.lotId);
+    if (oldLot.currentCount > 0) {
       await db.breedingLots.update(existing.lotId, {
         currentCount: oldLot.currentCount - 1,
         updatedAt: new Date().toISOString(),
@@ -113,14 +165,12 @@ export async function updateAnimal(
       });
     }
 
-    const newLot = await db.breedingLots.get(data.lotId);
-    if (newLot) {
-      await db.breedingLots.update(data.lotId, {
-        currentCount: (newLot.currentCount ?? 0) + 1,
-        updatedAt: new Date().toISOString(),
-        syncStatus: "pending" as const,
-      });
-    }
+    const newLot = await getActiveBreedingLot(data.lotId);
+    await db.breedingLots.update(data.lotId, {
+      currentCount: (newLot.currentCount ?? 0) + 1,
+      updatedAt: new Date().toISOString(),
+      syncStatus: "pending" as const,
+    });
   }
 
   await db.animals.update(id, {
@@ -139,16 +189,14 @@ export async function updateAnimal(
 }
 
 export async function deleteAnimal(id: string): Promise<void> {
-  const existing = await db.animals.get(id);
-  if (existing) {
-    const lot = await db.breedingLots.get(existing.lotId);
-    if (lot && lot.currentCount > 0) {
-      await db.breedingLots.update(existing.lotId, {
-        currentCount: lot.currentCount - 1,
-        updatedAt: new Date().toISOString(),
-        syncStatus: "pending" as const,
-      });
-    }
+  const existing = await getActiveAnimal(id);
+  const lot = await getActiveBreedingLot(existing.lotId);
+  if (lot.currentCount > 0) {
+    await db.breedingLots.update(existing.lotId, {
+      currentCount: lot.currentCount - 1,
+      updatedAt: new Date().toISOString(),
+      syncStatus: "pending" as const,
+    });
   }
 
   await db.animals.update(id, {
@@ -161,16 +209,16 @@ export async function createBreedingLot(data: BreedingLotFormData, code?: string
   const finalCode = code || (await generateBreedingLotCode());
   const now = new Date().toISOString();
   const workspaceId = getWorkspaceId();
-  const species = await db.species.get(data.speciesId);
-  const lot = buildBreedingLot({ data: { ...data, speciesName: species?.name || "" }, code: finalCode, now });
+  const species = await getActiveSpecies(data.speciesId);
+  const lot = buildBreedingLot({ data: { ...data, speciesName: species.name }, code: finalCode, now });
   lot.workspaceId = workspaceId;
   await db.breedingLots.add(lot);
   return lot;
 }
 
 export async function updateBreedingLot(id: string, data: BreedingLotFormData): Promise<void> {
-  const existing = await db.breedingLots.get(id);
-  if (!existing) throw new Error("Lote no encontrado");
+  await getActiveBreedingLot(id);
+  await getActiveSpecies(data.speciesId);
 
   await db.breedingLots.update(id, {
     name: data.name.trim(),
@@ -184,6 +232,7 @@ export async function updateBreedingLot(id: string, data: BreedingLotFormData): 
 }
 
 export async function deleteBreedingLot(id: string): Promise<void> {
+  await getActiveBreedingLot(id);
   await db.breedingLots.update(id, {
     deleted: true,
     syncStatus: "pending" as const,
@@ -198,6 +247,7 @@ export async function createFeeding(
   const finalCode = code || (await generateFeedingCode());
   const now = new Date().toISOString();
   const workspaceId = getWorkspaceId();
+  await getActiveBreedingLot(data.lotId);
   const feeding = buildFeeding({ data: { ...data, lotName }, code: finalCode, now });
   feeding.workspaceId = workspaceId;
   await db.feedings.add(feeding);
@@ -205,8 +255,8 @@ export async function createFeeding(
 }
 
 export async function updateFeeding(id: string, data: FeedingFormData, lotName: string): Promise<void> {
-  const existing = await db.feedings.get(id);
-  if (!existing) throw new Error("Alimentación no encontrada");
+  await getActiveFeeding(id);
+  await getActiveBreedingLot(data.lotId);
 
   await db.feedings.update(id, {
     lotId: data.lotId,
@@ -224,6 +274,7 @@ export async function updateFeeding(id: string, data: FeedingFormData, lotName: 
 }
 
 export async function deleteFeeding(id: string): Promise<void> {
+  await getActiveFeeding(id);
   await db.feedings.update(id, {
     deleted: true,
     syncStatus: "pending" as const,
@@ -238,6 +289,7 @@ export async function createReproduction(
   const finalCode = code || (await generateReproductionCode());
   const now = new Date().toISOString();
   const workspaceId = getWorkspaceId();
+  await getActiveAnimal(data.animalId);
   const repro = buildReproduction({ data: { ...data, animalName, targetAnimal: data.targetAnimal || "", result: data.result || "" }, code: finalCode, now });
   repro.workspaceId = workspaceId;
   await db.reproductions.add(repro);
@@ -245,8 +297,8 @@ export async function createReproduction(
 }
 
 export async function updateReproduction(id: string, data: ReproductionFormData, animalName: string): Promise<void> {
-  const existing = await db.reproductions.get(id);
-  if (!existing) throw new Error("Reproducción no encontrada");
+  await getActiveReproduction(id);
+  await getActiveAnimal(data.animalId);
 
   await db.reproductions.update(id, {
     animalId: data.animalId,
@@ -262,6 +314,7 @@ export async function updateReproduction(id: string, data: ReproductionFormData,
 }
 
 export async function deleteReproduction(id: string): Promise<void> {
+  await getActiveReproduction(id);
   await db.reproductions.update(id, {
     deleted: true,
     syncStatus: "pending" as const,
@@ -276,6 +329,7 @@ export async function createLivestockProduction(
   const finalCode = code || (await generateLivestockProductionCode());
   const now = new Date().toISOString();
   const workspaceId = getWorkspaceId();
+  await getActiveBreedingLot(data.lotId);
   const prod = buildLivestockProduction({ data: { ...data, lotName }, code: finalCode, now });
   prod.workspaceId = workspaceId;
   await db.livestockProductions.add(prod);
@@ -283,8 +337,8 @@ export async function createLivestockProduction(
 }
 
 export async function updateLivestockProduction(id: string, data: LivestockProductionFormData, lotName: string): Promise<void> {
-  const existing = await db.livestockProductions.get(id);
-  if (!existing) throw new Error("Producción no encontrada");
+  await getActiveLivestockProduction(id);
+  await getActiveBreedingLot(data.lotId);
 
   const totalValue = Math.round(data.quantity * data.unitPrice * 100) / 100;
 
@@ -304,6 +358,7 @@ export async function updateLivestockProduction(id: string, data: LivestockProdu
 }
 
 export async function deleteLivestockProduction(id: string): Promise<void> {
+  await getActiveLivestockProduction(id);
   await db.livestockProductions.update(id, {
     deleted: true,
     syncStatus: "pending" as const,

@@ -25,6 +25,7 @@ interface SyncState {
 
 const TABLE_MAP: Record<string, string> = {
   category: 'categories',
+  custom_icon: 'custom_icons',
   product: 'products',
   purchase: 'purchases',
   purchase_item: 'purchase_items',
@@ -47,6 +48,7 @@ const CHILD_MAP: Record<string, { table: string; fk: string; childType: string }
 
 const SYNC_STATUS_TABLES: Record<string, boolean> = {
   categories: true,
+  custom_icons: true,
   products: true,
   purchases: true,
   expenses: true,

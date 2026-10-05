@@ -7,7 +7,9 @@ import {
   updateInvestment,
   voidInvestment,
   deleteInvestment,
+  getInvestmentById,
 } from "./investmentService.ts";
+import { useWorkspaceStore } from "../../../stores/useWorkspaceStore.ts";
 
 const validData = {
   name: "Computador Dell",
@@ -144,5 +146,33 @@ describe("ciclo completo de vida de la inversión", () => {
     await deleteInvestment(investment.id);
     const afterDelete = await db.investments.get(investment.id);
     assert.equal(afterDelete!.deleted, true);
+  });
+});
+
+describe("aislamiento entre workspaces", () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({ activeWorkspaceId: "default" });
+  });
+
+  it("no permite editar, anular ni borrar una inversión de otro workspace", async () => {
+    const investment = await createInvestment(validData);
+    useWorkspaceStore.setState({ activeWorkspaceId: "otro" });
+
+    await assert.rejects(
+      () => updateInvestment(investment.id, { ...validData, name: "Impresora HP" }),
+      /no encontrada/i,
+    );
+    await assert.rejects(() => voidInvestment(investment.id), /no encontrada/i);
+    await assert.rejects(() => deleteInvestment(investment.id), /no encontrada/i);
+
+    const row = await db.investments.get(investment.id);
+    assert.equal(row!.deleted, false);
+    assert.equal(row!.status, "pagado");
+  });
+
+  it("no lee la inversión desde otro workspace", async () => {
+    const investment = await createInvestment(validData);
+    useWorkspaceStore.setState({ activeWorkspaceId: "otro" });
+    assert.equal(await getInvestmentById(investment.id), null);
   });
 });

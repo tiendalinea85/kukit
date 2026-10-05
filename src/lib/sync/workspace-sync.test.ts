@@ -642,8 +642,8 @@ describe("canonicalStringify stability", () => {
 });
 
 describe("SYNC_ENTITY_TABLES completeness", () => {
-  it("includes all 35 entity tables", () => {
-    assert.equal(SYNC_ENTITY_TABLES.length, 35);
+  it("includes all 36 entity tables", () => {
+    assert.equal(SYNC_ENTITY_TABLES.length, 36);
     const expected = [
       "expenses", "expenseDetails", "categories", "types", "investments", "investmentCategories",
       "customers", "products", "inventoryMovements", "sales", "saleDetails",
@@ -652,6 +652,7 @@ describe("SYNC_ENTITY_TABLES completeness", () => {
       "crops", "farmLots", "agroInputs", "applications", "labors", "harvests",
       "vehicleBrands", "vehicleModels", "autoParts", "partCompatibilities",
       "species", "breedingLots", "animals", "feedings", "reproductions", "livestockProductions",
+      "customIcons",
     ];
     for (const e of expected) {
       assert.ok((SYNC_ENTITY_TABLES as readonly string[]).includes(e), `missing ${e}`);

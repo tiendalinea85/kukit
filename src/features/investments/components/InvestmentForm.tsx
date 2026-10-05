@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { db } from "@/lib/db";
 import type { InvestmentCategory } from "@/types";
+import { iconText } from "@/features/categories/domain/customIconRules";
 
 const paymentMethodLabels: Record<string, string> = {
   efectivo: "Efectivo",
@@ -67,7 +68,7 @@ export function InvestmentForm({ onSubmit, defaultValues, loading }: Props) {
         <Input label="Valor" type="number" step="0.01" min="0.01" {...register("value")} error={errors.value?.message} placeholder="0.00" />
         <Select label="Categoría" {...register("categoryId")} error={errors.categoryId?.message}
           placeholder="Seleccionar"
-          options={categories.map((c) => ({ value: c.id, label: `${c.icon} ${c.name}` }))}
+          options={categories.map((c) => ({ value: c.id, label: `${iconText(c.icon)} ${c.name}` }))}
         />
       </div>
 

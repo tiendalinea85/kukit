@@ -1,7 +1,9 @@
 "use client";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Moon, Sun, Download, Upload, FileSpreadsheet, RefreshCw, Globe, Database, LogOut } from "lucide-react";
+import { Moon, Sun, Download, Upload, FileSpreadsheet, RefreshCw, Globe, Database, LogOut, Plus } from "lucide-react";
 import { useAppStore } from "@/stores/useAppStore";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { runManualSync, runRetryNow, useSyncStore } from "@/lib/sync";
@@ -9,6 +11,10 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { db } from "@/lib/db";
 import toast from "react-hot-toast";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useCategories } from "@/features/categories/hooks/useCategories";
+import { listCategories } from "@/features/categories/services/categoryService";
+import { QuickCategoryModal } from "@/features/categories/components/QuickCategoryModal";
+import { iconText } from "@/features/categories/domain/customIconRules";
 
 export default function SettingsPage() {
   const { theme, setTheme, language, setLanguage, online } = useAppStore();
@@ -17,6 +23,8 @@ export default function SettingsPage() {
   const sync = useSyncStore();
   const backend = "Supabase";
   const configured = isSupabaseConfigured();
+  const { categories } = useCategories();
+  const [newCategoryOpen, setNewCategoryOpen] = useState(false);
 
   const displayName = (() => {
     if (!user) return "";
@@ -71,12 +79,20 @@ export default function SettingsPage() {
     }
   };
 
+  // Exportar e importar siempre dentro del workspace activo: un respaldo es de
+  // un solo espacio de trabajo y al importar todo pasa a este.
   const handleExportCSV = async () => {
-    const all = await db.expenses.where({ deleted: false }).toArray();
+    const workspaceId = useWorkspaceStore.getState().activeWorkspaceId;
+    if (!workspaceId) { toast.error("No hay espacio de trabajo activo"); return; }
+    const all = (await db.expenses.where("workspaceId").equals(workspaceId).toArray())
+      .filter((e) => e.deleted !== true);
     if (!all.length) { toast.error("No hay datos para exportar"); return; }
+    const categoryNames = new Map(
+      (await listCategories(workspaceId)).map((c) => [c.id, `${iconText(c.icon)} ${c.name}`]),
+    );
     const headers = "Código,Descripción,Monto,Categoría,Método Pago,Estado,Fecha,Hora,Notas";
     const rows = all.map((e) =>
-      `"${e.code}","${e.description}","${e.amount}","${e.categoryId}","${e.paymentMethod}","${e.status}","${e.date}","${e.time}","${e.notes}"`
+      `"${e.code}","${e.description}","${e.amount}","${categoryNames.get(e.categoryId) || ""}","${e.paymentMethod}","${e.status}","${e.date}","${e.time}","${e.notes}"`
     ).join("\n");
     const blob = new Blob([`${headers}\n${rows}`], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -88,12 +104,14 @@ export default function SettingsPage() {
   };
 
   const handleExportJSON = async () => {
+    const workspaceId = useWorkspaceStore.getState().activeWorkspaceId;
+    if (!workspaceId) { toast.error("No hay espacio de trabajo activo"); return; }
     const [expenses, categories, types] = await Promise.all([
-      db.expenses.where({ deleted: false }).toArray(),
-      db.categories.toArray(),
-      db.types.toArray(),
+      db.expenses.where("workspaceId").equals(workspaceId).toArray(),
+      listCategories(workspaceId),
+      db.types.where("workspaceId").equals(workspaceId).toArray(),
     ]);
-    const data = { expenses, categories, types, exportedAt: new Date().toISOString() };
+    const data = { workspaceId, expenses, categories, types, exportedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -109,12 +127,18 @@ export default function SettingsPage() {
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
+      const workspaceId = useWorkspaceStore.getState().activeWorkspaceId;
+      if (!workspaceId) { toast.error("No hay espacio de trabajo activo"); return; }
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        if (data.expenses) await db.expenses.bulkPut(data.expenses);
-        if (data.categories) await db.categories.bulkPut(data.categories);
-        if (data.types) await db.types.bulkPut(data.types);
+        // Lo importado pasa a pertenecer al workspace activo y queda pendiente
+        // de sincronizar: un respaldo de otro espacio no debe mezclarse con él.
+        const stamp = <T extends { workspaceId?: string }>(rows: T[]) =>
+          rows.map((row) => ({ ...row, workspaceId, syncStatus: "pending" as const }));
+        if (data.expenses) await db.expenses.bulkPut(stamp(data.expenses));
+        if (data.categories) await db.categories.bulkPut(stamp(data.categories));
+        if (data.types) await db.types.bulkPut(stamp(data.types));
         toast.success("Datos importados correctamente");
       } catch {
         toast.error("Error al importar");
@@ -138,6 +162,17 @@ export default function SettingsPage() {
           label: _("settings.language"),
           value: language === "es" ? "Español" : "English",
           action: () => setLanguage(language === "es" ? "en" : "es"),
+        },
+      ],
+    },
+    {
+      title: _("settings.categories"),
+      items: [
+        {
+          icon: Plus,
+          label: _("settings.newCategory"),
+          value: String(categories.length),
+          action: () => setNewCategoryOpen(true),
         },
       ],
     },
@@ -301,6 +336,8 @@ export default function SettingsPage() {
           <LogOut size={16} /> {_("settings.logout")}
         </Button>
       </div>
+
+      <QuickCategoryModal open={newCategoryOpen} onClose={() => setNewCategoryOpen(false)} />
     </motion.div>
   );
 }

@@ -2,11 +2,14 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   CATEGORY_COLORS,
+  CATEGORY_ICON_GROUPS,
   CATEGORY_ICONS,
   DEFAULT_CATEGORY_COLOR,
   DEFAULT_CATEGORY_ICON,
   buildCategory,
   buildCategoryChanges,
+  filterCategoryIconGroups,
+  findCategoryIconGroup,
   findDuplicateCategory,
   isSameCategoryName,
   listActiveCategories,
@@ -28,6 +31,63 @@ function makeCategory(id: string, name: string, workspaceId = WS, color = "#0000
     syncStatus: "synced",
   };
 }
+
+describe("CATEGORY_ICON_GROUPS", () => {
+  it("offers a wide catalogue grouped by domain", () => {
+    assert.ok(CATEGORY_ICONS.length >= 100, `solo hay ${CATEGORY_ICONS.length} iconos`);
+    assert.ok(CATEGORY_ICON_GROUPS.length >= 10);
+    for (const group of CATEGORY_ICON_GROUPS) {
+      assert.ok(group.label.trim().length > 0, "grupo sin etiqueta");
+      assert.ok(group.keywords.trim().length > 0, `${group.label} sin palabras clave`);
+      assert.ok(group.icons.length > 0, `${group.label} sin iconos`);
+    }
+  });
+
+  it("never repeats an icon across groups", () => {
+    const seen = new Set<string>();
+    for (const icon of CATEGORY_ICONS) {
+      assert.ok(!seen.has(icon), `icono repetido: ${icon}`);
+      seen.add(icon);
+    }
+  });
+
+  it("keeps the flat list in group order", () => {
+    const flat = CATEGORY_ICON_GROUPS.flatMap((g) => [...g.icons]);
+    assert.deepEqual(CATEGORY_ICONS, flat);
+  });
+
+  it("still offers the emoji used as default", () => {
+    assert.ok(CATEGORY_ICONS.includes(DEFAULT_CATEGORY_ICON));
+  });
+});
+
+describe("filterCategoryIconGroups", () => {
+  it("returns the whole catalogue for a blank query", () => {
+    assert.equal(filterCategoryIconGroups("").length, CATEGORY_ICON_GROUPS.length);
+    assert.equal(filterCategoryIconGroups("   ").length, CATEGORY_ICON_GROUPS.length);
+  });
+
+  it("matches the group label without accents or case", () => {
+    const found = filterCategoryIconGroups("CRIAN");
+    assert.deepEqual(found.map((g) => g.label), ["Crianza"]);
+  });
+
+  it("matches the keywords that are not in the label", () => {
+    assert.deepEqual(filterCategoryIconGroups("gasolina").map((g) => g.label), ["Transporte"]);
+    assert.deepEqual(filterCategoryIconGroups("tela").map((g) => g.label), ["Taller de confección"]);
+  });
+
+  it("returns nothing when there is no match", () => {
+    assert.equal(filterCategoryIconGroups("zzzz").length, 0);
+  });
+});
+
+describe("findCategoryIconGroup", () => {
+  it("locates the section of an icon", () => {
+    assert.equal(findCategoryIconGroup("🧵")?.label, "Taller de confección");
+    assert.equal(findCategoryIconGroup("no-existe"), undefined);
+  });
+});
 
 describe("normalizeCategoryName", () => {
   it("trims and collapses inner spaces", () => {

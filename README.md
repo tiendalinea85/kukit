@@ -42,7 +42,7 @@ GEMINI_API_KEY=            # opcional, asistente de voz
 
 ### Base de datos (Supabase)
 
-Aplica las migraciones de `supabase/migrations/` **en orden** (00001 a 00013):
+Aplica las migraciones de `supabase/migrations/` **en orden** (00001 a 00018):
 
 | Migración | Contenido |
 |-----------|-----------|
@@ -59,12 +59,17 @@ Aplica las migraciones de `supabase/migrations/` **en orden** (00001 a 00013):
 | `00011` | Seed de datos de prueba (dev; requiere un usuario creado) |
 | `00012` | Gastos: recibo/OCR (receipt_thumb_url) |
 | `00013` | Módulos especializados (tailoring, agricultura, repuestos, crianza) |
+| `00014` | Workspaces: RLS completo de propietario (SELECT/INSERT/UPDATE/DELETE) + GRANTS |
+| `00015` | Detalles de gasto (`expense_details`, snapshot de producto) |
+| `00016` | Gastos: `name` opcional (fix de sincronización) |
+| `00017` | Iconos propios reutilizables (`custom_icons`, PNG en data URL) |
+| `00018` | `workspace_members`: FK, trigger de propietario y backfill (requiere `00009`) |
 
 > ℹ️ Las migraciones están ordenadas por dependencia: `products` → `purchases`
 > → `purchase_details` → `revision/triggers` → `workspace_id` → sincronización.
 > Cada ALTER/trigger solo toca tablas que ya existen (comprobación con
 > `information_schema`), y todo es idempotente (IF NOT EXISTS + DROP/CREATE),
-> por lo que la secuencia 00001→00013 corre limpia de corrida en una base
+> por lo que la secuencia 00001→00018 corre limpia de corrida en una base
 > nueva y también sobre una base existente sin borrar datos. Validación en
 > `supabase/validation/validate_schema.sql`.
 

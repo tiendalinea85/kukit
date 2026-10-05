@@ -16,8 +16,11 @@ export interface ProductWithStock extends Product {
   stock: number;
 }
 
+// El stock se deriva de los movimientos del workspace activo: sumar entradas y
+// salidas de otros espacios de trabajo daría stocks que no existen.
 export async function getStockById(): Promise<Record<string, number>> {
-  const movements = await db.inventoryMovements.toArray();
+  const workspaceId = getWorkspaceId();
+  const movements = await db.inventoryMovements.where("workspaceId").equals(workspaceId).toArray();
   const byId: Record<string, number> = {};
   for (const m of movements) {
     byId[m.productId] = (byId[m.productId] ?? 0) + (m.type === "entrada" ? m.quantity : -m.quantity);
@@ -26,12 +29,21 @@ export async function getStockById(): Promise<Record<string, number>> {
 }
 
 export async function getProductStock(productId: string): Promise<number> {
-  const movements = await db.inventoryMovements.where("productId").equals(productId).toArray();
+  const workspaceId = getWorkspaceId();
+  const movements = await db.inventoryMovements
+    .where("workspaceId")
+    .equals(workspaceId)
+    .filter((m) => m.productId === productId)
+    .toArray();
   return computeStock(movements);
 }
 
 export async function listProductsWithStock(): Promise<ProductWithStock[]> {
-  const [products, stockById] = await Promise.all([db.products.toArray(), getStockById()]);
+  const workspaceId = getWorkspaceId();
+  const [products, stockById] = await Promise.all([
+    db.products.where("workspaceId").equals(workspaceId).toArray(),
+    getStockById(),
+  ]);
   return products
     .filter((p) => !p.deleted)
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -80,6 +92,7 @@ export async function createProduct(data: ProductWithStockFormData): Promise<Pro
 export async function updateProduct(id: string, data: ProductFormData): Promise<void> {
   const existing = await db.products.get(id);
   if (!existing) throw new Error("Producto no encontrado");
+  if (existing.workspaceId !== getWorkspaceId()) throw new Error("Producto no encontrado");
 
   await db.products.update(id, {
     code: data.code.trim(),
@@ -92,6 +105,10 @@ export async function updateProduct(id: string, data: ProductFormData): Promise<
 }
 
 export async function deleteProduct(id: string): Promise<void> {
+  const existing = await db.products.get(id);
+  if (!existing || existing.workspaceId !== getWorkspaceId()) {
+    throw new Error("Producto no encontrado");
+  }
   await db.products.update(id, {
     deleted: true,
     updatedAt: now(),

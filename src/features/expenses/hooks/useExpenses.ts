@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { liveQuery } from "dexie";
 import { db } from "@/lib/db";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
-import { voidExpense } from "../services/expenseService";
+import { deleteExpense, voidExpense } from "../services/expenseService";
 import type { Expense } from "@/types";
 
 export function useExpenses() {
@@ -36,7 +36,7 @@ export function useExpenses() {
   }, [activeWorkspaceId]);
 
   const remove = useCallback(async (id: string) => {
-    await db.expenses.update(id, { deleted: true, syncStatus: "pending" });
+    await deleteExpense(id);
   }, []);
 
   const voidById = useCallback(async (id: string) => {

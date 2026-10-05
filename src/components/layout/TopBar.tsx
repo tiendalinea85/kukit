@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAppStore } from "@/stores/useAppStore";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { SyncIndicator } from "@/components/sync/SyncIndicator";
+import { CategoryIcon } from "@/components/ui/CategoryIcon";
 
 export function TopBar() {
   const router = useRouter();
@@ -134,7 +135,7 @@ export function TopBar() {
                                 : "text-zinc-300 hover:bg-zinc-800/70"
                             }`}
                           >
-                            <span className="text-base shrink-0">{cat?.icon ?? "🏠"}</span>
+                            <CategoryIcon icon={cat?.icon} className="text-base shrink-0" />
                             <span className="truncate flex-1">{w.name}</span>
                             {w.id === activeWorkspaceId && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />}
                           </button>

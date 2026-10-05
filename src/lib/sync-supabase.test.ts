@@ -12,6 +12,7 @@ const ROW = {
   name: "Camisa",
   color: "rojo",
   categoryId: "cat-1",
+  workspaceId: "ws-1",
   deleted: false,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-02-01T00:00:00.000Z",
@@ -36,6 +37,7 @@ describe("Payload de products hacia Supabase", () => {
       "revision",
       "updated_at",
       "user_id",
+      "workspace_id",
     ]);
   });
 
@@ -54,5 +56,17 @@ describe("Payload de products hacia Supabase", () => {
     const products = buildSupabaseTransport().find((e) => e.name === "products");
     assert.deepEqual(products?.localOnlyFields, ["categoryId"]);
     assert.equal(products?.serverTable, "products");
+  });
+});
+
+describe("Payload con workspace_id", () => {
+  it("envía el workspace local para que el servidor pueda aislar por workspace", () => {
+    const payload = productToPayload(ROW, "user-1");
+    assert.equal(payload.workspace_id, "ws-1");
+  });
+
+  it("envía null si la fila local no tiene workspace", () => {
+    const payload = productToPayload({ ...ROW, workspaceId: "" }, "user-1");
+    assert.equal(payload.workspace_id, null);
   });
 });

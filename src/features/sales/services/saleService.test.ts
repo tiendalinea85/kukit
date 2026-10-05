@@ -8,8 +8,11 @@ import {
   updateSale,
   voidSale,
   deleteSale,
+  getSaleById,
+  listSaleDetails,
 } from "./saleService.ts";
 import { createProduct, addStockMovement } from "./productService.ts";
+import { useWorkspaceStore } from "../../../stores/useWorkspaceStore.ts";
 import type { SaleDetailInput } from "../domain/saleRules.ts";
 
 function makeDetail(productId: string): SaleDetailInput {
@@ -275,5 +278,66 @@ describe("deleteSale", () => {
     const deleted = await db.sales.get(sale.id);
     assert.equal(deleted!.deleted, true);
     assert.equal(deleted!.syncStatus, "pending");
+  });
+});
+
+describe("aislamiento entre workspaces", () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({ activeWorkspaceId: "default" });
+  });
+
+  it("no permite confirmar, editar, anular ni borrar una venta de otro workspace", async () => {
+    const product = await createProduct({ code: "PRD-001", name: "Camisa" });
+    const sale = await createSale({
+      header,
+      details: [makeDetail(product.id)],
+    });
+    useWorkspaceStore.setState({ activeWorkspaceId: "otro" });
+
+    await assert.rejects(() => confirmSale(sale.id), /no encontrada/i);
+    await assert.rejects(
+      () => updateSale(sale.id, { header, details: [] }),
+      /no encontrada/i,
+    );
+    await assert.rejects(() => voidSale(sale.id), /no encontrada/i);
+    await assert.rejects(() => deleteSale(sale.id), /no encontrada/i);
+
+    const row = await db.sales.get(sale.id);
+    assert.equal(row!.deleted, false);
+    assert.equal(row!.status, "pendiente");
+  });
+
+  it("no lee la venta ni sus detalles desde otro workspace", async () => {
+    const product = await createProduct({ code: "PRD-001", name: "Camisa" });
+    const sale = await createSale({
+      header,
+      details: [makeDetail(product.id)],
+    });
+    useWorkspaceStore.setState({ activeWorkspaceId: "otro" });
+
+    assert.equal(await getSaleById(sale.id), null);
+    assert.deepEqual(await listSaleDetails(sale.id), []);
+  });
+
+  it("calcula el stock con los movimientos del workspace de la venta", async () => {
+    const product = await createProduct({ code: "PRD-001", name: "Camisa" });
+    await addStockMovement({
+      productId: product.id,
+      type: "entrada",
+      quantity: 10,
+      referenceType: "inventario_inicial",
+      referenceId: "ajuste-1",
+      notes: "Stock inicial",
+    });
+    useWorkspaceStore.setState({ activeWorkspaceId: "otro" });
+    // Solo existe stock en "default": la venta de "otro" no debe confirmarse.
+    const sale = await createSale({
+      header,
+      details: [makeDetail(product.id)],
+    });
+
+    await assert.rejects(() => confirmSale(sale.id), /stock insuficiente/i);
+    const movements = await db.inventoryMovements.toArray();
+    assert.equal(movements.filter((m) => m.type === "salida").length, 0);
   });
 });

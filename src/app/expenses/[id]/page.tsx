@@ -3,16 +3,22 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, Edit2, Trash2, Ban } from "lucide-react";
-import { db } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/utils/format";
-import { voidExpense, deleteExpense, listExpenseDetails } from "@/features/expenses/services/expenseService";
+import {
+  getExpenseById,
+  voidExpense,
+  deleteExpense,
+  listExpenseDetails,
+} from "@/features/expenses/services/expenseService";
 import { listCategories } from "@/features/categories/services/categoryService";
 import { canEditExpense, canVoidExpense, isVoided } from "@/features/expenses/domain/expenseRules";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import toast from "react-hot-toast";
 import Link from "next/link";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import type { Expense, ExpenseDetail, Category } from "@/types";
+import { iconText } from "@/features/categories/domain/customIconRules";
 
 const paymentMethodLabels: Record<string, string> = {
   efectivo: "Efectivo",
@@ -33,19 +39,23 @@ const statusLabel: Record<string, string> = {
 export default function ExpenseDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const [expense, setExpense] = useState<Expense | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
   const [details, setDetails] = useState<ExpenseDetail[]>([]);
   const [voidOpen, setVoidOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  // El gasto se resuelve por id pero validando el workspace activo: una URL
+  // con el id de otro workspace no debe mostrar sus datos.
   useEffect(() => {
-    db.expenses.get(id).then((e) => {
+    if (!activeWorkspaceId) return;
+    getExpenseById(id).then((e) => {
       if (!e) return;
       setExpense(e);
     });
     listExpenseDetails(id).then(setDetails);
-  }, [id]);
+  }, [id, activeWorkspaceId]);
 
   // La categoría se resuelve dentro del workspace activo: un id de otra cuenta
   // no debe poder mostrar su nombre en el detalle.
@@ -69,7 +79,7 @@ export default function ExpenseDetailPage() {
       await voidExpense(expense.id);
       toast.success("Gasto anulado");
       setVoidOpen(false);
-      db.expenses.get(expense.id).then((e) => e && setExpense(e));
+      getExpenseById(expense.id).then((e) => e && setExpense(e));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo anular");
     }
@@ -121,7 +131,7 @@ export default function ExpenseDetailPage() {
           </div>
           <div>
             <p className="text-zinc-500">Categoría</p>
-            <p className="text-zinc-200">{category ? `${category.icon} ${category.name}` : "-"}</p>
+            <p className="text-zinc-200">{category ? `${iconText(category.icon)} ${category.name}` : "-"}</p>
           </div>
           <div>
             <p className="text-zinc-500">Método de Pago</p>

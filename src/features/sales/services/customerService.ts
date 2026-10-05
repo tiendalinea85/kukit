@@ -11,6 +11,21 @@ function now(): string {
   return new Date().toISOString();
 }
 
+// El id es clave primaria: sin este filtro, el id de un cliente de otro
+// workspace permitiria editarlo o borrarlo.
+async function getActiveCustomer(id: string): Promise<Customer> {
+  const customer = await db.customers.get(id);
+  if (!customer || customer.workspaceId !== getWorkspaceId()) {
+    throw new Error("Cliente no encontrado");
+  }
+  return customer;
+}
+
+export async function getCustomerById(id: string): Promise<Customer | null> {
+  const customer = await db.customers.get(id);
+  return customer && customer.workspaceId === getWorkspaceId() ? customer : null;
+}
+
 export async function createCustomer(data: CustomerFormData): Promise<Customer> {
   const customer: Customer = {
     id: crypto.randomUUID(),
@@ -29,8 +44,7 @@ export async function createCustomer(data: CustomerFormData): Promise<Customer> 
 }
 
 export async function updateCustomer(id: string, data: CustomerFormData): Promise<void> {
-  const existing = await db.customers.get(id);
-  if (!existing) throw new Error("Cliente no encontrado");
+  await getActiveCustomer(id);
 
   await db.customers.update(id, {
     name: data.name.trim(),
@@ -43,6 +57,7 @@ export async function updateCustomer(id: string, data: CustomerFormData): Promis
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
+  await getActiveCustomer(id);
   await db.customers.update(id, {
     deleted: true,
     updatedAt: now(),

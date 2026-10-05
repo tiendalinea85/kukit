@@ -1,7 +1,12 @@
 -- ============================================================
 -- VALIDACIÓN DE ESQUEMA — POS RETAIL EMPRESARIAL
 -- ============================================================
--- Ejecutar tras aplicar las migraciones 00001..00013 en orden.
+-- Ejecutar tras aplicar las migraciones 00001..00018 en orden.
+-- OJO: las listas de tablas de las secciones 1, 2 y 4 arrastran nombres
+-- antiguos (sale_details, purchase_details, inventory_movements, types,
+-- customers) y hoy reportan falsos positivos; los bloques genéricos (3, 5, 6)
+-- sí son válidos. `custom_icons` (00017) entra por los bloques genéricos:
+-- revisión, workspace_id y RLS los comprueba la sección 5.
 -- Cada bloque es una consulta de verificación:
 --   - 0 filas devueltas  = comprobación OK
 --   - filas devueltas    = detalle de lo que falta o está mal

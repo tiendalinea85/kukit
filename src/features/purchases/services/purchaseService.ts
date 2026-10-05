@@ -20,6 +20,16 @@ function now(): string {
   return new Date().toISOString();
 }
 
+// El id es clave primaria: sin este filtro, el id de una compra de otro
+// workspace permitiria recibirla, editarla o anularla.
+async function getActivePurchase(id: string): Promise<Purchase> {
+  const purchase = await db.purchases.get(id);
+  if (!purchase || purchase.workspaceId !== getWorkspaceId()) {
+    throw new Error("Compra no encontrada");
+  }
+  return purchase;
+}
+
 export interface PurchaseData {
   header: PurchaseFormData;
   details: PurchaseDetailInput[];
@@ -57,8 +67,7 @@ export async function createPurchase(data: PurchaseData, options?: { receive?: b
 
 // Recibir: pendiente -> recibida. Genera movimientos ENTRADA de inventario.
 export async function receivePurchase(id: string): Promise<Purchase> {
-  const purchase = await db.purchases.get(id);
-  if (!purchase) throw new Error("Compra no encontrada");
+  const purchase = await getActivePurchase(id);
   if (purchase.status !== "pendiente") throw new Error("Solo las compras pendientes pueden recibirse");
 
   const details = await db.purchaseDetails.where("purchaseId").equals(id).toArray();
@@ -91,8 +100,7 @@ async function applyInboundMovements(purchase: Purchase): Promise<void> {
 }
 
 export async function updatePurchase(id: string, data: PurchaseData): Promise<void> {
-  const existing = await db.purchases.get(id);
-  if (!existing) throw new Error("Compra no encontrada");
+  const existing = await getActivePurchase(id);
   if (!canEditPurchase(existing.status)) {
     throw new Error("Solo las compras pendientes pueden editarse");
   }
@@ -118,8 +126,7 @@ export async function updatePurchase(id: string, data: PurchaseData): Promise<vo
 // Anular: si estaba recibida, revierte el inventario con movimientos de SALIDA
 // de compensación (el historial de ENTRADA se conserva).
 export async function voidPurchase(id: string): Promise<void> {
-  const existing = await db.purchases.get(id);
-  if (!existing) throw new Error("Compra no encontrada");
+  const existing = await getActivePurchase(id);
   if (existing.status === "anulada") throw new Error("La compra ya está anulada");
 
   const wasReceived = isReceived(existing);
@@ -152,6 +159,7 @@ export async function voidPurchase(id: string): Promise<void> {
 }
 
 export async function deletePurchase(id: string): Promise<void> {
+  await getActivePurchase(id);
   await db.purchases.update(id, {
     deleted: true,
     updatedAt: now(),
@@ -160,7 +168,7 @@ export async function deletePurchase(id: string): Promise<void> {
 }
 
 export async function listPurchaseDetailsByPurchase(): Promise<Record<string, PurchaseDetail[]>> {
-  const details = await db.purchaseDetails.toArray();
+  const details = await db.purchaseDetails.where("workspaceId").equals(getWorkspaceId()).toArray();
   const map: Record<string, PurchaseDetail[]> = {};
   for (const d of details) (map[d.purchaseId] ??= []).push(d);
   return map;

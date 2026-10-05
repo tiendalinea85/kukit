@@ -5,6 +5,7 @@ export type InvoiceDraftTarget = "purchase" | "expense";
 
 export interface InvoiceDraft {
   id: string;
+  workspaceId?: string;
   photoBase64: string;
   status: InvoiceDraftStatus;
   target: InvoiceDraftTarget | null;

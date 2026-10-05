@@ -5,7 +5,7 @@ import { PRINCIPAL_WORKSPACES } from '../workspace/modules';
 import { ACTIVE_WORKSPACE_KEY, getActiveWorkspaceId } from '../workspace/activeWorkspace';
 
 const DATABASE_NAME = 'cato-ledger.db';
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 let dbPromise: Promise<SQLiteDatabase> | null = null;
 
@@ -142,6 +142,32 @@ const MIGRATIONS: Migration[] = [
       if (!invCols.some((c) => c.name === 'voided_at')) {
         await txn.execAsync(`ALTER TABLE investments ADD COLUMN voided_at TEXT`);
       }
+    },
+  },
+  {
+    version: 7,
+    name: 'custom-icons',
+    up: async (txn) => {
+      // La tabla nace completa (workspace_id + sync_status incluidos): las
+      // migraciones 2 y 3 ya corrieron y no volverían a pasar por ella.
+      await txn.execAsync(`
+        CREATE TABLE IF NOT EXISTS custom_icons (
+          id TEXT PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL,
+          data_url TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          workspace_id TEXT NOT NULL DEFAULT '',
+          deleted INTEGER NOT NULL DEFAULT 0,
+          sync_status TEXT NOT NULL DEFAULT 'synced'
+        );
+      `);
+      await txn.execAsync(
+        'CREATE INDEX IF NOT EXISTS idx_custom_icons_workspace ON custom_icons(workspace_id)'
+      );
+      await txn.execAsync(
+        'CREATE INDEX IF NOT EXISTS idx_custom_icons_updated ON custom_icons(updated_at)'
+      );
     },
   },
 ];

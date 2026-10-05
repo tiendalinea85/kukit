@@ -9,6 +9,22 @@ function getWorkspaceId(): string {
   return useWorkspaceStore.getState().activeWorkspaceId ?? "default";
 }
 
+// `id` es clave primaria: sin este filtro, una URL con el id de otro workspace
+// abría, editaba o borraba gastos ajenos. Mismo error para no revelar su
+// existencia.
+async function getActiveExpense(id: string): Promise<Expense> {
+  const expense = await db.expenses.get(id);
+  if (!expense || expense.workspaceId !== getWorkspaceId()) {
+    throw new Error("Gasto no encontrado");
+  }
+  return expense;
+}
+
+export async function getExpenseById(id: string): Promise<Expense | null> {
+  const expense = await db.expenses.get(id);
+  return expense && expense.workspaceId === getWorkspaceId() ? expense : null;
+}
+
 export async function createExpense(
   data: ExpenseFormData,
   code?: string,
@@ -45,8 +61,7 @@ export async function updateExpense(
   data: ExpenseFormData,
   details: ExpenseDetailInput[] = []
 ): Promise<void> {
-  const existing = await db.expenses.get(id);
-  if (!existing) throw new Error("Gasto no encontrado");
+  const existing = await getActiveExpense(id);
   if (!canEditExpense(existing.status)) {
     throw new Error("Un gasto anulado no puede editarse");
   }
@@ -92,8 +107,7 @@ export async function updateExpense(
 }
 
 export async function voidExpense(id: string): Promise<void> {
-  const existing = await db.expenses.get(id);
-  if (!existing) throw new Error("Gasto no encontrado");
+  const existing = await getActiveExpense(id);
   if (existing.status === "anulado") throw new Error("El gasto ya está anulado");
 
   await db.expenses.update(id, {
@@ -105,6 +119,7 @@ export async function voidExpense(id: string): Promise<void> {
 }
 
 export async function deleteExpense(id: string): Promise<void> {
+  await getActiveExpense(id);
   await db.transaction("rw", db.expenses, db.expenseDetails, async () => {
     // Soft-delete de las líneas: el tombstone se propaga por el Sync Engine
     // (deleted=true) en lugar de un DELETE físico que el servidor nunca vería.
@@ -121,7 +136,7 @@ export async function deleteExpense(id: string): Promise<void> {
 
 export async function listExpenseDetails(expenseId: string): Promise<ExpenseDetail[]> {
   const all = await db.expenseDetails.where("expenseId").equals(expenseId).toArray();
-  return all.filter((d) => !d.deleted);
+  return all.filter((d) => !d.deleted && d.workspaceId === getWorkspaceId());
 }
 
 export async function quickCreateProduct(data: {

@@ -117,3 +117,33 @@ describe("Pull: campos locales que el servidor no almacena", () => {
     assert.equal(row?.categoryId, "");
   });
 });
+
+// Aislamiento por workspace: el workspace de una fila lo decide el servidor.
+// Si la fila remota no lo trae (tabla sin `workspace_id`), el pull NO puede
+// inventar el workspace activo: eso mete gastos de un workspace en otro.
+
+describe("Pull: workspace de la fila remota", () => {
+  it("aplica el workspace que envía el servidor", async () => {
+    await seedProduct({ syncStatus: "synced" });
+    await runPull(productsTransport([remoteProduct({ workspaceId: "ws-b" })]));
+
+    const row = await db.products.get("p1");
+    assert.equal(row?.workspaceId, "ws-b");
+  });
+
+  it("conserva el workspace local si la fila remota no lo trae", async () => {
+    await seedProduct({ workspaceId: "ws-a", syncStatus: "synced" });
+    await runPull(productsTransport([remoteProduct({ workspaceId: "" })]));
+
+    const row = await db.products.get("p1");
+    assert.equal(row?.workspaceId, "ws-a");
+    assert.equal(row?.name, "Camisa manga larga");
+  });
+
+  it("no atribuye a ningún workspace una fila nueva sin workspace", async () => {
+    await runPull(productsTransport([remoteProduct({ id: "p3", workspaceId: "" })]));
+
+    const row = await db.products.get("p3");
+    assert.equal(row?.workspaceId, "");
+  });
+});

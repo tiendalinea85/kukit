@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { Pagination } from "@/components/ui/Pagination";
 import toast from "react-hot-toast";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import type { Expense, Investment, Customer, Product, Sale } from "@/types";
 
 const PAGE_SIZE = 25;
@@ -30,6 +31,7 @@ const KIND_LABEL: Record<TrashKind, string> = {
 };
 
 export default function TrashPage() {
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -37,12 +39,33 @@ export default function TrashPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [page, setPage] = useState(1);
 
+  // La papelera es del workspace activo: una fila de otro espacio de trabajo
+  // tampoco debe poder restaurarse ni borrarse desde aquí.
   useEffect(() => {
-    const expObs = liveQuery(() => db.expenses.where({ deleted: true }).reverse().sortBy("updatedAt"));
-    const invObs = liveQuery(() => db.investments.where({ deleted: true }).reverse().sortBy("updatedAt"));
-    const custObs = liveQuery(() => db.customers.where({ deleted: true }).reverse().sortBy("updatedAt"));
-    const prodObs = liveQuery(() => db.products.where({ deleted: true }).reverse().sortBy("updatedAt"));
-    const saleObs = liveQuery(() => db.sales.where({ deleted: true }).reverse().sortBy("updatedAt"));
+    if (!activeWorkspaceId) {
+      setExpenses([]);
+      setInvestments([]);
+      setCustomers([]);
+      setProducts([]);
+      setSales([]);
+      return;
+    }
+    const ws = activeWorkspaceId;
+    const expObs = liveQuery(() =>
+      db.expenses.where("workspaceId").equals(ws).filter((e) => e.deleted === true).reverse().sortBy("updatedAt"),
+    );
+    const invObs = liveQuery(() =>
+      db.investments.where("workspaceId").equals(ws).filter((e) => e.deleted === true).reverse().sortBy("updatedAt"),
+    );
+    const custObs = liveQuery(() =>
+      db.customers.where("workspaceId").equals(ws).filter((e) => e.deleted === true).reverse().sortBy("updatedAt"),
+    );
+    const prodObs = liveQuery(() =>
+      db.products.where("workspaceId").equals(ws).filter((e) => e.deleted === true).reverse().sortBy("updatedAt"),
+    );
+    const saleObs = liveQuery(() =>
+      db.sales.where("workspaceId").equals(ws).filter((e) => e.deleted === true).reverse().sortBy("updatedAt"),
+    );
     const expSub = expObs.subscribe((data) => setExpenses(data));
     const invSub = invObs.subscribe((data) => setInvestments(data));
     const custSub = custObs.subscribe((data) => setCustomers(data));
@@ -55,7 +78,7 @@ export default function TrashPage() {
       prodSub.unsubscribe();
       saleSub.unsubscribe();
     };
-  }, []);
+  }, [activeWorkspaceId]);
 
   const items: TrashItem[] = [
     ...expenses.map((e) => ({

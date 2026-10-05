@@ -24,6 +24,56 @@ function getWorkspaceId(): string {
   return id;
 }
 
+// Validación de pertenencia al workspace activo para evitar acceso entre espacios.
+
+async function getActiveGarment(id: string): Promise<Garment> {
+  const row = await db.garments.get(id);
+  if (!row || row.workspaceId !== getWorkspaceId()) {
+    throw new Error("Prenda no encontrada");
+  }
+  return row;
+}
+
+async function getActiveSize(id: string): Promise<Size> {
+  const row = await db.sizes.get(id);
+  if (!row || row.workspaceId !== getWorkspaceId()) {
+    throw new Error("Talla no encontrada");
+  }
+  return row;
+}
+
+async function getActiveColor(id: string): Promise<Color> {
+  const row = await db.garmentColors.get(id);
+  if (!row || row.workspaceId !== getWorkspaceId()) {
+    throw new Error("Color no encontrado");
+  }
+  return row;
+}
+
+async function getActiveMaterial(id: string): Promise<Material> {
+  const row = await db.materials.get(id);
+  if (!row || row.workspaceId !== getWorkspaceId()) {
+    throw new Error("Material no encontrado");
+  }
+  return row;
+}
+
+async function getActiveProductionOrder(id: string): Promise<ProductionOrder> {
+  const row = await db.productionOrders.get(id);
+  if (!row || row.workspaceId !== getWorkspaceId()) {
+    throw new Error("Orden de producción no encontrada");
+  }
+  return row;
+}
+
+async function getActiveProductionMaterial(id: string): Promise<ProductionMaterial> {
+  const row = await db.productionMaterials.get(id);
+  if (!row || row.workspaceId !== getWorkspaceId()) {
+    throw new Error("Material de orden no encontrado");
+  }
+  return row;
+}
+
 export async function createGarment(data: GarmentFormData, code?: string): Promise<Garment> {
   const finalCode = code || (await generateGarmentCode());
   const now = new Date().toISOString();
@@ -35,8 +85,7 @@ export async function createGarment(data: GarmentFormData, code?: string): Promi
 }
 
 export async function updateGarment(id: string, data: GarmentFormData): Promise<void> {
-  const existing = await db.garments.get(id);
-  if (!existing) throw new Error("Prenda no encontrada");
+  const existing = await getActiveGarment(id);
   if (!canEditGarment(existing)) throw new Error("No se puede editar esta prenda");
 
   await db.garments.update(id, {
@@ -51,6 +100,7 @@ export async function updateGarment(id: string, data: GarmentFormData): Promise<
 }
 
 export async function deleteGarment(id: string): Promise<void> {
+  await getActiveGarment(id);
   await db.garments.update(id, {
     deleted: true,
     syncStatus: "pending" as const,
@@ -58,6 +108,7 @@ export async function deleteGarment(id: string): Promise<void> {
 }
 
 export async function voidGarment(id: string): Promise<void> {
+  await getActiveGarment(id);
   await db.garments.update(id, {
     deleted: true,
     syncStatus: "pending" as const,
@@ -74,8 +125,7 @@ export async function createSize(data: SizeFormData): Promise<Size> {
 }
 
 export async function updateSize(id: string, data: SizeFormData): Promise<void> {
-  const existing = await db.sizes.get(id);
-  if (!existing) throw new Error("Talla no encontrada");
+  await getActiveSize(id);
 
   await db.sizes.update(id, {
     name: data.name.trim(),
@@ -85,6 +135,7 @@ export async function updateSize(id: string, data: SizeFormData): Promise<void> 
 }
 
 export async function deleteSize(id: string): Promise<void> {
+  await getActiveSize(id);
   await db.sizes.update(id, {
     deleted: true,
     syncStatus: "pending" as const,
@@ -101,8 +152,7 @@ export async function createColor(data: ColorFormData): Promise<Color> {
 }
 
 export async function updateColor(id: string, data: ColorFormData): Promise<void> {
-  const existing = await db.garmentColors.get(id);
-  if (!existing) throw new Error("Color no encontrado");
+  await getActiveColor(id);
 
   await db.garmentColors.update(id, {
     name: data.name.trim(),
@@ -112,6 +162,7 @@ export async function updateColor(id: string, data: ColorFormData): Promise<void
 }
 
 export async function deleteColor(id: string): Promise<void> {
+  await getActiveColor(id);
   await db.garmentColors.update(id, {
     deleted: true,
     syncStatus: "pending" as const,
@@ -129,8 +180,7 @@ export async function createMaterial(data: MaterialFormData, code?: string): Pro
 }
 
 export async function updateMaterial(id: string, data: MaterialFormData): Promise<void> {
-  const existing = await db.materials.get(id);
-  if (!existing) throw new Error("Material no encontrado");
+  await getActiveMaterial(id);
 
   await db.materials.update(id, {
     name: data.name.trim(),
@@ -144,6 +194,7 @@ export async function updateMaterial(id: string, data: MaterialFormData): Promis
 }
 
 export async function deleteMaterial(id: string): Promise<void> {
+  await getActiveMaterial(id);
   await db.materials.update(id, {
     deleted: true,
     syncStatus: "pending" as const,
@@ -175,8 +226,7 @@ export async function createProductionOrder(
 }
 
 export async function updateProductionOrder(id: string, data: ProductionOrderFormData): Promise<void> {
-  const existing = await db.productionOrders.get(id);
-  if (!existing) throw new Error("Orden no encontrada");
+  const existing = await getActiveProductionOrder(id);
   if (!canVoidProduction(existing)) throw new Error("No se puede editar esta orden");
 
   const totalCost = Math.round(data.quantity * data.unitCost * 100) / 100;
@@ -197,6 +247,7 @@ export async function updateProductionOrder(id: string, data: ProductionOrderFor
 }
 
 export async function deleteProductionOrder(id: string): Promise<void> {
+  await getActiveProductionOrder(id);
   const materials = await db.productionMaterials
     .where("productionOrderId")
     .equals(id)
@@ -215,8 +266,7 @@ export async function deleteProductionOrder(id: string): Promise<void> {
 }
 
 export async function voidProductionOrder(id: string): Promise<void> {
-  const existing = await db.productionOrders.get(id);
-  if (!existing) throw new Error("Orden no encontrada");
+  const existing = await getActiveProductionOrder(id);
   if (existing.status === "anulada") throw new Error("La orden ya está anulada");
 
   await db.productionOrders.update(id, {
@@ -234,6 +284,11 @@ export async function addProductionMaterial(data: {
   quantity: number;
   unitCost: number;
 }): Promise<ProductionMaterial> {
+  // Validar que la orden de producción pertenece al workspace activo.
+  await getActiveProductionOrder(data.productionOrderId);
+  // Validar que el material pertenece al workspace activo.
+  await getActiveMaterial(data.materialId);
+
   const now = new Date().toISOString();
   const workspaceId = getWorkspaceId();
   const totalCost = Math.round(data.quantity * data.unitCost * 100) / 100;
@@ -247,5 +302,6 @@ export async function addProductionMaterial(data: {
 }
 
 export async function removeProductionMaterial(id: string): Promise<void> {
+  await getActiveProductionMaterial(id);
   await db.productionMaterials.delete(id);
 }

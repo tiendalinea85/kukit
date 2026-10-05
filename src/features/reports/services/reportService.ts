@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { listCategories } from "@/features/categories/services/categoryService";
 import { normalizeText } from "@/utils/text";
+import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import type { Category, PeriodFilter, Expense } from "@/types";
 
 export interface ReportQueryResult {
@@ -68,6 +69,10 @@ function isInRange(expense: Expense, start: Date, end: Date): boolean {
   return date >= start && date <= end;
 }
 
+function activeWorkspaceId(): string | undefined {
+  return useWorkspaceStore.getState().activeWorkspaceId ?? undefined;
+}
+
 export async function queryExpensesReport(options: {
   period: PeriodFilter;
   dateFrom?: string;
@@ -76,11 +81,14 @@ export async function queryExpensesReport(options: {
   language: "es" | "en";
   workspaceId?: string;
 }): Promise<ReportQueryResult> {
+  // Sin workspace explícito se usa el activo: un reporte sin workspace
+  // devolvería la mezcla de todos los espacios de trabajo.
+  const workspaceId = options.workspaceId ?? activeWorkspaceId();
   const [all, categories] = await Promise.all([
-    options.workspaceId
-      ? db.expenses.where("workspaceId").equals(options.workspaceId).toArray()
-      : db.expenses.toArray(),
-    listCategories(options.workspaceId),
+    workspaceId
+      ? db.expenses.where("workspaceId").equals(workspaceId).toArray()
+      : Promise.resolve([] as Expense[]),
+    listCategories(workspaceId),
   ]);
 
   let filtered = all.filter((e) => e.deleted !== true);

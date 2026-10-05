@@ -3,6 +3,7 @@ import type {
   Expense,
   ExpenseDetail,
   Category,
+  CustomIcon,
   Type,
   Investment,
   InvestmentCategory,
@@ -95,6 +96,9 @@ class ZaneDB extends Dexie {
 
   // Borradores de facturas (OCR)
   invoiceDrafts!: Table<InvoiceDraft, string>;
+
+  // Iconos propios reutilizables
+  customIcons!: Table<CustomIcon, string>;
 
   constructor() {
     super("zane-db");
@@ -344,6 +348,13 @@ class ZaneDB extends Dexie {
       expenseDetails:
         "id, workspaceId, expenseId, productId, createdAt, syncStatus",
     });
+
+    // ICONOS PROPIOS: set reutilizable por workspace. `updatedAt` va indexado
+    // porque el pull usa esa columna como marca de agua.
+    this.version(14).stores({
+      customIcons:
+        "id, workspaceId, name, createdAt, updatedAt, deleted, syncStatus",
+    });
   }
 }
 
@@ -386,6 +397,7 @@ export async function clearLocalData(): Promise<void> {
     db.feedings.clear(),
     db.reproductions.clear(),
     db.livestockProductions.clear(),
+    db.customIcons.clear(),
     db.invoiceDrafts.clear(),
     db.syncOutbox.clear(),
     db.syncLog.clear(),

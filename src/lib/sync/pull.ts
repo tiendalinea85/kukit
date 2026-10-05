@@ -42,6 +42,19 @@ function localOnlyFields(
   return kept;
 }
 
+// El workspace es el límite de aislamiento: solo puede venir del servidor. Si
+// la fila remota no trae `workspace_id` (tablas antiguas sin la columna) se
+// conserva el local; inventar el workspace activo en el pullmetería datos de
+// un workspace en otro.
+function withWorkspace(
+  row: Record<string, unknown>,
+  local: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  if (row.workspaceId) return row;
+  const localWorkspaceId = local?.workspaceId;
+  return localWorkspaceId ? { ...row, workspaceId: localWorkspaceId } : row;
+}
+
 async function tableOf(entity: string): Promise<
   { get(id: string): Promise<unknown>; put(row: unknown): Promise<unknown>; update(id: string, changes: Record<string, unknown>): Promise<number> } | null
 > {
@@ -84,7 +97,7 @@ export async function runPull(
         }
 
         if (!local) {
-          await table.put(row);
+          await table.put(withWorkspace(row as Record<string, unknown>, undefined));
           result.pulled++;
           continue;
         }
@@ -115,7 +128,7 @@ export async function runPull(
           const res = resolveConflict(local, row as { updatedAt?: string; revision?: number }, false);
           if (res.resolution === "keep_remote") {
             await table.put({
-              ...row,
+              ...withWorkspace(row as Record<string, unknown>, local),
               ...localOnlyFields(local, entity.localOnlyFields),
               syncStatus: "synced",
             });

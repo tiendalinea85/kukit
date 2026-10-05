@@ -3,9 +3,9 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, Edit2, Trash2, Ban, ReceiptText, CheckCircle2 } from "lucide-react";
-import { db } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/utils/format";
-import { voidSale, deleteSale } from "@/features/sales/services/saleService";
+import { voidSale, deleteSale, getSaleById, listSaleDetails } from "@/features/sales/services/saleService";
+import { getCustomerById } from "@/features/sales/services/customerService";
 import { canEditSale, canVoidSale, isConfirmed, isVoided } from "@/features/sales/domain/saleRules";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -39,12 +39,12 @@ export default function SaleDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const reload = () => {
-    db.sales.get(id).then((s) => {
+    getSaleById(id).then((s) => {
       if (!s) return;
       setSale(s);
-      db.customers.get(s.customerId).then((c) => c && !c.deleted && setCustomer(c));
+      getCustomerById(s.customerId).then((c) => c && !c.deleted && setCustomer(c));
     });
-    db.saleDetails.where("saleId").equals(id).toArray().then(setDetails);
+    listSaleDetails(id).then(setDetails);
   };
 
   useEffect(() => {

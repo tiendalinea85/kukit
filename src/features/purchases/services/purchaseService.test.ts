@@ -8,8 +8,10 @@ import {
   updatePurchase,
   voidPurchase,
   deletePurchase,
+  listPurchaseDetailsByPurchase,
 } from "./purchaseService.ts";
 import { createProduct } from "../../sales/services/productService.ts";
+import { useWorkspaceStore } from "../../../stores/useWorkspaceStore.ts";
 import type { PurchaseDetailInput } from "../domain/purchaseRules.ts";
 
 function makeDetail(productId: string): PurchaseDetailInput {
@@ -256,5 +258,45 @@ describe("deletePurchase", () => {
     const deleted = await db.purchases.get(purchase.id);
     assert.equal(deleted!.deleted, true);
     assert.equal(deleted!.syncStatus, "pending");
+  });
+});
+
+describe("aislamiento entre workspaces", () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({ activeWorkspaceId: "otro" });
+  });
+
+  it("no permite recibir, editar, anular ni borrar una compra de otro workspace", async () => {
+    useWorkspaceStore.setState({ activeWorkspaceId: "default" });
+    const product = await createProduct({ code: "PRD-001", name: "Tejido" });
+    const purchase = await createPurchase({
+      header,
+      details: [makeDetail(product.id)],
+    });
+    useWorkspaceStore.setState({ activeWorkspaceId: "otro" });
+
+    await assert.rejects(() => receivePurchase(purchase.id), /no encontrada/i);
+    await assert.rejects(
+      () => updatePurchase(purchase.id, { header, details: [] }),
+      /no encontrada/i,
+    );
+    await assert.rejects(() => voidPurchase(purchase.id), /no encontrada/i);
+    await assert.rejects(() => deletePurchase(purchase.id), /no encontrada/i);
+
+    const row = await db.purchases.get(purchase.id);
+    assert.equal(row!.deleted, false);
+    assert.equal(row!.status, "pendiente");
+  });
+
+  it("no devuelve los detalles de una compra de otro workspace", async () => {
+    useWorkspaceStore.setState({ activeWorkspaceId: "default" });
+    const product = await createProduct({ code: "PRD-001", name: "Tejido" });
+    await createPurchase({
+      header,
+      details: [makeDetail(product.id)],
+    });
+    useWorkspaceStore.setState({ activeWorkspaceId: "otro" });
+
+    assert.deepEqual(await listPurchaseDetailsByPurchase(), {});
   });
 });

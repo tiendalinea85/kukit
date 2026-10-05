@@ -18,6 +18,7 @@ import { generateProductCode } from "@/utils/code";
 import { formatCurrency } from "@/utils/format";
 import toast from "react-hot-toast";
 import type { ExpenseDetailInput, Product } from "@/types";
+import { iconText } from "@/features/categories/domain/customIconRules";
 
 const paymentMethodLabels: Record<string, string> = {
   efectivo: "Efectivo",
@@ -332,7 +333,7 @@ export function ExpenseForm({
         {hasDetails && <p className="col-span-2 text-xs text-zinc-500 -mt-2">El monto se calcula automáticamente según los detalles del gasto.</p>}
         <Select label="Categoría" {...register("categoryId")} error={errors.categoryId?.message}
           placeholder="Seleccionar"
-          options={categories.map((c) => ({ value: c.id, label: `${c.icon} ${c.name}` }))}
+          options={categories.map((c) => ({ value: c.id, label: `${iconText(c.icon)} ${c.name}` }))}
           onNew={() => setCategoryModal(true)}
           newLabel="Nueva categoría"
         />

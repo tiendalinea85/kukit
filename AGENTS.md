@@ -41,7 +41,7 @@ src/
   types/      index.ts (dominio) · sync.ts · modules.ts (catálogo)
   utils/      code.ts (códigos correlativos), formato
   __tests__/  tests de utils y aislamiento
-supabase/migrations/   SQL versionado (00001→00013, aplicar EN ORDEN)
+supabase/migrations/   SQL versionado (00001→00018, aplicar EN ORDEN)
 scripts/              backup/restore/health-check, validador de migración móvil
 docs/                 arquitectura y operación
 ```

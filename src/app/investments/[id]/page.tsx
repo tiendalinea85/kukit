@@ -3,15 +3,20 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, Edit2, Trash2, Ban, Briefcase } from "lucide-react";
-import { db } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/utils/format";
-import { voidInvestment, deleteInvestment } from "@/features/investments/services/investmentService";
+import {
+  voidInvestment,
+  deleteInvestment,
+  getInvestmentById,
+  getInvestmentCategoryById,
+} from "@/features/investments/services/investmentService";
 import { canEditInvestment, canVoidInvestment, isVoided } from "@/features/investments/domain/investmentRules";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import type { Investment, InvestmentCategory } from "@/types";
+import { iconText } from "@/features/categories/domain/customIconRules";
 
 const paymentMethodLabels: Record<string, string> = {
   efectivo: "Efectivo",
@@ -38,10 +43,10 @@ export default function InvestmentDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
-    db.investments.get(id).then((e) => {
+    getInvestmentById(id).then((e) => {
       if (!e) return;
       setInvestment(e);
-      db.investmentCategories.get(e.categoryId).then((c) => c && setCategory(c));
+      getInvestmentCategoryById(e.categoryId).then((c) => c && setCategory(c));
     });
   }, [id]);
 
@@ -58,7 +63,7 @@ export default function InvestmentDetailPage() {
       await voidInvestment(investment.id);
       toast.success("Inversión anulada");
       setVoidOpen(false);
-      db.investments.get(investment.id).then((e) => e && setInvestment(e));
+      getInvestmentById(investment.id).then((e) => e && setInvestment(e));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo anular");
     }
@@ -108,7 +113,7 @@ export default function InvestmentDetailPage() {
           </div>
           <div>
             <p className="text-zinc-500">Categoría</p>
-            <p className="text-zinc-200">{category ? `${category.icon} ${category.name}` : "-"}</p>
+            <p className="text-zinc-200">{category ? `${iconText(category.icon)} ${category.name}` : "-"}</p>
           </div>
           <div>
             <p className="text-zinc-500">Proveedor</p>

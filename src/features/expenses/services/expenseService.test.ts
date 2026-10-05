@@ -8,7 +8,9 @@ import {
   voidExpense,
   deleteExpense,
   listExpenseDetails,
+  getExpenseById,
 } from "./expenseService.ts";
+import { useWorkspaceStore } from "../../../stores/useWorkspaceStore.ts";
 import type { ExpenseDetailInput } from "../../../types/index.ts";
 
 const validData = {
@@ -42,6 +44,7 @@ const detailLines: ExpenseDetailInput[] = [
 ];
 
 beforeEach(async () => {
+  useWorkspaceStore.setState({ activeWorkspaceId: "default" });
   await Promise.all([db.expenses.clear(), db.expenseDetails.clear()]);
 });
 
@@ -241,8 +244,31 @@ describe("deleteExpense", () => {
     }
   });
 
-  it("lanza error cuando el gasto no existe (actualiza id inexistente silenciosamente)", async () => {
-    await deleteExpense("id-inexistente");
+  it("lanza error cuando el gasto no existe (no borra un id inexistente en silencio)", async () => {
+    await assert.rejects(() => deleteExpense("id-inexistente"), /Gasto no encontrado/);
+  });
+});
+
+describe("aislamiento entre workspaces", () => {
+  it("no permite editar, anular ni borrar un gasto de otro workspace", async () => {
+    const expense = await createExpense(validData);
+    useWorkspaceStore.setState({ activeWorkspaceId: "otro" });
+
+    await assert.rejects(() => updateExpense(expense.id, validData), /Gasto no encontrado/);
+    await assert.rejects(() => voidExpense(expense.id), /Gasto no encontrado/);
+    await assert.rejects(() => deleteExpense(expense.id), /Gasto no encontrado/);
+
+    const row = await db.expenses.get(expense.id);
+    assert.equal(row!.deleted, false);
+    assert.equal(row!.status, "pagado");
+  });
+
+  it("no devuelve los detalles de un gasto de otro workspace", async () => {
+    const expense = await createExpense(validData, undefined, detailLines);
+    useWorkspaceStore.setState({ activeWorkspaceId: "otro" });
+
+    assert.deepEqual(await listExpenseDetails(expense.id), []);
+    assert.equal(await getExpenseById(expense.id), null);
   });
 });
 
