@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import { db } from "../db.ts";
 import type {
   OutboxOperation,
@@ -93,7 +94,7 @@ export function hashPayload(payload: Record<string, unknown>): string {
 }
 
 export function uuid(): string {
-  return crypto.randomUUID();
+  return newId();
 }
 
 export function isoNow(): string {

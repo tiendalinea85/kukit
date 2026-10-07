@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import type { CustomIcon } from "@/types";
 
 // Reglas puras de los iconos propios (sin React ni Dexie).
@@ -72,7 +73,7 @@ export function buildCustomIcon(input: {
     throw new Error("El icono debe ser una imagen PNG convertida a data URL");
   }
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId: input.workspaceId,
     name,
     dataUrl: input.data.dataUrl,

@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import type { Sale, SaleDetail, SaleStatus } from "@/types";
 import { PAYMENT_METHODS } from "../../expenses/domain/expenseRules.ts";
 
@@ -48,7 +49,7 @@ export function isVoided(sale: Pick<Sale, "status">): boolean {
 
 export function buildSaleDetail(input: SaleDetailInput, saleId: string, now: string, workspaceId: string = "default"): SaleDetail {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId,
     saleId,
     productId: input.productId,
@@ -65,7 +66,7 @@ export function buildSaleDetail(input: SaleDetailInput, saleId: string, now: str
 
 export function buildSale(input: NewSaleInput, code: string, now: string): Sale {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId: input.workspaceId ?? "default",
     code,
     customerId: input.customerId,

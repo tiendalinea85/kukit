@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import { db } from "@/lib/db";
 import { buildSale, buildSaleDetail, canEditSale, computeSaleTotal, isConfirmed } from "../domain/saleRules";
 import { missingStock, computeStockById } from "../domain/stockRules";
@@ -106,7 +107,7 @@ export async function confirmSale(id: string): Promise<Sale> {
 async function applyOutboundMovements(sale: Sale): Promise<void> {
   const details = await db.saleDetails.where("saleId").equals(sale.id).toArray();
   const movements: InventoryMovement[] = details.map((d) => ({
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId: sale.workspaceId,
     productId: d.productId,
     type: "salida" as const,
@@ -157,7 +158,7 @@ export async function voidSale(id: string): Promise<void> {
     if (wasConfirmed) {
       const details = await db.saleDetails.where("saleId").equals(id).toArray();
       const movements: InventoryMovement[] = details.map((d) => ({
-        id: crypto.randomUUID(),
+        id: newId(),
         workspaceId: existing.workspaceId,
         productId: d.productId,
         type: "entrada" as const,

@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import type { Investment, InvestmentStatus, PaymentMethod } from "@/types";
 
 export const INVESTMENT_STATUSES = ["pagado", "pendiente", "anulado"] as const satisfies readonly InvestmentStatus[];
@@ -46,7 +47,7 @@ export function buildInvestment(input: {
 }): Investment {
   const { data, now } = input;
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     name: data.name.trim(),
     value: data.value,
     categoryId: data.categoryId,

@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import { db } from "@/lib/db";
 import type { Customer } from "@/types";
 import type { CustomerFormData } from "../schemas/customerSchema";
@@ -28,7 +29,7 @@ export async function getCustomerById(id: string): Promise<Customer | null> {
 
 export async function createCustomer(data: CustomerFormData): Promise<Customer> {
   const customer: Customer = {
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId: getWorkspaceId(),
     name: data.name.trim(),
     phone: data.phone?.trim() ?? "",

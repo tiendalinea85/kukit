@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import type {
   Garment,
   Size,
@@ -40,7 +41,7 @@ export function buildGarment(input: {
   now: string;
 }): Garment {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code: input.code,
     name: input.data.name.trim(),
     description: (input.data.description || "").trim(),
@@ -60,7 +61,7 @@ export function buildSize(input: {
   now: string;
 }): Size {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     name: input.data.name.trim(),
     sortOrder: input.data.sortOrder,
     createdAt: input.now,
@@ -76,7 +77,7 @@ export function buildColor(input: {
   now: string;
 }): Color {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     name: input.data.name.trim(),
     hex: input.data.hex,
     createdAt: input.now,
@@ -99,7 +100,7 @@ export function buildMaterial(input: {
   now: string;
 }): Material {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code: input.code,
     name: input.data.name.trim(),
     unit: input.data.unit,
@@ -133,7 +134,7 @@ export function buildProductionOrder(input: {
   now: string;
 }): ProductionOrder {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code: input.code,
     garmentId: input.data.garmentId,
     garmentName: input.data.garmentName,
@@ -170,7 +171,7 @@ export function buildProductionMaterial(input: {
   now: string;
 }): ProductionMaterial {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     productionOrderId: input.data.productionOrderId,
     materialId: input.data.materialId,
     materialName: input.data.materialName,

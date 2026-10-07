@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import { db } from "@/lib/db";
 import { generateExpenseCode } from "@/utils/code";
 import { buildExpense, buildExpenseDetail, canEditExpense, computeExpenseTotal } from "../domain/expenseRules";
@@ -145,7 +146,7 @@ export async function quickCreateProduct(data: {
 }): Promise<Product> {
   const t = new Date().toISOString();
   const product: Product = {
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId: getWorkspaceId(),
     code: data.code.trim(),
     name: data.name.trim(),

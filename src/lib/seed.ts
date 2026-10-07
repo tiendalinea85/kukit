@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import { db } from "./db";
 import type { Expense, Investment } from "@/types";
 import { INVESTMENT_CATEGORY_DEFAULTS } from "@/features/investments/domain/investmentRules";
@@ -38,7 +39,7 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
 
   if (catCount === 0) {
     const categories = defaultCategories.map((c) => ({
-      id: crypto.randomUUID(),
+      id: newId(),
       workspaceId,
       ...c,
       createdAt: new Date().toISOString(),
@@ -55,7 +56,7 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
 
   if (typeCount === 0) {
     const types = defaultTypes.map((t) => ({
-      id: crypto.randomUUID(),
+      id: newId(),
       workspaceId,
       name: t,
       createdAt: new Date().toISOString(),
@@ -69,7 +70,7 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
 
   if (invCatCount === 0) {
     const invCats = INVESTMENT_CATEGORY_DEFAULTS.map((c) => ({
-      id: crypto.randomUUID(),
+      id: newId(),
       workspaceId,
       ...c,
       createdAt: new Date().toISOString(),
@@ -90,15 +91,15 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
     const [servicios, transporte, publicidad, arriendo, mantenimiento, sueldos, otros] = catIds;
 
     const sampleExpenses: Expense[] = [
-      { id: crypto.randomUUID(), workspaceId, code: "G000001", description: "Recibo de energía eléctrica", amount: 98.30, categoryId: servicios, paymentMethod: "transferencia", status: "pagado", date: daysAgo(1), time: "14:00", notes: "Período mensual", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
-      { id: crypto.randomUUID(), workspaceId, code: "G000002", description: "Combustible de la camioneta de reparto", amount: 45.00, categoryId: transporte, paymentMethod: "efectivo", status: "pagado", date: daysAgo(1), time: "18:30", notes: "", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
-      { id: crypto.randomUUID(), workspaceId, code: "G000003", description: "Campaña en redes sociales", amount: 250.00, categoryId: publicidad, paymentMethod: "yape", status: "pagado", date: daysAgo(2), time: "11:20", notes: "Anuncio mensual", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
-      { id: crypto.randomUUID(), workspaceId, code: "G000004", description: "Arriendo del local comercial", amount: 850.00, categoryId: arriendo, paymentMethod: "transferencia", status: "pagado", date: daysAgo(3), time: "10:00", notes: "Mes actual", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
-      { id: crypto.randomUUID(), workspaceId, code: "G000005", description: "Reparación del sistema de aire acondicionado", amount: 160.00, categoryId: mantenimiento, paymentMethod: "tarjeta_debito", status: "pendiente", date: daysAgo(4), time: "16:40", notes: "Cotización aprobada", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
-      { id: crypto.randomUUID(), workspaceId, code: "G000006", description: "Sueldo quincenal del asistente", amount: 520.00, categoryId: sueldos, paymentMethod: "transferencia", status: "pagado", date: daysAgo(5), time: "09:00", notes: "", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
-      { id: crypto.randomUUID(), workspaceId, code: "G000007", description: "Caja menor y varios", amount: 75.00, categoryId: otros, paymentMethod: "efectivo", status: "pagado", date: daysAgo(0), time: "20:15", notes: "", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
-      { id: crypto.randomUUID(), workspaceId, code: "G000008", description: "Mantenimiento preventivo de computadoras", amount: 120.00, categoryId: mantenimiento, paymentMethod: "tarjeta_credito", status: "pagado", date: daysAgo(6), time: "15:00", notes: "", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
-      { id: crypto.randomUUID(), workspaceId, code: "G000009", description: "Gasto anulado de prueba", amount: 40.00, categoryId: otros, paymentMethod: "efectivo", status: "anulado", date: daysAgo(7), time: "12:00", notes: "Se anuló por error", voidedAt: now, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, code: "G000001", description: "Recibo de energía eléctrica", amount: 98.30, categoryId: servicios, paymentMethod: "transferencia", status: "pagado", date: daysAgo(1), time: "14:00", notes: "Período mensual", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, code: "G000002", description: "Combustible de la camioneta de reparto", amount: 45.00, categoryId: transporte, paymentMethod: "efectivo", status: "pagado", date: daysAgo(1), time: "18:30", notes: "", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, code: "G000003", description: "Campaña en redes sociales", amount: 250.00, categoryId: publicidad, paymentMethod: "yape", status: "pagado", date: daysAgo(2), time: "11:20", notes: "Anuncio mensual", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, code: "G000004", description: "Arriendo del local comercial", amount: 850.00, categoryId: arriendo, paymentMethod: "transferencia", status: "pagado", date: daysAgo(3), time: "10:00", notes: "Mes actual", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, code: "G000005", description: "Reparación del sistema de aire acondicionado", amount: 160.00, categoryId: mantenimiento, paymentMethod: "tarjeta_debito", status: "pendiente", date: daysAgo(4), time: "16:40", notes: "Cotización aprobada", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, code: "G000006", description: "Sueldo quincenal del asistente", amount: 520.00, categoryId: sueldos, paymentMethod: "transferencia", status: "pagado", date: daysAgo(5), time: "09:00", notes: "", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, code: "G000007", description: "Caja menor y varios", amount: 75.00, categoryId: otros, paymentMethod: "efectivo", status: "pagado", date: daysAgo(0), time: "20:15", notes: "", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, code: "G000008", description: "Mantenimiento preventivo de computadoras", amount: 120.00, categoryId: mantenimiento, paymentMethod: "tarjeta_credito", status: "pagado", date: daysAgo(6), time: "15:00", notes: "", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, code: "G000009", description: "Gasto anulado de prueba", amount: 40.00, categoryId: otros, paymentMethod: "efectivo", status: "anulado", date: daysAgo(7), time: "12:00", notes: "Se anuló por error", voidedAt: now, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
     ];
 
     await db.expenses.bulkAdd(sampleExpenses);
@@ -110,12 +111,12 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
     const [maquinaria, equipamiento, herramientas, computacion, muebles, otros] = invCatIds;
 
     const sampleInvestments: Investment[] = [
-      { id: crypto.randomUUID(), workspaceId, name: "Máquina de coser industrial", value: 1450.00, categoryId: maquinaria, supplier: "Importadora Maquipack", paymentMethod: "transferencia", status: "pagado", date: daysAgo(30), notes: "Máquina overlock de 5 hilos", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
-      { id: crypto.randomUUID(), workspaceId, name: "Computadora para diseño", value: 980.00, categoryId: computacion, supplier: "TechStore S.A.", paymentMethod: "tarjeta_credito", status: "pagado", date: daysAgo(25), notes: "Laptop con 16GB RAM", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
-      { id: crypto.randomUUID(), workspaceId, name: "Mesa de corte", value: 320.00, categoryId: muebles, supplier: "", paymentMethod: "efectivo", status: "pagado", date: daysAgo(20), notes: "Mesa plegable de 2.4m", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
-      { id: crypto.randomUUID(), workspaceId, name: "Juego de herramientas", value: 210.00, categoryId: herramientas, supplier: "Ferretería Central", paymentMethod: "efectivo", status: "pendiente", date: daysAgo(12), notes: "Herramientas de mantenimiento", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
-      { id: crypto.randomUUID(), workspaceId, name: "Impresora de etiquetas", value: 450.00, categoryId: equipamiento, supplier: "Office Depot", paymentMethod: "transferencia", status: "pagado", date: daysAgo(8), notes: "", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
-      { id: crypto.randomUUID(), workspaceId, name: "Inversión anulada de prueba", value: 150.00, categoryId: otros, supplier: "", paymentMethod: "efectivo", status: "anulado", date: daysAgo(5), notes: "Se anuló por error", voidedAt: now, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, name: "Máquina de coser industrial", value: 1450.00, categoryId: maquinaria, supplier: "Importadora Maquipack", paymentMethod: "transferencia", status: "pagado", date: daysAgo(30), notes: "Máquina overlock de 5 hilos", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, name: "Computadora para diseño", value: 980.00, categoryId: computacion, supplier: "TechStore S.A.", paymentMethod: "tarjeta_credito", status: "pagado", date: daysAgo(25), notes: "Laptop con 16GB RAM", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, name: "Mesa de corte", value: 320.00, categoryId: muebles, supplier: "", paymentMethod: "efectivo", status: "pagado", date: daysAgo(20), notes: "Mesa plegable de 2.4m", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, name: "Juego de herramientas", value: 210.00, categoryId: herramientas, supplier: "Ferretería Central", paymentMethod: "efectivo", status: "pendiente", date: daysAgo(12), notes: "Herramientas de mantenimiento", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, name: "Impresora de etiquetas", value: 450.00, categoryId: equipamiento, supplier: "Office Depot", paymentMethod: "transferencia", status: "pagado", date: daysAgo(8), notes: "", voidedAt: null, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
+      { id: newId(), workspaceId, name: "Inversión anulada de prueba", value: 150.00, categoryId: otros, supplier: "", paymentMethod: "efectivo", status: "anulado", date: daysAgo(5), notes: "Se anuló por error", voidedAt: now, createdAt: now, updatedAt: now, deleted: false, syncStatus: "local" },
     ];
 
     await db.investments.bulkAdd(sampleInvestments);
@@ -131,7 +132,7 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
     ];
     await db.customers.bulkAdd(
       sampleCustomers.map((c) => ({
-        id: crypto.randomUUID(),
+        id: newId(),
         workspaceId,
         ...c,
         createdAt: now,
@@ -155,7 +156,7 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
     ];
     for (const p of sampleProducts) {
       const product = {
-        id: crypto.randomUUID(),
+        id: newId(),
         workspaceId,
         code: p.code,
         name: p.name,
@@ -169,7 +170,7 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
       await db.products.add(product);
       if (p.stock > 0) {
         await db.inventoryMovements.add({
-          id: crypto.randomUUID(),
+          id: newId(),
           workspaceId,
           productId: product.id,
           type: "entrada",
@@ -195,7 +196,7 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
     if (mary && leggings && topBlanco) {
       // Venta confirmada: genera SALIDA de inventario.
       const sale1 = {
-        id: crypto.randomUUID(),
+        id: newId(),
         workspaceId,
         code: "V000001",
         customerId: mary.id,
@@ -213,10 +214,10 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
       };
       await db.sales.add(sale1);
       await db.saleDetails.bulkAdd([
-        { id: crypto.randomUUID(), workspaceId, saleId: sale1.id, productId: leggings.id, code: leggings.code, name: leggings.name, color: leggings.color, quantity: 2, unitPrice: 15, subtotal: 30, createdAt: now, syncStatus: "local" as const },
+        { id: newId(), workspaceId, saleId: sale1.id, productId: leggings.id, code: leggings.code, name: leggings.name, color: leggings.color, quantity: 2, unitPrice: 15, subtotal: 30, createdAt: now, syncStatus: "local" as const },
       ]);
       await db.inventoryMovements.add({
-        id: crypto.randomUUID(),
+        id: newId(),
         workspaceId,
         productId: leggings.id,
         type: "salida",
@@ -230,7 +231,7 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
 
       // Venta pendiente: aún no genera SALIDA.
       const sale2 = {
-        id: crypto.randomUUID(),
+        id: newId(),
         workspaceId,
         code: "V000002",
         customerId: carlos?.id ?? mary.id,
@@ -248,13 +249,13 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
       };
       await db.sales.add(sale2);
       await db.saleDetails.bulkAdd([
-        { id: crypto.randomUUID(), workspaceId, saleId: sale2.id, productId: topBlanco.id, code: topBlanco.code, name: topBlanco.name, color: topBlanco.color, quantity: 3, unitPrice: 7.5, subtotal: 22.5, createdAt: now, syncStatus: "local" as const },
+        { id: newId(), workspaceId, saleId: sale2.id, productId: topBlanco.id, code: topBlanco.code, name: topBlanco.name, color: topBlanco.color, quantity: 3, unitPrice: 7.5, subtotal: 22.5, createdAt: now, syncStatus: "local" as const },
       ]);
 
       if (luisa) {
         // Venta anulada de prueba.
         const sale3 = {
-          id: crypto.randomUUID(),
+          id: newId(),
           workspaceId,
           code: "V000003",
           customerId: luisa.id,
@@ -272,7 +273,7 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
         };
         await db.sales.add(sale3);
         await db.saleDetails.bulkAdd([
-          { id: crypto.randomUUID(), workspaceId, saleId: sale3.id, productId: leggings.id, code: leggings.code, name: leggings.name, color: leggings.color, quantity: 1, unitPrice: 15, subtotal: 15, createdAt: now, syncStatus: "local" as const },
+          { id: newId(), workspaceId, saleId: sale3.id, productId: leggings.id, code: leggings.code, name: leggings.name, color: leggings.color, quantity: 1, unitPrice: 15, subtotal: 15, createdAt: now, syncStatus: "local" as const },
         ]);
       }
     }

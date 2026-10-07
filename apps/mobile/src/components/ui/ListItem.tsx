@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { CategoryIconSlot } from './CategoryIcon';
 import { colors, radius, spacing } from './theme';
 
 interface ListItemProps {
@@ -13,7 +14,7 @@ interface ListItemProps {
 export function ListItem({ title, subtitle, right, onPress, icon, titleColor }: ListItemProps) {
   const content = (
     <View style={styles.row}>
-      {icon ? <Text style={styles.icon}>{icon}</Text> : null}
+      {icon ? <CategoryIconSlot icon={icon} /> : null}
       <View style={styles.main}>
         <Text style={[styles.title, titleColor ? { color: titleColor } : null]} numberOfLines={1}>
           {title}
@@ -51,9 +52,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  icon: {
-    fontSize: 22,
   },
   main: {
     flex: 1,

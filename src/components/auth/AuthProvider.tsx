@@ -5,6 +5,7 @@ import { User } from "@supabase/supabase-js";
 import { onAuthStateChange, getCurrentUser, signOut as supabaseSignOut } from "@/lib/supabase";
 import { clearLocalData } from "@/lib/db";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
+import { markRecoveryPending, clearRecoveryPending, isRecoveryPending, shouldForceReset } from "@/lib/recoveryGuard";
 
 interface AuthContextValue {
   user: User | null;
@@ -36,9 +37,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    const unsub = onAuthStateChange((u) => {
+    const unsub = onAuthStateChange((u, event) => {
       setUser(u);
       setLoading(false);
+      if (event === "PASSWORD_RECOVERY") {
+        // Sesión creada por el link de recuperación: no vale para navegar la
+        // app hasta que se cambie la contraseña.
+        markRecoveryPending();
+      }
       if (u) {
         localStorage.setItem("zane-auth", "true");
       } else {
@@ -54,10 +60,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
-    const isAuthPage = pathname === "/auth";
+    const pending = isRecoveryPending();
+    // Cierre de seguridad: con recovery pendiente, cualquier ruta fuera de /auth
+    // (incluida la home a la que supabase-js redirige tras crear la sesión)
+    // vuelve al formulario de nueva contraseña.
+    if (shouldForceReset(pathname, pending)) {
+      router.replace("/auth/reset");
+      return;
+    }
+    // Prefijo, no igualdad: /auth/reset y /auth/callback manejan su propia
+    // navegación y no deben ser expulsados ni redirigidos a "/" a mitad de flujo.
+    const isAuthPage = pathname === "/auth" || (pathname?.startsWith("/auth/") ?? false);
+    const isSelfManaged = pathname === "/auth/reset" || pathname === "/auth/callback";
     if (!user && !isAuthPage) {
       router.replace("/auth");
-    } else if (user && isAuthPage) {
+    } else if (user && isAuthPage && !isSelfManaged && !pending) {
+      // Con recovery pendiente el usuario se queda en /auth (puede pedir el link
+      // de nuevo o volver); no se le manda a la app sin cambiar la contraseña.
       router.replace("/");
     }
   }, [user, loading, pathname, router]);
@@ -69,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("zane-workspaces");
     localStorage.removeItem("zane-auth");
     localStorage.removeItem("zane-user");
+    clearRecoveryPending();
     router.replace("/auth");
   }, [router]);
 

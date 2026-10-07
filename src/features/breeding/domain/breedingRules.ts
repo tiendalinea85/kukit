@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import type {
   Species,
   Animal,
@@ -124,7 +125,7 @@ export function buildSpecies(input: {
   now: string;
 }): Species {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     name: input.data.name.trim(),
     category: input.data.category as Species["category"],
     unit: input.data.unit.trim(),
@@ -153,7 +154,7 @@ export function buildAnimal(input: {
   now: string;
 }): Animal {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code: input.code,
     name: input.data.name.trim(),
     speciesId: input.data.speciesId,
@@ -185,7 +186,7 @@ export function buildBreedingLot(input: {
   now: string;
 }): BreedingLot {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code: input.code,
     name: input.data.name.trim(),
     speciesId: input.data.speciesId,
@@ -218,7 +219,7 @@ export function buildFeeding(input: {
   now: string;
 }): Feeding {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code: input.code,
     lotId: input.data.lotId,
     lotName: input.data.lotName,
@@ -251,7 +252,7 @@ export function buildReproduction(input: {
   now: string;
 }): Reproduction {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code: input.code,
     animalId: input.data.animalId,
     animalName: input.data.animalName,
@@ -284,7 +285,7 @@ export function buildLivestockProduction(input: {
 }): LivestockProduction {
   const totalValue = Math.round(input.data.quantity * input.data.unitPrice * 100) / 100;
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code: input.code,
     lotId: input.data.lotId,
     lotName: input.data.lotName,

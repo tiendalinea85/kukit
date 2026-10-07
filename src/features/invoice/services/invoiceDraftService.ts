@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import { db } from "@/lib/db";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import type { InvoiceDraft, InvoiceDraftTarget } from "../domain/types";
@@ -27,7 +28,7 @@ async function getActiveDraft(id: string): Promise<InvoiceDraft> {
 export async function createDraft(photoBase64: string): Promise<InvoiceDraft> {
   const t = now();
   const draft: InvoiceDraft = {
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId: getWorkspaceId(),
     photoBase64,
     status: "captured",

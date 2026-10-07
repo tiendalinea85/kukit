@@ -6,7 +6,18 @@ import { Input } from "@/components/ui/Input";
 import { KeyRound } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import toast from "react-hot-toast";
-import { getOAuthCode, getSupabase, updatePassword, signOut } from "@/lib/supabase";
+import {
+  getSupabase,
+  updatePassword,
+  signOut,
+  clearAuthHash,
+  onAuthStateChange,
+} from "@/lib/supabase";
+import {
+  clearRecoveryPending,
+  isRecoveryPending,
+  parseAuthCallback,
+} from "@/lib/recoveryGuard";
 
 export default function AuthResetPage() {
   const { t: _ } = useTranslation();
@@ -19,13 +30,11 @@ export default function AuthResetPage() {
     if (exchangingRef.current) return;
     exchangingRef.current = true;
 
-    const code = getOAuthCode();
-
-    if (!code) {
-      toast.error(_("auth.resetInvalid"));
-      window.location.replace("/auth");
-      return;
-    }
+    // Se lee la URL ANTES de crear el cliente: createClient procesa y borra el
+    // hash de tokens de forma asíncrona.
+    const { code, hasRecoveryTokens, hasError } = parseAuthCallback(
+      window.location.href
+    );
 
     const sb = getSupabase();
     if (!sb) {
@@ -34,16 +43,56 @@ export default function AuthResetPage() {
       return;
     }
 
-    void sb.auth
-      .exchangeCodeForSession(code)
-      .then(({ error }) => {
-        if (error) throw error;
+    const fail = () => {
+      toast.error(_("auth.resetInvalid"));
+      window.location.replace("/auth");
+    };
+
+    if (hasError) {
+      fail();
+      return;
+    }
+
+    // PKCE: el link llega con ?code= y hay que canjearlo por una sesión.
+    if (code) {
+      void sb.auth
+        .exchangeCodeForSession(code)
+        .then(({ error }) => {
+          if (error) throw error;
+          clearAuthHash();
+          setReady(true);
+        })
+        .catch(fail);
+      return;
+    }
+
+    // Implícito (default de supabase-js): los tokens van en el hash y
+    // detectSessionInUrl los canjea al crear el cliente. Se espera la sesión;
+    // si no aparece en 5s, el enlace es inválido o expiró.
+    if (hasRecoveryTokens || isRecoveryPending()) {
+      let settled = false;
+      const timeout = window.setTimeout(fail, 5000);
+      const settle = () => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        clearAuthHash();
         setReady(true);
-      })
-      .catch(() => {
-        toast.error(_("auth.resetInvalid"));
-        window.location.replace("/auth");
+      };
+      // La suscripción se queda viva (módulo singleton): el guard de `settled`
+      // evita doble-settle por la invocación síncrona inicial del wrapper o por
+      // el double-mount de reactStrictMode en dev.
+      onAuthStateChange((u) => {
+        if (u) settle();
       });
+      // La sesión puede haberse creado antes de que este efecto se suscriba.
+      void sb.auth.getSession().then(({ data }) => {
+        if (data.session) settle();
+      });
+      return;
+    }
+
+    fail();
   }, [_]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,6 +101,7 @@ export default function AuthResetPage() {
     setSaving(true);
     try {
       await updatePassword(password);
+      clearRecoveryPending();
       await signOut();
       toast.success(_("auth.resetSuccess"));
       window.location.replace("/auth");

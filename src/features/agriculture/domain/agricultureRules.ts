@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import type { Crop, FarmLot, AgroInput, Application, Labor, Harvest, LaborType } from "@/types/modules";
 
 export const CROP_STATUSES = ["activa", "completada", "cancelada"] as const;
@@ -25,7 +26,7 @@ export function buildCrop(input: {
 }): Crop {
   const { data, code, now, workspaceId } = input;
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code,
     name: data.name.trim(),
     description: data.description.trim(),
@@ -50,7 +51,7 @@ export function buildFarmLot(input: {
 }): FarmLot {
   const { data, code, now, workspaceId } = input;
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code,
     name: data.name.trim(),
     area: data.area,
@@ -74,7 +75,7 @@ export function buildAgroInput(input: {
 }): AgroInput {
   const { data, code, now, workspaceId } = input;
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code,
     name: data.name.trim(),
     type: data.type,
@@ -99,7 +100,7 @@ export function buildApplication(input: {
 }): Application {
   const { data, code, now, workspaceId } = input;
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code,
     cropId: data.cropId,
     cropName: data.cropName,
@@ -127,7 +128,7 @@ export function buildLabor(input: {
 }): Labor {
   const { data, code, now, workspaceId } = input;
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code,
     cropId: data.cropId,
     cropName: data.cropName,
@@ -156,7 +157,7 @@ export function buildHarvest(input: {
   const { data, code, now, workspaceId } = input;
   const totalValue = data.quantity * data.unitPrice;
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code,
     cropId: data.cropId,
     cropName: data.cropName,

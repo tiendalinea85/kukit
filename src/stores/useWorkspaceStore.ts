@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { getCurrentUser, getSupabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -210,7 +211,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       // Crea en Supabase (si hay sesión) y actualiza el store de inmediato.
       createWorkspace: async (input) => {
-        const id = crypto.randomUUID();
+        const id = newId();
         const ws: Workspace = {
           id,
           name: input.name,

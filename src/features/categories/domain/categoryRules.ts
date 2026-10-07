@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import type { Category } from "@/types";
 import { normalizeText } from "@/utils/text";
 
@@ -189,7 +190,7 @@ export function buildCategory(input: {
 }): Category {
   const { data, workspaceId, now } = input;
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId,
     name: normalizeCategoryName(data.name),
     color: data.color || DEFAULT_CATEGORY_COLOR,

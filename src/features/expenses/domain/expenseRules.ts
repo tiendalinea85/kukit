@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import type { Expense, ExpenseDetail, ExpenseDetailInput, ExpenseStatus, PaymentMethod } from "@/types";
 
 export const EXPENSE_STATUSES = ["pagado", "pendiente", "anulado"] as const satisfies readonly ExpenseStatus[];
@@ -43,7 +44,7 @@ export function buildExpenseDetail(input: {
 }): ExpenseDetail {
   const { data, expenseId, workspaceId, now } = input;
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId,
     expenseId,
     productId: data.productId,
@@ -78,7 +79,7 @@ export function buildExpense(input: {
 }): Expense {
   const { data, code, now } = input;
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code,
     description: data.description.trim(),
     amount: data.amount,

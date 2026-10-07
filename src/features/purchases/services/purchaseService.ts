@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import { db } from "@/lib/db";
 import { generatePurchaseCode } from "@/utils/code";
 import {
@@ -85,7 +86,7 @@ export async function receivePurchase(id: string): Promise<Purchase> {
 async function applyInboundMovements(purchase: Purchase): Promise<void> {
   const details = await db.purchaseDetails.where("purchaseId").equals(purchase.id).toArray();
   const movements: InventoryMovement[] = details.map((d) => ({
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId: purchase.workspaceId,
     productId: d.productId,
     type: "entrada" as const,
@@ -136,7 +137,7 @@ export async function voidPurchase(id: string): Promise<void> {
     if (wasReceived) {
       const details = await db.purchaseDetails.where("purchaseId").equals(id).toArray();
       const movements: InventoryMovement[] = details.map((d) => ({
-        id: crypto.randomUUID(),
+        id: newId(),
         workspaceId: existing.workspaceId,
         productId: d.productId,
         type: "salida" as const,

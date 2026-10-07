@@ -1,4 +1,5 @@
 "use client";
+import { newId } from "@/utils/id";
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus, Pencil, Trash2 } from "lucide-react";
@@ -37,7 +38,7 @@ export default function TypesPage() {
         await db.types.update(editing.id, { name: name.trim(), syncStatus: "pending" });
         toast.success("Tipo actualizado");
       } else {
-        await db.types.add({ id: crypto.randomUUID(), workspaceId: useWorkspaceStore.getState().activeWorkspaceId ?? "default", name: name.trim(), createdAt: new Date().toISOString(), syncStatus: "pending" });
+        await db.types.add({ id: newId(), workspaceId: useWorkspaceStore.getState().activeWorkspaceId ?? "default", name: name.trim(), createdAt: new Date().toISOString(), syncStatus: "pending" });
         toast.success("Tipo creado");
       }
       setModalOpen(false);

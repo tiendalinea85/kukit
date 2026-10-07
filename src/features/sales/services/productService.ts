@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import { db } from "@/lib/db";
 import { computeStock } from "../domain/stockRules";
 import type { InventoryMovement, Product } from "@/types";
@@ -53,7 +54,7 @@ export async function listProductsWithStock(): Promise<ProductWithStock[]> {
 export async function createProduct(data: ProductWithStockFormData): Promise<Product> {
   const t = now();
   const product: Product = {
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId: getWorkspaceId(),
     code: data.code.trim(),
     name: data.name.trim(),
@@ -71,7 +72,7 @@ export async function createProduct(data: ProductWithStockFormData): Promise<Pro
     await db.products.add(product);
     if ((data.initialStock ?? 0) > 0) {
       const movement: InventoryMovement = {
-        id: crypto.randomUUID(),
+        id: newId(),
         workspaceId: product.workspaceId,
         productId: product.id,
         type: "entrada",
@@ -125,7 +126,7 @@ export async function addStockMovement(input: {
   notes: string;
 }): Promise<InventoryMovement> {
   const movement: InventoryMovement = {
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId: getWorkspaceId(),
     productId: input.productId,
     type: input.type,

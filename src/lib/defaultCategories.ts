@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import { db } from "./db";
 import { getCurrentUser } from "./supabase";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
@@ -26,7 +27,7 @@ export async function seedCategoriesIfEmpty(userId: string | null): Promise<bool
 
   await db.categories.bulkAdd(
     DEFAULT_CATEGORIES.map((c) => ({
-      id: crypto.randomUUID(),
+      id: newId(),
       workspaceId,
       name: c.name,
       icon: c.icon,

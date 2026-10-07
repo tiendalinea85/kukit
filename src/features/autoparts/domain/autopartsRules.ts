@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import type {
   VehicleBrand,
   VehicleModel,
@@ -23,7 +24,7 @@ export function buildVehicleBrand(input: {
   now: string;
 }): VehicleBrand {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     name: input.data.name.trim(),
     country: input.data.country.trim(),
     createdAt: input.now,
@@ -47,7 +48,7 @@ export function buildVehicleModel(input: {
   now: string;
 }): VehicleModel {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     brandId: input.data.brandId,
     brandName: input.data.brandName.trim(),
     name: input.data.name.trim(),
@@ -78,7 +79,7 @@ export function buildAutoPart(input: {
   now: string;
 }): AutoPart {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     code: input.code,
     name: input.data.name.trim(),
     partNumber: input.data.partNumber.trim(),
@@ -111,7 +112,7 @@ export function buildPartCompatibility(input: {
   now: string;
 }): PartCompatibility {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     partId: input.data.partId,
     modelId: input.data.modelId,
     brandName: input.data.brandName.trim(),

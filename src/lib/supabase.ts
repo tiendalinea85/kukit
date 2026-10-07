@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { isOffline, withTimeout } from "./net";
+import { parseAuthCallback } from "./recoveryGuard";
 
 let _supabase: SupabaseClient | null = null;
 let _currentUser: User | null = null;
@@ -8,7 +9,7 @@ let _currentUser: User | null = null;
 // sin esta bandera, onAuthStateChange notificaba un null síncrono al suscribirse
 // y AuthProvider expulsaba a /auth en cada carga antes de resolver la sesión.
 let _userResolved = false;
-let _authListeners: Array<(user: User | null) => void> = [];
+let _authListeners: Array<(user: User | null, event?: string) => void> = [];
 let _authUnsub: (() => void) | null = null;
 
 function getSupabaseUrl(): string {
@@ -26,12 +27,14 @@ export function isSupabaseConfigured(): boolean {
 // Lee el código OAuth/recovery desde la URL, tanto si llega como query param
 // (PKCE) como en el hash. Usado por /auth/callback y /auth/reset.
 export function getOAuthCode(): string | null {
-  const url = new URL(window.location.href);
-  let code = url.searchParams.get("code");
-  if (!code) {
-    code = new URLSearchParams(window.location.hash.slice(1)).get("code");
-  }
-  return code;
+  return parseAuthCallback(window.location.href).code;
+}
+
+// Borra los tokens del hash tras montar para que no se re-procesen en recargas
+// ni queden expuestos en la barra de direcciones.
+export function clearAuthHash(): void {
+  if (!window.location.hash) return;
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
 }
 
 export function getSupabase(): SupabaseClient | null {
@@ -75,7 +78,9 @@ export async function getCurrentUser(): Promise<User | null> {
   return _currentUser;
 }
 
-export function onAuthStateChange(callback: (user: User | null) => void): () => void {
+export function onAuthStateChange(
+  callback: (user: User | null, event?: string) => void
+): () => void {
   _authListeners.push(callback);
   // Solo se replica el estado si ya se resolvió: notificar un null " provisional"
   // provocaba un ciclo logout→login en cada recarga de la PWA.
@@ -84,10 +89,10 @@ export function onAuthStateChange(callback: (user: User | null) => void): () => 
   if (!_authUnsub) {
     const sb = getSupabase();
     if (sb) {
-      const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
+      const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
         _currentUser = session?.user ?? null;
         _userResolved = true;
-        _authListeners.forEach((cb) => cb(_currentUser));
+        _authListeners.forEach((cb) => cb(_currentUser, event));
       });
       _authUnsub = () => sub.subscription.unsubscribe();
     }

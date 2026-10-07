@@ -1,4 +1,5 @@
 "use client";
+import { newId } from "@/utils/id";
 import { useState, useEffect, useCallback } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -108,7 +109,7 @@ export function ProductionOrderForm({
     setMaterialRows((prev) => [
       ...prev,
       {
-        id: crypto.randomUUID(),
+        id: newId(),
         materialId: "",
         materialName: "",
         quantity: 1,

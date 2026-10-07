@@ -1,3 +1,4 @@
+import { newId } from "@/utils/id";
 import type { Purchase, PurchaseDetail, PurchaseStatus } from "@/types";
 import { PAYMENT_METHODS } from "../../expenses/domain/expenseRules.ts";
 
@@ -45,7 +46,7 @@ export function isReceived(purchase: Pick<Purchase, "status">): boolean {
 
 export function buildPurchaseDetail(input: PurchaseDetailInput, purchaseId: string, now: string, workspaceId: string = "default"): PurchaseDetail {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId,
     purchaseId,
     productId: input.productId,
@@ -62,7 +63,7 @@ export function buildPurchaseDetail(input: PurchaseDetailInput, purchaseId: stri
 
 export function buildPurchase(input: NewPurchaseInput, code: string, now: string): Purchase {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     workspaceId: input.workspaceId ?? "default",
     code,
     supplier: input.supplier.trim(),
