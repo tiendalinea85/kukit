@@ -65,6 +65,51 @@ describe("classifySyncError", () => {
     assert.equal(info.type, "validation");
   });
 
+  it("classifies a PostgREST RLS denial (SQLSTATE 42501) as a permanent auth error", () => {
+    const info = classifySyncError({
+      code: "42501",
+      message: 'new row violates row-level security policy for table "purchases"',
+    });
+    assert.equal(info.type, "auth");
+    assert.ok(!isRetryableError(info));
+    assert.ok(isPermanentError(info.type));
+  });
+
+  it("does not read a SQLSTATE code as an HTTP status", () => {
+    const info = classifySyncError({ code: "42501", message: "boom" });
+    assert.notEqual(info.type, "server");
+  });
+
+  it("classifies a unique violation (SQLSTATE 23505) as a permanent validation error", () => {
+    const info = classifySyncError({
+      code: "23505",
+      message: 'duplicate key value violates unique constraint "idx_expenses_user_code"',
+    });
+    assert.equal(info.type, "validation");
+    assert.ok(!isRetryableError(info));
+  });
+
+  it("keeps a foreign key violation (SQLSTATE 23503) retryable", () => {
+    const info = classifySyncError({
+      code: "23503",
+      message: "insert or update on table expense_details violates foreign key constraint",
+    });
+    assert.equal(info.type, "server");
+    assert.ok(isRetryableError(info));
+  });
+
+  it("classifies a missing table or column (PGRST205) as a retryable server error", () => {
+    const info = classifySyncError({ code: "PGRST205", message: "Could not find the table" });
+    assert.equal(info.type, "server");
+    assert.ok(isRetryableError(info));
+  });
+
+  it("classifies an expired JWT (PGRST301) as a permanent auth error", () => {
+    const info = classifySyncError({ code: "PGRST301", message: "JWT expired" });
+    assert.equal(info.type, "auth");
+    assert.ok(!isRetryableError(info));
+  });
+
   it("detecta mensajes de append-only como conflict", () => {
     const info = classifySyncError(new Error("append-only: movimiento registrado"));
     assert.equal(info.type, "conflict");

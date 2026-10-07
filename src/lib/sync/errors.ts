@@ -10,6 +10,9 @@ import type { SyncErrorInfo, SyncErrorType } from "../../types/sync.ts";
 //   - conflict:   el servidor tiene una revisión más nueva (409 o guardado OCC).
 //   - unknown:    cualquier otra cosa.
 //
+// PostgREST devuelve el SQLSTATE de PostgreSQL en `code` ("42501", "23505",
+// "PGRST301") y el estado HTTP en `status`; ver classifySqlState.
+//
 // Los errores `retryable` se reintentan con backoff exponencial; el resto se
 // marcan como `failed` permanente o `conflict` (requieren intervención).
 
@@ -42,6 +45,53 @@ export interface ClassifyOptions {
   offline: boolean;
 }
 
+// SQLSTATE de PostgreSQL (5 caracteres), errores propios de PostgREST
+// ("PGRST" + 3 dígitos) y estados HTTP (3 dígitos).
+const SQLSTATE_RE = /^(PGRST\d{3}|[0-9A-Z]{5})$/;
+const HTTP_STATUS_RE = /^\d{3}$/;
+
+function classifySqlState(code: string, message: string): SyncErrorInfo | null {
+  if (code.startsWith("PGRST")) {
+    if (/^PGRST3\d\d$/.test(code)) {
+      return { type: "auth", message: `Sesión inválida o expirada: ${message}`, retryable: false };
+    }
+    // PGRST2xx: tabla o columna ausente del esquema. Como un 404, se reintenta
+    // con backoff para auto-repararse cuando se publique la migración que falta.
+    return { type: "server", message, retryable: true };
+  }
+
+  switch (code.slice(0, 2)) {
+    case "28": // credenciales de autenticación inválidas
+      return { type: "auth", message, retryable: false };
+    case "42":
+      if (code === "42501") {
+        // RLS o GRANT denegado: reintentar no cambia nada, hay que revisar
+        // permisos/ políticas en el servidor.
+        return { type: "auth", message: `Sin permisos sobre la tabla (RLS): ${message}`, retryable: false };
+      }
+      if (code === "42P01") {
+        // Tabla inexistente: igual que un 404, esperar a que exista.
+        return { type: "server", message, retryable: true };
+      }
+      return { type: "validation", message, retryable: false };
+    case "23": // violación de integridad
+      if (code === "23503") {
+        return { type: "server", message: "Referencia pendiente de sincronizar (dependencia)", retryable: true };
+      }
+      // 23505 (clave duplicada) y 23514 (check): el payload no se arregla solo.
+      return { type: "validation", message, retryable: false };
+    case "22": // rango / conversión de datos
+      return { type: "validation", message, retryable: false };
+    case "53":
+    case "54":
+    case "57":
+    case "58": // recursos insuficientes, límites, conexión
+      return { type: "server", message, retryable: true };
+    default:
+      return null;
+  }
+}
+
 export function classifySyncError(err: unknown, opts: ClassifyOptions = { offline: false }): SyncErrorInfo {
   const message = messageOf(err);
 
@@ -58,13 +108,23 @@ export function classifySyncError(err: unknown, opts: ClassifyOptions = { offlin
   const code = (err as { code?: unknown } | null)?.code;
   const status = (err as { status?: number; statusCode?: number } | null)?.status;
 
+  // PostgREST entrega en `code` el SQLSTATE de PostgreSQL ("42501", "23505",
+  // "PGRST301"), que NO es un estado HTTP. Tratarlo como tal mete 42501 (RLS)
+  // y 23505 (duplicado) en la rama ">= 500" y se reintentan para siempre.
+  if (typeof code === "string" && SQLSTATE_RE.test(code)) {
+    const info = classifySqlState(code, message);
+    if (info) return info;
+  }
+
   if (typeof status === "number" || typeof code === "number" || typeof code === "string") {
     const httpStatus =
       typeof status === "number"
         ? status
         : typeof code === "number"
           ? code
-          : Number(String(code).replace(/\D/g, "")) || 0;
+          : typeof code === "string" && HTTP_STATUS_RE.test(code)
+            ? Number(code)
+            : 0;
 
     if (httpStatus === 401 || httpStatus === 403) {
       return { type: "auth", message: "Sesión inválida o sin permisos", retryable: false };
