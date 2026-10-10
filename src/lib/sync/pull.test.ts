@@ -6,8 +6,9 @@ import { runPull } from "./pull.ts";
 import type { SyncTransportEntity } from "../../types/sync.ts";
 import type { Product } from "../../types/index.ts";
 
-// El servidor de products no tiene columna `category_id`: la fila remota llega
-// sin ella. El pull no debe borrar la categoría que solo existe en Dexie.
+// Mecanismo genérico de `localOnlyFields`: si una entidad declara campos que el
+// servidor no almacena, el pull no debe borrar el valor que solo existe en
+// Dexie al aplicarse una fila remota. (products ya no lo usa desde 00020.)
 
 const WS = "default";
 

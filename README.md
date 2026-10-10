@@ -42,7 +42,7 @@ GEMINI_API_KEY=            # opcional, asistente de voz
 
 ### Base de datos (Supabase)
 
-Aplica las migraciones de `supabase/migrations/` **en orden** (00001 a 00019):
+Aplica las migraciones de `supabase/migrations/` **en orden** (00001 a 00021):
 
 | Migración | Contenido |
 |-----------|-----------|
@@ -65,12 +65,14 @@ Aplica las migraciones de `supabase/migrations/` **en orden** (00001 a 00019):
 | `00017` | Iconos propios reutilizables (`custom_icons`, PNG en data URL) |
 | `00018` | `workspace_members`: FK, trigger de propietario y backfill (requiere `00009`) |
 | `00019` | Compras: reafirma RLS de `purchases` / `purchase_details` + GRANTS |
+| `00020` | Products: `category_id` (cierre de drift; aditiva e idempotente) |
+| `00021` | `sale_details` / `purchase_details`: `deleted` + `workspace_id` + `updated_at` (soft delete Offline-First) |
 
 > ℹ️ Las migraciones están ordenadas por dependencia: `products` → `purchases`
 > → `purchase_details` → `revision/triggers` → `workspace_id` → sincronización.
 > Cada ALTER/trigger solo toca tablas que ya existen (comprobación con
 > `information_schema`), y todo es idempotente (IF NOT EXISTS + DROP/CREATE),
-> por lo que la secuencia 00001→00019 corre limpia de corrida en una base
+> por lo que la secuencia 00001→00021 corre limpia de corrida en una base
 > nueva y también sobre una base existente sin borrar datos. Validación en
 > `supabase/validation/validate_schema.sql`.
 

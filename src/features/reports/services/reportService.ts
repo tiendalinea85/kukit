@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { listCategories } from "@/features/categories/services/categoryService";
+import { isVoided } from "@/features/expenses/domain/expenseRules";
 import { normalizeText } from "@/utils/text";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import type { Category, PeriodFilter, Expense } from "@/types";
@@ -91,7 +92,9 @@ export async function queryExpensesReport(options: {
     listCategories(workspaceId),
   ]);
 
-  let filtered = all.filter((e) => e.deleted !== true);
+  // Un gasto anulado no es un gasto realizado: se excluye de los informes de
+  // gastos (totales, agrupaciones, conteos y listados).
+  let filtered = all.filter((e) => e.deleted !== true && !isVoided(e));
 
   if (options.period === "custom" && options.dateFrom && options.dateTo) {
     const start = new Date(options.dateFrom);

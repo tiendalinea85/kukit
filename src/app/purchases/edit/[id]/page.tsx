@@ -25,10 +25,11 @@ export default function EditPurchasePage() {
 
   useEffect(() => {
     (async () => {
-      const [purchase, details] = await Promise.all([
+      const [purchase, allDetails] = await Promise.all([
         db.purchases.get(id),
         db.purchaseDetails.where("purchaseId").equals(id).toArray(),
       ]);
+      const details = allDetails.filter((d) => !d.deleted);
       if (!purchase) {
         setNotFound(true);
         setLoading(false);

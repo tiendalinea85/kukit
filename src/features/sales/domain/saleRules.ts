@@ -60,6 +60,7 @@ export function buildSaleDetail(input: SaleDetailInput, saleId: string, now: str
     unitPrice: input.unitPrice,
     subtotal: computeSubtotal(input.quantity, input.unitPrice),
     createdAt: now,
+    deleted: false,
     syncStatus: "pending",
   };
 }

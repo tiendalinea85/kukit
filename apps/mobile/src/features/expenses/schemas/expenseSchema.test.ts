@@ -44,10 +44,10 @@ describe('expenseSchema', () => {
     assert.equal(result.success && result.data.amount, 50);
   });
 
-  it('defaults status a activo cuando se omite', () => {
+  it('defaults status a pagado cuando se omite', () => {
     const result = expenseSchema.safeParse({ ...validInput, status: undefined });
     assert.ok(result.success);
-    assert.equal(result.success && result.data.status, 'activo');
+    assert.equal(result.success && result.data.status, 'pagado');
   });
 
   it('rechaza un método de pago inválido', () => {
@@ -82,7 +82,7 @@ describe('expenseSchema', () => {
   });
 
   it('expone los catálogos canónicos', () => {
-    assert.deepEqual(EXPENSE_STATUSES, ['activo', 'pendiente', 'pagado', 'cancelado']);
+    assert.deepEqual(EXPENSE_STATUSES, ['pagado', 'pendiente', 'anulado']);
     assert.deepEqual(PAYMENT_METHODS, ['efectivo', 'tarjeta', 'transferencia', 'otro']);
   });
 });

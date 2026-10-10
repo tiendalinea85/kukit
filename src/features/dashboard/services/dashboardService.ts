@@ -155,7 +155,7 @@ export async function loadDashboard(workspaceId?: string): Promise<DashboardData
   // Detalle de ventas confirmadas del rango (índice por saleId).
   let confirmedDetails: SaleDetail[] = [];
   if (confirmedIds.size > 0) {
-    confirmedDetails = await db.saleDetails.where("saleId").anyOf([...confirmedIds]).toArray();
+    confirmedDetails = (await db.saleDetails.where("saleId").anyOf([...confirmedIds]).toArray()).filter((d) => !d.deleted);
   }
 
   const unitsSold = confirmedDetails.reduce((s, d) => s + d.quantity, 0);

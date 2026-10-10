@@ -60,7 +60,7 @@ useEffect(() => {
     if (!activeWorkspaceId) return;
     db.saleDetails.where("workspaceId").equals(activeWorkspaceId).toArray().then((arr) => {
       const map: Record<string, SaleDetail[]> = {};
-      arr.forEach((d) => { (map[d.saleId] ??= []).push(d); });
+      arr.filter((d) => !d.deleted).forEach((d) => { (map[d.saleId] ??= []).push(d); });
       setDetailsBySale(map);
     });
   }, [activeWorkspaceId]);

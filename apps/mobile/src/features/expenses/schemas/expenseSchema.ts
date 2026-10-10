@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const EXPENSE_STATUSES = ['activo', 'pendiente', 'pagado', 'cancelado'] as const;
+export const EXPENSE_STATUSES = ['pagado', 'pendiente', 'anulado'] as const;
 
 export const PAYMENT_METHODS = ['efectivo', 'tarjeta', 'transferencia', 'otro'] as const;
 
@@ -15,7 +15,7 @@ export const expenseSchema = z.object({
   category_id: z.string().nullable().optional(),
   type_id: z.string().nullable().optional(),
   payment_method: z.enum(PAYMENT_METHODS, { message: 'Selecciona un método de pago' }),
-  status: z.enum(EXPENSE_STATUSES, { message: 'Selecciona un estado' }).default('activo'),
+  status: z.enum(EXPENSE_STATUSES, { message: 'Selecciona un estado' }).default('pagado'),
   date: z.string().regex(DATE_RE, 'Selecciona una fecha'),
   time: z.string().min(1, 'Selecciona una hora'),
   notes: z.string().max(1000, 'Las observaciones son demasiado largas').optional(),

@@ -1,6 +1,6 @@
 import { newId } from "@/utils/id";
 import { db } from "@/lib/db";
-import { computeStock } from "../domain/stockRules";
+import { computeStock, stockDelta } from "../domain/stockRules";
 import type { InventoryMovement, Product } from "@/types";
 import type { ProductFormData, ProductWithStockFormData } from "../schemas/productSchema";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
@@ -24,7 +24,7 @@ export async function getStockById(): Promise<Record<string, number>> {
   const movements = await db.inventoryMovements.where("workspaceId").equals(workspaceId).toArray();
   const byId: Record<string, number> = {};
   for (const m of movements) {
-    byId[m.productId] = (byId[m.productId] ?? 0) + (m.type === "entrada" ? m.quantity : -m.quantity);
+    byId[m.productId] = (byId[m.productId] ?? 0) + stockDelta(m);
   }
   return byId;
 }

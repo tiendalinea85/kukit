@@ -214,7 +214,7 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
       };
       await db.sales.add(sale1);
       await db.saleDetails.bulkAdd([
-        { id: newId(), workspaceId, saleId: sale1.id, productId: leggings.id, code: leggings.code, name: leggings.name, color: leggings.color, quantity: 2, unitPrice: 15, subtotal: 30, createdAt: now, syncStatus: "local" as const },
+        { id: newId(), workspaceId, saleId: sale1.id, productId: leggings.id, code: leggings.code, name: leggings.name, color: leggings.color, quantity: 2, unitPrice: 15, subtotal: 30, createdAt: now, deleted: false, syncStatus: "local" as const },
       ]);
       await db.inventoryMovements.add({
         id: newId(),
@@ -249,7 +249,7 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
       };
       await db.sales.add(sale2);
       await db.saleDetails.bulkAdd([
-        { id: newId(), workspaceId, saleId: sale2.id, productId: topBlanco.id, code: topBlanco.code, name: topBlanco.name, color: topBlanco.color, quantity: 3, unitPrice: 7.5, subtotal: 22.5, createdAt: now, syncStatus: "local" as const },
+        { id: newId(), workspaceId, saleId: sale2.id, productId: topBlanco.id, code: topBlanco.code, name: topBlanco.name, color: topBlanco.color, quantity: 3, unitPrice: 7.5, subtotal: 22.5, createdAt: now, deleted: false, syncStatus: "local" as const },
       ]);
 
       if (luisa) {
@@ -273,7 +273,7 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
         };
         await db.sales.add(sale3);
         await db.saleDetails.bulkAdd([
-          { id: newId(), workspaceId, saleId: sale3.id, productId: leggings.id, code: leggings.code, name: leggings.name, color: leggings.color, quantity: 1, unitPrice: 15, subtotal: 15, createdAt: now, syncStatus: "local" as const },
+          { id: newId(), workspaceId, saleId: sale3.id, productId: leggings.id, code: leggings.code, name: leggings.name, color: leggings.color, quantity: 1, unitPrice: 15, subtotal: 15, createdAt: now, deleted: false, syncStatus: "local" as const },
         ]);
       }
     }

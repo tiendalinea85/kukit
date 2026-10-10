@@ -16,7 +16,17 @@ import type {
   PaymentMethod,
 } from "../types/index.ts";
 import type { OutboxOperation, SyncErrorInfo, SyncTransportEntity } from "../types/sync.ts";
-import { classifySyncError } from "./sync/errors.ts";
+import { classifySyncError, classifyWriteResponse } from "./sync/errors.ts";
+import type { WriteResponseLike } from "./sync/errors.ts";
+import { db } from "./db.ts";
+import { hashPayload, isoNow } from "./sync/outbox.ts";
+
+// TEMPORAL DIAGNÓSTICO — ETAPA 1: captura del payload real antes de writeWith.
+// Se elimina al cerrar la etapa. NO registra tokens ni claves, solo datos del
+// dominio que el propio usuario guardó. Filtro: console.warn → grep [SYNC-DIAG].
+function diag(tag: string, data: unknown): void {
+  console.warn(`[SYNC-DIAG] ${tag}`, JSON.stringify(data));
+}
 
 // TRANSPORTE: refleja las tablas locales (Dexie) en Supabase.
 //
@@ -92,6 +102,10 @@ function expenseDetailToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
+    // El hijo hereda el workspace de su gasto: sin esto la fila remota queda
+    // con NULL y el detalle queda fuera del aislamiento por workspace. El pull
+    // ya lo lee (`expenseDetailFromRow`) y `withWorkspace` protege los NULL viejos.
+    workspace_id: asStr(row.workspaceId) || null,
     expense_id: asStr(row.expenseId),
     product_id: asStr(row.productId) || null,
     code: asStr(row.code),
@@ -199,11 +213,13 @@ export function productToPayload(row: Record<string, unknown>, userId: string) {
     code: asStr(row.code),
     name: asStr(row.name),
     color: asStr(row.color),
-    // `categoryId` NO se envía: `public.products` del Supabase desplegado no
-    // tiene la columna `category_id` y PostgREST rechaza el payload entero
-    // (PGRST204) antes de insertar. El campo es local (Dexie) y se conserva en
-    // el pull vía `localOnlyFields`; si algún día el servidor vuelve a exponer la
-    // columna, se reincorpora aquí.
+    // `category_id` se envía desde la migración 00020. Si el servidor aún no
+    // tiene la columna, PostgREST responde PGRST204 y `writeWith` la retira del
+    // payload y reintenta una sola vez (auto-reparación sin tocar Supabase).
+    // La FK `products.category_id → categories.id` puede dar 23503 si la
+    // categoría todavía no se sincronizó: se clasifica como dependencia
+    // retryable y el outbox reintenta con backoff.
+    category_id: asStr(row.categoryId) || null,
     deleted: asBool(row.deleted),
     created_at: asStr(row.createdAt),
     updated_at: asStr(row.updatedAt),
@@ -260,6 +276,7 @@ function saleDetailToPayload(row: Record<string, unknown>, userId: string) {
     quantity: asNum(row.quantity),
     unit_price: asNum(row.unitPrice),
     subtotal: asNum(row.subtotal),
+    deleted: asBool(row.deleted),
     created_at: asStr(row.createdAt),
     revision: asNum(row.revision, 1),
   };
@@ -299,6 +316,7 @@ function purchaseDetailToPayload(row: Record<string, unknown>, userId: string) {
     quantity: asNum(row.quantity),
     unit_price: asNum(row.unitPrice),
     subtotal: asNum(row.subtotal),
+    deleted: asBool(row.deleted),
     created_at: asStr(row.createdAt),
     revision: asNum(row.revision, 1),
   };
@@ -308,7 +326,7 @@ function purchaseDetailToPayload(row: Record<string, unknown>, userId: string) {
 // Mapeos pull (servidor → local)
 // ---------------------------------------------------------------------------
 
-function expenseFromRow(row: Record<string, unknown>): Expense {
+export function expenseFromRow(row: Record<string, unknown>): Expense {
   return {
     id: asStr(row.id),
     workspaceId: asStr(row.workspace_id),
@@ -319,7 +337,13 @@ function expenseFromRow(row: Record<string, unknown>): Expense {
     paymentMethod: asStr(row.payment_method, "efectivo") as PaymentMethod,
     status: normalizeStatus(
       row.status,
-      { pagado: "pagado", pendiente: "pendiente", anulado: "anulado" },
+      {
+        pagado: "pagado",
+        pendiente: "pendiente",
+        anulado: "anulado",
+        activo: "pagado",
+        cancelado: "anulado",
+      },
       "pagado",
     ),
     date: asStr(row.date),
@@ -526,6 +550,7 @@ function saleDetailFromRow(row: Record<string, unknown>): SaleDetail {
     unitPrice: asNum(row.unit_price),
     subtotal: asNum(row.subtotal),
     createdAt: asStr(row.created_at),
+    deleted: asBool(row.deleted),
     syncStatus: "synced",
     revision: asNum(row.revision, 1),
   };
@@ -569,6 +594,7 @@ function purchaseDetailFromRow(row: Record<string, unknown>): PurchaseDetail {
     unitPrice: asNum(row.unit_price),
     subtotal: asNum(row.subtotal),
     createdAt: asStr(row.created_at),
+    deleted: asBool(row.deleted),
     syncStatus: "synced",
     revision: asNum(row.revision, 1),
   };
@@ -1078,7 +1104,7 @@ const ENTITY_SPECS: EntitySpec[] = [
   { name: "types", serverTable: "types", order: 2, mode: "master", toPayload: typeToPayload, fromRow: typeFromRow },
   { name: "investmentCategories", serverTable: "investment_categories", order: 3, mode: "master", toPayload: investmentCategoryToPayload, fromRow: investmentCategoryFromRow },
   { name: "customers", serverTable: "customers", order: 4, mode: "master", toPayload: customerToPayload, fromRow: customerFromRow },
-  { name: "products", serverTable: "products", order: 5, mode: "master", localOnlyFields: ["categoryId"], toPayload: productToPayload, fromRow: productFromRow },
+  { name: "products", serverTable: "products", order: 5, mode: "master", toPayload: productToPayload, fromRow: productFromRow },
   { name: "expenses", serverTable: "expenses", order: 6, mode: "guarded", toPayload: expenseToPayload, fromRow: expenseFromRow },
   { name: "expenseDetails", serverTable: "expense_details", order: 6.5, mode: "guarded", orderColumn: "created_at", toPayload: expenseDetailToPayload, fromRow: expenseDetailFromRow },
   { name: "investments", serverTable: "investments", order: 7, mode: "guarded", toPayload: investmentToPayload, fromRow: investmentFromRow },
@@ -1136,100 +1162,282 @@ export function buildSupabaseTransport(): SyncTransportEntity[] {
   }));
 }
 
-// Tablas cuyo `workspace_id` el servidor todavía no conoce (migración 00010 sin
-// aplicar): PostgREST rechaza el payload entero (PGRST204). Se reintenta sin la
-// columna y la tabla se marca para no volver a insistir en cada operación.
-const tablesWithoutWorkspaceColumn = new Set<string>();
+// Columnas que PostgREST rechaza porque no existen en el esquema del servidor
+// (PGRST204). Se retiran del payload de esa tabla para no volver a enviarlas en
+// cada operación: es la degradación con la que el push se auto-repara sin tocar
+// Supabase (p. ej. `workspace_id` cuando la migración 00010 no está aplicada).
+const strippedColumnsByTable = new Map<string, Set<string>>();
 
-function isMissingWorkspaceColumn(error: unknown): boolean {
-  const message = String((error as { message?: unknown } | null)?.message ?? "").toLowerCase();
-  return message.includes("pgrst204") || message.includes("could not find the 'workspace_id' column");
+/** Columna que PostgREST no encuentra en el schema cache (PGRST204). */
+export function missingSchemaColumn(error: unknown): string | null {
+  const message = String((error as { message?: unknown } | null)?.message ?? "");
+  const code = String((error as { code?: unknown } | null)?.code ?? "");
+  const isMissingColumn =
+    code === "PGRST204" || /pgrst204/i.test(message) || /could not find the .* column/i.test(message);
+  if (!isMissingColumn) return null;
+  const named = message.match(/could not find the '([^']+)' column/i);
+  return named?.[1] ?? null;
 }
 
+type WriteResponse = WriteResponseLike & { data?: unknown };
+
+function logWriteResponse(table: string, response: WriteResponse): void {
+  if (!response.error) return;
+  diag("writeWith.response", {
+    table,
+    error: {
+      message: String((response.error as { message?: unknown }).message ?? ""),
+      status: (response.error as { status?: unknown }).status ?? response.status ?? null,
+      code: (response.error as { code?: unknown }).code ?? null,
+    },
+  });
+}
+
+/**
+ * Envía el payload y devuelve la respuesta cruda. El ACK lo decide siempre
+ * `classifyWriteResponse` en el llamador: aquí solo se aplica la degradación de
+ * columnas ausentes (un reintento, nunca un bucle).
+ */
 async function writeWith(
   table: string,
   payload: Record<string, unknown>,
-  send: (body: Record<string, unknown>) => PromiseLike<{ error: unknown }>,
-): Promise<unknown | null> {
-  const withoutWorkspace = (): Record<string, unknown> => {
-    const rest = { ...payload };
-    delete rest.workspace_id;
-    return rest;
+  send: (body: Record<string, unknown>) => PromiseLike<WriteResponse>,
+): Promise<WriteResponse> {
+  const dropped = strippedColumnsByTable.get(table) ?? new Set<string>();
+  const buildBody = (): Record<string, unknown> => {
+    const body = { ...payload };
+    for (const column of dropped) delete body[column];
+    return body;
   };
-  const body = tablesWithoutWorkspaceColumn.has(table) ? withoutWorkspace() : payload;
 
-  const first = await send(body);
-  if (!first.error || !("workspace_id" in body)) return first.error ?? null;
+  const body = buildBody();
+  diag("writeWith.body", { table, body });
+  let response = await send(body);
+  logWriteResponse(table, response);
 
-  if (tablesWithoutWorkspaceColumn.has(table) || !isMissingWorkspaceColumn(first.error)) {
-    return first.error;
+  if (response.error) {
+    const column = missingSchemaColumn(response.error);
+    // Solo se retira si la columna viaja en el body y aún no se había retirado.
+    // Si no, no hay nada que quitar y el error llega a la clasificación como
+    // permanente: así no se generan reintentos infinitos por una migración que
+    // falta en el servidor.
+    if (column && Object.prototype.hasOwnProperty.call(body, column)) {
+      dropped.add(column);
+      strippedColumnsByTable.set(table, dropped);
+      const stripped = buildBody();
+      diag("writeWith.retry", { table, body: stripped, column });
+      response = await send(stripped);
+      logWriteResponse(table, response);
+    }
   }
-
-  tablesWithoutWorkspaceColumn.add(table);
-  const retry = await send(withoutWorkspace());
-  return retry.error ?? null;
+  return response;
 }
 
-async function pushOp(spec: EntitySpec, op: OutboxOperation): Promise<SyncErrorInfo | null> {
-  const sb = getSupabase();
-  if (!sb) return { type: "network", message: "Supabase no configurado", retryable: true };
-  const userId = await currentUserId();
-  if (!userId) return { type: "auth", message: "Sin sesión activa", retryable: false };
+// ---------------------------------------------------------------------------
+// Auto-reparación del código correlativo duplicado
+// ---------------------------------------------------------------------------
 
-  const payload = spec.toPayload(op.payload, userId);
+// Las tablas con columna `code` tienen un índice único por usuario
+// (`idx_<tabla>_user_code`, `<tabla>_code_key`). El código se genera en el
+// cliente, así que dos dispositivos offline pueden producir el mismo y el
+// servidor responde 23505 al insertar. PostgREST lo devuelve como 409 con el
+// nombre del índice en el mensaje.
+export function isDuplicateCodeError(error: unknown): boolean {
+  if (!error) return false;
+  const code = String((error as { code?: unknown }).code ?? "");
+  const message = String((error as { message?: unknown }).message ?? "");
+  return code === "23505" && /code/i.test(message);
+}
+
+// Siguiente código libre conservando el prefijo y el ancho numérico actuales
+// (p. ej. "G000007" con códigos hasta "G000012" -> "G000013"; "ROT-003" -> "ROT-004").
+export function nextAvailableCode(current: string, codes: Array<string | null | undefined>): string {
+  const match = /^(.*?)(\d+)$/.exec(current);
+  if (!match) return `${current}${Date.now().toString(36).slice(-4)}`;
+  const prefix = match[1];
+  const width = match[2].length;
+  let max = 0;
+  for (const candidate of codes) {
+    if (typeof candidate !== "string" || !candidate.startsWith(prefix)) continue;
+    const rest = candidate.slice(prefix.length);
+    if (!/^\d+$/.test(rest)) continue;
+    const n = Number.parseInt(rest, 10);
+    if (Number.isInteger(n) && n > max) max = n;
+  }
+  return `${prefix}${String(max + 1).padStart(width, "0")}`;
+}
+
+interface HealthTable {
+  get(id: string): Promise<unknown>;
+  toArray(): Promise<unknown[]>;
+  update(id: string, changes: Record<string, unknown>): Promise<unknown>;
+}
+
+// Reasigna un código libre al registro local y refresca el payload del outbox.
+// Se consultan los códigos del servidor (autoridad) con el mismo prefijo y los
+// locales, y se toma el mayor + 1. Muta el `op` en memoria para que el
+// completado (compare-and-set) no lo reencole: el payload y la huella quedan
+// sincronizados con la fila ya reasignada.
+async function healDuplicateCode(spec: EntitySpec, op: OutboxOperation): Promise<boolean> {
+  const table = (db as unknown as Record<string, HealthTable | undefined>)[spec.name];
+  const sb = getSupabase();
+  const userId = await currentUserId();
+  if (!table || !sb || !userId) return false;
+
+  const row = (await table.get(op.entityId)) as Record<string, unknown> | undefined;
+  const current = asStr(row?.code);
+  if (!row || !current) return false;
+
+  const prefix = /^(.*?)(\d+)$/.exec(current)?.[1] ?? current;
+  const remote = await sb
+    .from(spec.serverTable)
+    .select("code")
+    .eq("user_id", userId)
+    .like("code", `${prefix}%`);
+  const remoteCodes = ((remote.data ?? []) as Array<{ code?: unknown }>).map((r) => asStr(r.code));
+  const localCodes = ((await table.toArray()) as Array<{ code?: unknown }>).map((r) => asStr(r.code));
+  const newCode = nextAvailableCode(current, [...remoteCodes, ...localCodes]);
+  if (newCode === current) return false;
+
+  const now = isoNow();
+  const updated = { ...row, code: newCode, updatedAt: now, syncStatus: "pending" };
+  await table.update(op.entityId, { code: newCode, updatedAt: now, syncStatus: "pending" });
+  await db.syncOutbox.update(op.id, {
+    payload: updated,
+    payloadHash: hashPayload(updated),
+    claimedRowHash: null,
+    updatedAt: now,
+  });
+  op.payload = updated;
+  op.payloadHash = hashPayload(updated);
+  op.claimedRowHash = null;
+  diag("pushOp.codeHealed", { entity: spec.name, entityId: op.entityId, from: current, to: newCode });
+  return true;
+}
+
+/** Filas que un UPDATE con `return=representation` confirma como afectadas. */
+function affectedRows(data: unknown): number {
+  if (Array.isArray(data)) return data.length;
+  return data && typeof data === "object" ? 1 : 0;
+}
+
+interface PushAttempt {
+  error: SyncErrorInfo | null;
+  duplicateCode: boolean;
+}
+
+async function pushAttempt(
+  spec: EntitySpec,
+  op: OutboxOperation,
+  payload: Record<string, unknown>,
+): Promise<PushAttempt> {
+  const sb = getSupabase();
+  if (!sb) {
+    return { error: { type: "network", message: "Supabase no configurado", retryable: true }, duplicateCode: false };
+  }
+
+  const flag = (response: WriteResponse): PushAttempt => {
+    const error = classifyWriteResponse(response);
+    return { error, duplicateCode: error !== null && isDuplicateCodeError(response.error) };
+  };
 
   try {
     if (op.op === "delete") {
-      const { error } = await sb.from(spec.serverTable).delete().eq("id", op.entityId);
-      return error ? classifySyncError(error) : null;
+      return flag(await sb.from(spec.serverTable).delete().eq("id", op.entityId));
     }
 
     if (spec.mode === "append") {
       // Movimientos de inventario: INSERT idempotente, nunca se actualizan.
-      const error = await writeWith(spec.serverTable, payload, (body) =>
+      return flag(await writeWith(spec.serverTable, payload, (body) =>
         sb.from(spec.serverTable).upsert(body, { onConflict: "id", ignoreDuplicates: true }),
-      );
-      return error ? classifySyncError(error) : null;
+      ));
     }
 
     if (spec.mode === "guarded") {
       // Operaciones registradas: guardado condicional por revisión.
       const localRevision = asNum(payload.revision, 1);
-      const { data: existing, error: selErr } = await sb
+      const select = await sb
         .from(spec.serverTable)
         .select("id, revision")
         .eq("id", op.entityId)
         .maybeSingle();
-      if (selErr) return classifySyncError(selErr);
+      const selectAck = classifyWriteResponse(select);
+      if (selectAck) return { error: selectAck, duplicateCode: false };
 
+      const existing = select.data as { revision?: unknown } | null;
       if (existing) {
         if (asNum((existing as { revision?: unknown }).revision, 1) > localRevision) {
           return {
-            type: "conflict",
-            message: `Versión remota más nueva (${(existing as { revision?: unknown }).revision} > ${localRevision})`,
-            retryable: false,
+            error: {
+              type: "conflict",
+              message: `Versión remota más nueva (${(existing as { revision?: unknown }).revision} > ${localRevision})`,
+              retryable: false,
+            },
+            duplicateCode: false,
           };
         }
-        const updErr = await writeWith(spec.serverTable, payload, (body) =>
-          sb.from(spec.serverTable).update(body).eq("id", op.entityId),
+        const update = await writeWith(spec.serverTable, payload, (body) =>
+          // `.select("id")` obliga a devolver las filas afectadas: un 204 sin
+          // cuerpo no confirma que la actualización haya ocurrido sobre una
+          // fila que ya no existe en el servidor.
+          sb.from(spec.serverTable).update(body).eq("id", op.entityId).select("id"),
         );
-        return updErr ? classifySyncError(updErr) : null;
+        const updateResult = flag(update);
+        if (updateResult.error) return updateResult;
+        if (affectedRows(update.data) > 0) return { error: null, duplicateCode: false };
+        // La fila remota desapareció (borrada en el servidor): se inserta.
       }
 
-      const insErr = await writeWith(spec.serverTable, payload, (body) =>
+      return flag(await writeWith(spec.serverTable, payload, (body) =>
         sb.from(spec.serverTable).upsert(body, { onConflict: "id", ignoreDuplicates: true }),
-      );
-      return insErr ? classifySyncError(insErr) : null;
+      ));
     }
 
     // Master data: upsert idempotente por id.
-    const error = await writeWith(spec.serverTable, payload, (body) =>
+    return flag(await writeWith(spec.serverTable, payload, (body) =>
       sb.from(spec.serverTable).upsert(body, { onConflict: "id", ignoreDuplicates: false }),
-    );
-    return error ? classifySyncError(error) : null;
+    ));
   } catch (err) {
-    return classifySyncError(err);
+    return { error: classifySyncError(err), duplicateCode: false };
   }
+}
+
+async function pushOp(spec: EntitySpec, op: OutboxOperation): Promise<SyncErrorInfo | null> {
+  const userId = await currentUserId();
+  if (!userId) return { type: "auth", message: "Sin sesión activa", retryable: false };
+
+  // Hasta 3 intentos: si el servidor rechaza por código correlativo duplicado
+  // (23505) se reasigna uno libre y se reenvía con el nuevo payload.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const payload = spec.toPayload(op.payload, userId);
+
+    // TEMPORAL DIAGNÓSTICO — payload final justo antes de writeWith (punto
+    // solicitado en la ETAPA 1). No se filtra nada excepto tokens/claves.
+    diag("pushOp.pre", {
+      entity: spec.name,
+      entityId: op.entityId,
+      workspaceId: op.workspaceId,
+      op: op.op,
+      payloadHash: op.payloadHash,
+      payload,
+    });
+    // TEMPORAL DIAGNÓSTICO — caso products: fila local cruda vs payload mapeado.
+    if (spec.name === "products") {
+      diag("products.productRow", op.payload);
+      diag("products.payloadFinal", payload);
+    }
+
+    const result = await pushAttempt(spec, op, payload);
+    if (!result.error) return null;
+    if (result.duplicateCode && (await healDuplicateCode(spec, op))) continue;
+    return result.error;
+  }
+
+  return {
+    type: "validation",
+    message: "No se pudo asignar un código correlativo libre tras varios intentos",
+    retryable: false,
+  };
 }
 
 async function pullTable(

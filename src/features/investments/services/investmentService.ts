@@ -72,6 +72,7 @@ export async function deleteInvestment(id: string): Promise<void> {
   await getActiveInvestment(id);
   await db.investments.update(id, {
     deleted: true,
+    updatedAt: new Date().toISOString(),
     syncStatus: "pending" as const,
   });
 }

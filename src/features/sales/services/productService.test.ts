@@ -7,6 +7,7 @@ import {
   updateProduct,
   deleteProduct,
   getProductStock,
+  getStockById,
   listProductsWithStock,
   addStockMovement,
   adjustStock,
@@ -240,5 +241,12 @@ describe("cómputo de stock acumulado", () => {
     });
     const stock = await getProductStock(product.id);
     assert.equal(stock, 12);
+  });
+
+  it("getStockById resta los ajustes negativos (cantidad firmada)", async () => {
+    const product = await createProduct({ code: "PRD-001", name: "Tejido", initialStock: 20 });
+    await adjustStock({ productId: product.id, delta: -5, notes: "Merma" });
+    const stockById = await getStockById();
+    assert.equal(stockById[product.id], 15);
   });
 });

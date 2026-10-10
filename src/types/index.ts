@@ -196,6 +196,7 @@ export interface SaleDetail {
   unitPrice: number;
   subtotal: number;
   createdAt: string;
+  deleted: boolean;
   syncStatus: SyncStatus;
   revision?: number;
 }
@@ -237,6 +238,7 @@ export interface PurchaseDetail {
   unitPrice: number;
   subtotal: number;
   createdAt: string;
+  deleted: boolean;
   syncStatus: SyncStatus;
   revision?: number;
 }

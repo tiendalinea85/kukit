@@ -97,6 +97,12 @@ async def create_workspace(
                 ws_id, user.id, body.name.strip(), ws_type, parent_id,
                 body.model_key, body.description, now, now,
             )
+            await conn.execute(
+                """INSERT INTO workspace_members (workspace_id, user_id, role)
+                   VALUES ($1, $2, 'OWNER')
+                   ON CONFLICT (workspace_id, user_id) DO NOTHING""",
+                ws_id, user.id,
+            )
             for module_key in body.modules:
                 await conn.execute(
                     """INSERT INTO workspace_modules (workspace_id, module_key, status, created_at)

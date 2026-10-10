@@ -1,8 +1,8 @@
 import { newId } from "@/utils/id";
+import type { Table } from "dexie";
 import { db } from "../db.ts";
 import type {
   OutboxOperation,
-  OutboxState,
   SyncErrorInfo,
   SyncErrorType,
   SyncLogEntry,
@@ -63,12 +63,9 @@ export const SYNC_ENTITY_TABLES = [
 
 export type SyncEntity = (typeof SYNC_ENTITY_TABLES)[number];
 
-function entityTable(entity: string): { update(id: string, changes: { syncStatus: OutboxState }): Promise<number> } | null {
+function entityTable(entity: string): Table<Record<string, unknown>, string> | null {
   if (!(SYNC_ENTITY_TABLES as readonly string[]).includes(entity)) return null;
-  const table = db[entity as SyncEntity] as unknown as {
-    update(id: string, changes: { syncStatus: OutboxState }): Promise<number>;
-  };
-  return table ?? null;
+  return db[entity as SyncEntity] as unknown as Table<Record<string, unknown>, string>;
 }
 
 /** Stringify canónico (claves ordenadas) para comparar payloads de forma estable. */
@@ -101,11 +98,57 @@ export function isoNow(): string {
   return new Date().toISOString();
 }
 
+// Poda del log de sincronización. Evidencia de crecimiento: `syncLog` solo se
+// escribe (cada ciclo añade `sync_started`, un `push_ok` por operación, eventos
+// de pull y de reconciliación) con auto-sincronización cada 60 s, y hoy nadie
+// lo lee en la app; sin límite acumula ~1.400 filas/día. Se conservan como
+// mucho SYNC_LOG_MAX_ENTRIES entradas y las emitidas en los últimos
+// SYNC_LOG_MAX_AGE_MS.
+export const SYNC_LOG_MAX_ENTRIES = 1_000;
+export const SYNC_LOG_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
+
+// La poda se ejecuta de forma amortiguada: un `count()` por cada 25 escritos en
+// vez de uno por cada evento, para no penalizar el push.
+const TRIM_EVERY_N_WRITES = 25;
+let writesSinceTrim = 0;
+
 export async function logSyncEvent(
   entry: Omit<SyncLogEntry, "id" | "ts">,
   now: string = isoNow(),
 ): Promise<void> {
   await db.syncLog.add({ id: uuid(), ts: now, ...entry });
+  if (++writesSinceTrim < TRIM_EVERY_N_WRITES) return;
+  writesSinceTrim = 0;
+  try {
+    await trimSyncLog(now);
+  } catch {
+    // La poda es mantenimiento: jamás debe romper la sincronización (se
+    // reintentará en los próximos escritos).
+  }
+}
+
+/** Elimina entradas vencidas y las que superen el tope, dejando las más nuevas. */
+export async function trimSyncLog(now: string = isoNow()): Promise<number> {
+  let removed = 0;
+
+  const cutoff = new Date(new Date(now).getTime() - SYNC_LOG_MAX_AGE_MS).toISOString();
+  const expired = await db.syncLog.where("ts").below(cutoff).primaryKeys();
+  if (expired.length) {
+    await db.syncLog.bulkDelete(expired);
+    removed += expired.length;
+  }
+
+  const total = await db.syncLog.count();
+  if (total > SYNC_LOG_MAX_ENTRIES) {
+    const excess = total - SYNC_LOG_MAX_ENTRIES;
+    const oldest = await db.syncLog.orderBy("ts").limit(excess).primaryKeys();
+    if (oldest.length) {
+      await db.syncLog.bulkDelete(oldest);
+      removed += oldest.length;
+    }
+  }
+
+  return removed;
 }
 
 export async function clearSyncLog(): Promise<void> {
@@ -128,47 +171,59 @@ export async function enqueueOperation(input: {
   now?: string;
 }): Promise<OutboxOperation> {
   const now = input.now ?? isoNow();
-  const wsId = input.workspaceId ?? "";
-  const existing = await db.syncOutbox.where("[entity+entityId]").equals([input.entity, input.entityId]).first();
+  // Lectura + escritura en la MISMA transacción: dos encolados simultáneos de
+  // una misma entidad deben ver la fila del otro. Separados en dos pasos,
+  // ambos leerían "no existe" y se crearían DOS operaciones para un mismo
+  // cambio (una quedaría huérfana y el push la reenviaría sin motivo).
+  return db.transaction("rw", db.syncOutbox, async () => {
+    const existing = await db.syncOutbox.where("[entity+entityId]").equals([input.entity, input.entityId]).first();
 
-  if (existing) {
-    const updated: Partial<OutboxOperation> = {
+    if (existing) {
+      const updated: Partial<OutboxOperation> = {
+        op: input.op,
+        payload: input.payload,
+        payloadHash: hashPayload(input.payload),
+        // El payload cambió: la huella de la fila reclamada ya no describe lo que
+        // se envía, así que se descarta (la vuelve a tomar el próximo claim).
+        claimedRowHash: null,
+        updatedAt: now,
+      };
+      // No se pisa un workspace conocido con vacío: un llamador que no lo trae
+      // (p. ej. la reconciliación antigua) no debe borrar el que ya había.
+      const wsId = input.workspaceId ?? existing.workspaceId;
+      if (wsId) updated.workspaceId = wsId;
+      if (existing.state !== "syncing") {
+        updated.state = "pending";
+        updated.attempts = 0;
+        updated.lastError = null;
+        updated.lastErrorType = null;
+        updated.retryAt = null;
+      }
+      await db.syncOutbox.update(existing.id, updated);
+      return { ...existing, ...updated } as OutboxOperation;
+    }
+
+    const op: OutboxOperation = {
+      id: uuid(),
+      entity: input.entity,
+      entityId: input.entityId,
+      workspaceId: input.workspaceId ?? "",
       op: input.op,
       payload: input.payload,
       payloadHash: hashPayload(input.payload),
-      workspaceId: wsId,
+      claimedRowHash: null,
+      state: "pending",
+      attempts: 0,
+      lastError: null,
+      lastErrorType: null,
+      createdAt: now,
       updatedAt: now,
+      lastAttemptAt: null,
+      retryAt: null,
     };
-    if (existing.state !== "syncing") {
-      updated.state = "pending";
-      updated.attempts = 0;
-      updated.lastError = null;
-      updated.lastErrorType = null;
-      updated.retryAt = null;
-    }
-    await db.syncOutbox.update(existing.id, updated);
-    return { ...existing, ...updated } as OutboxOperation;
-  }
-
-  const op: OutboxOperation = {
-    id: uuid(),
-    entity: input.entity,
-    entityId: input.entityId,
-    workspaceId: wsId,
-    op: input.op,
-    payload: input.payload,
-    payloadHash: hashPayload(input.payload),
-    state: "pending",
-    attempts: 0,
-    lastError: null,
-    lastErrorType: null,
-    createdAt: now,
-    updatedAt: now,
-    lastAttemptAt: null,
-    retryAt: null,
-  };
-  await db.syncOutbox.add(op);
-  return op;
+    await db.syncOutbox.add(op);
+    return op;
+  });
 }
 
 /**
@@ -230,65 +285,101 @@ export async function claimNextBatch(
   limit: number,
   now: string = isoNow(),
 ): Promise<OutboxOperation[]> {
-  const tx = db.transaction("rw", db.syncOutbox, async () => {
-    const pending = await db.syncOutbox.where("state").equals("pending").toArray();
-    const ready = pending.filter(
-      (op) => !op.retryAt || new Date(op.retryAt).getTime() <= new Date(now).getTime(),
-    );
-    ready.sort((a, b) => {
-      const rank = pushRank(a.entity) - pushRank(b.entity);
-      if (rank !== 0) return rank;
-      return (a.updatedAt ?? a.createdAt).localeCompare(b.updatedAt ?? b.createdAt);
-    });
-    const selected = ready.slice(0, limit);
-    for (const op of selected) {
-      await db.syncOutbox.update(op.id, {
-        state: "syncing",
-        lastAttemptAt: now,
+  // El alcance incluye todas las tablas de entidad: dentro de LA MISMA
+  // transacción se lee la huella (hash) de la fila reclamada. Esa huella es la
+  // base del compare-and-set de `completeOperation`; leerla fuera del claim
+  // dejaría una ventana en la que una edición no se detectaría.
+  const tx = db.transaction(
+    "rw",
+    [db.syncOutbox, ...SYNC_ENTITY_TABLES.map((entity) => db[entity])],
+    async () => {
+      const pending = await db.syncOutbox.where("state").equals("pending").toArray();
+      const ready = pending.filter(
+        (op) => !op.retryAt || new Date(op.retryAt).getTime() <= new Date(now).getTime(),
+      );
+      ready.sort((a, b) => {
+        const rank = pushRank(a.entity) - pushRank(b.entity);
+        if (rank !== 0) return rank;
+        return (a.updatedAt ?? a.createdAt).localeCompare(b.updatedAt ?? b.createdAt);
       });
-    }
-    return selected.map((op) => ({
-      ...op,
-      state: "syncing" as const,
-      lastAttemptAt: now,
-    }));
-  });
+      const selected = ready.slice(0, limit);
+      const claimed: OutboxOperation[] = [];
+      for (const op of selected) {
+        const table = entityTable(op.entity);
+        const row = table
+          ? ((await table.get(op.entityId)) as Record<string, unknown> | undefined)
+          : undefined;
+        const claimedRowHash = row ? hashPayload(row) : null;
+        await db.syncOutbox.update(op.id, {
+          state: "syncing",
+          lastAttemptAt: now,
+          claimedRowHash,
+        });
+        claimed.push({ ...op, state: "syncing", lastAttemptAt: now, claimedRowHash });
+      }
+      return claimed;
+    },
+  );
   return tx;
 }
 
 /**
- * Completado idempotente: marca la operación como `synced` y el registro como
- * `synced`. Si el payload cambió mientras estaba en vuelo (hash distinto),
- * vuelve a encolarla como `pending` para no perder la escritura.
+ * Completado idempotente (compare-and-set): marca la operación y el registro
+ * como `synced` SOLO si nada cambió desde el reclamo. En caso contrario se
+ * refresca el payload desde la fila actual y vuelve a `pending`:
+ *
+ *   - el payload del outbox cambió (hubo un `enqueueOperation` en vuelo) →
+ *     hash distinto;
+ *   - la fila local cambió sin pasar por `enqueueOperation` (los servicios solo
+ *     marcan `syncStatus`) → `claimedRowHash` distinto del hash actual.
+ *
+ * Devuelve `true` solo cuando el push quedó reflejado en el registro.
  */
 export async function completeOperation(
   op: OutboxOperation,
   now: string = isoNow(),
 ): Promise<boolean> {
-  const current = await db.syncOutbox.get(op.id);
-  if (!current) return true;
+  const table = entityTable(op.entity);
+  const scope: Array<Table<OutboxOperation, string> | Table<Record<string, unknown>, string>> = table
+    ? [db.syncOutbox, table]
+    : [db.syncOutbox];
+  const tx = db.transaction("rw", scope, async (): Promise<boolean> => {
+    const current = await db.syncOutbox.get(op.id);
+    if (!current) return true;
 
-  if (current.payloadHash !== op.payloadHash) {
+    const requeue = async (payload: Record<string, unknown>): Promise<false> => {
+      await db.syncOutbox.update(op.id, {
+        payload,
+        payloadHash: hashPayload(payload),
+        state: "pending",
+        attempts: 0,
+        lastError: null,
+        lastErrorType: null,
+        retryAt: null,
+        claimedRowHash: null,
+        updatedAt: now,
+      });
+      return false;
+    };
+
+    if (current.payloadHash !== op.payloadHash) return await requeue(current.payload);
+
+    if (table && op.claimedRowHash) {
+      const row = (await table.get(op.entityId)) as Record<string, unknown> | undefined;
+      if (row && hashPayload(row) !== op.claimedRowHash) return await requeue(row);
+    }
+
     await db.syncOutbox.update(op.id, {
-      state: "pending",
-      attempts: 0,
+      state: "synced",
+      updatedAt: now,
       lastError: null,
       lastErrorType: null,
-      retryAt: null,
-      updatedAt: now,
+      claimedRowHash: null,
     });
-    return false;
-  }
-
-  await db.syncOutbox.update(op.id, {
-    state: "synced",
-    updatedAt: now,
-    lastError: null,
-    lastErrorType: null,
+    if (table) await table.update(op.entityId, { syncStatus: "synced" });
+    return true;
   });
-  const table = entityTable(op.entity);
-  if (table) await table.update(op.entityId, { syncStatus: "synced" });
-  return true;
+  return tx;
 }
 
 export interface FailOptions {
@@ -489,41 +580,124 @@ export async function requeueOperation(id: string, now: string = isoNow()): Prom
 }
 
 /**
+ * Dependencias por clave foránea: antes de empujar un registro, su referencia
+ * debe existir en el servidor, o el FK devolvería 23503 reintentable sin fin
+ * (p. ej. un gasto cuya categoría por defecto quedó en `local` y nunca se
+ * encoló). El orden de push ya pone las maestras delante; aquí solo se asegura
+ * que la referencia local esté encolada.
+ */
+const DEPENDENCIES: Partial<Record<SyncEntity, Array<{ entity: SyncEntity; field: string }>>> = {
+  expenses: [{ entity: "categories", field: "categoryId" }],
+  expenseDetails: [{ entity: "products", field: "productId" }],
+  saleDetails: [{ entity: "products", field: "productId" }],
+  purchaseDetails: [{ entity: "products", field: "productId" }],
+  investments: [{ entity: "investmentCategories", field: "categoryId" }],
+};
+
+async function enqueueDependencies(
+  entity: string,
+  row: Record<string, unknown>,
+  now: string,
+): Promise<void> {
+  const deps = DEPENDENCIES[entity as SyncEntity];
+  if (!deps) return;
+  for (const dep of deps) {
+    const depId = row[dep.field];
+    if (typeof depId !== "string" || !depId) continue;
+    const depTable = db[dep.entity] as unknown as
+      | { get(id: string): Promise<Record<string, unknown> | undefined> }
+      | undefined;
+    if (!depTable) continue;
+    const depRow = await depTable.get(depId);
+    if (!depRow || depRow.deleted) continue;
+    if (depRow.syncStatus === "synced") continue;
+    const existing = await db.syncOutbox
+      .where("[entity+entityId]")
+      .equals([dep.entity, depId])
+      .first();
+    if (existing && existing.state !== "synced" && existing.payloadHash === hashPayload(depRow)) {
+      continue;
+    }
+    await enqueueOperation({
+      entity: dep.entity,
+      entityId: depId,
+      workspaceId: typeof depRow.workspaceId === "string" ? depRow.workspaceId : undefined,
+      op: "upsert",
+      payload: depRow,
+      now,
+    });
+  }
+}
+
+/**
  * Reconciliación: encola en el outbox los registros marcados como `pending`
  * que aún no tienen operación (compatibilidad con servicios que solo marcan
  * `syncStatus`). Garantiza que ningún cambio pendiente quede sin enviar.
+ *
+ * Si YA existe una operación solo se salta cuando sigue viva y su payload
+ * describe exactamente la fila actual. En cualquier otro caso se refresca el
+ * payload desde la fila ACTUAL: una operación `synced` con la fila otra vez
+ * `pending`, o una operación vieja con la fila ya editada, dejarían en el
+ * servidor una versión antigua (o la marcarían `synced` sin haberse enviado).
+ * Al refrescar se conserva el estado de la operación: no se resetea el backoff
+ * de un `failed` ni se reabre un `conflict` (eso requiere decisión del usuario).
+ *
+ * El retorno cuenta solo operaciones nuevas; los refrescos se informan en el
+ * log (`reconciled`) para no confundirlos con duplicados.
  */
 export async function reconcilePendingEntities(now: string = isoNow()): Promise<number> {
   let enqueued = 0;
+  let refreshed = 0;
   for (const entity of SYNC_ENTITY_TABLES) {
     const table = db[entity] as unknown as {
-      where(key: string): { equals(v: string): { toArray(): Promise<Array<{ id: string }>> } };
+      where(key: string): { equals(v: string): { toArray(): Promise<Array<Record<string, unknown>>> } };
     };
-    let rows: Array<{ id: string }> = [];
+    let rows: Array<Record<string, unknown>> = [];
     try {
       rows = await table.where("syncStatus").equals("pending").toArray();
     } catch {
       continue; // Índice o tabla no disponible.
     }
     for (const row of rows) {
-      if (!row.id) continue;
-      const existing = await db.syncOutbox.where("[entity+entityId]").equals([entity, row.id]).first();
-      if (existing) continue;
-      await enqueueOperation({
-        entity,
-        entityId: row.id,
-        op: "upsert",
-        payload: row as unknown as Record<string, unknown>,
-        now,
-      });
+      const entityId = typeof row.id === "string" ? row.id : "";
+      if (!entityId) continue;
+      const workspaceId = typeof row.workspaceId === "string" ? row.workspaceId : undefined;
+      // Las referencias deben estar encoladas aunque el propio registro ya lo esté.
+      await enqueueDependencies(entity, row, now);
+      const existing = await db.syncOutbox.where("[entity+entityId]").equals([entity, entityId]).first();
+
+      if (existing) {
+        if (existing.state !== "synced" && existing.payloadHash === hashPayload(row)) continue;
+        if (existing.state === "synced") {
+          // La fila volvió a `pending` tras haberse enviado: hace falta una
+          // operación nueva (se conserva el tipo de la anterior).
+          await enqueueOperation({ entity, entityId, workspaceId, op: existing.op, payload: row, now });
+        } else {
+          // Solo se actualiza el contenido: el estado (pending/failed/conflict)
+          // y el backoff se conservan para no reintentar antes de tiempo ni
+          // reabrir conflictos que requieren decisión del usuario.
+          await db.syncOutbox.update(existing.id, {
+            payload: row,
+            payloadHash: hashPayload(row),
+            claimedRowHash: null,
+            updatedAt: now,
+          });
+        }
+        refreshed++;
+        continue;
+      }
+
+      await enqueueOperation({ entity, entityId, workspaceId, op: "upsert", payload: row, now });
       enqueued++;
     }
   }
-  if (enqueued > 0) {
+  if (enqueued > 0 || refreshed > 0) {
     await logSyncEvent({
       level: "info",
       event: "reconciled",
-      message: `${enqueued} registros pendientes encolados`,
+      message:
+        `${enqueued} registros pendientes encolados` +
+        (refreshed ? ` · ${refreshed} payloads refrescados desde la fila actual` : ""),
     }, now);
   }
   return enqueued;

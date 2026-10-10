@@ -1,7 +1,7 @@
 const { DatabaseSync } = require('node:sqlite');
 const fs = require('fs');
 
-const src = fs.readFileSync('apps/mobile/src/core/db/database.ts', 'utf8');
+const src = fs.readFileSync('apps/mobile/src/core/db/migrations.ts', 'utf8');
 
 function extract(name) {
   const m = src.match(new RegExp(`const ${name} = \\\`([\\s\\S]*?)\\\`;`));

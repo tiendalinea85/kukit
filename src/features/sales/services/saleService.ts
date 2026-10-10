@@ -33,7 +33,14 @@ export async function getSaleById(id: string): Promise<Sale | null> {
 
 export async function listSaleDetails(saleId: string): Promise<SaleDetail[]> {
   const rows = await db.saleDetails.where("saleId").equals(saleId).toArray();
-  return rows.filter((d) => d.workspaceId === getWorkspaceId());
+  return rows.filter((d) => !d.deleted && d.workspaceId === getWorkspaceId());
+}
+
+// Los detalles reemplazados en una edición quedan como tombstone (deleted:true)
+// dentro del mismo saleId: leerlos duplicaría movimientos de inventario.
+async function getActiveSaleDetails(saleId: string): Promise<SaleDetail[]> {
+  const rows = await db.saleDetails.where("saleId").equals(saleId).toArray();
+  return rows.filter((d) => !d.deleted);
 }
 
 export interface SaleData {
@@ -76,7 +83,7 @@ export async function confirmSale(id: string): Promise<Sale> {
   const sale = await getActiveSale(id);
   if (sale.status !== "pendiente") throw new Error("Solo se pueden confirmar ventas pendientes");
 
-  const details = await db.saleDetails.where("saleId").equals(id).toArray();
+  const details = await getActiveSaleDetails(id);
   if (details.length === 0) throw new Error("La venta no tiene detalle de productos");
 
   // El stock disponible es el del workspace de la venta: sumando movimientos de
@@ -105,7 +112,7 @@ export async function confirmSale(id: string): Promise<Sale> {
 }
 
 async function applyOutboundMovements(sale: Sale): Promise<void> {
-  const details = await db.saleDetails.where("saleId").equals(sale.id).toArray();
+  const details = await getActiveSaleDetails(sale.id);
   const movements: InventoryMovement[] = details.map((d) => ({
     id: newId(),
     workspaceId: sale.workspaceId,
@@ -138,7 +145,10 @@ export async function updateSale(id: string, data: SaleData): Promise<void> {
       updatedAt,
       syncStatus: "pending" as const,
     });
-    await db.saleDetails.where("saleId").equals(id).delete();
+    await db.saleDetails
+      .where("saleId")
+      .equals(id)
+      .modify({ deleted: true as boolean, syncStatus: "pending" as const });
     await db.saleDetails.bulkAdd(
       data.details.map((d) => buildSaleDetail(d, id, updatedAt, existing.workspaceId)),
     );
@@ -156,7 +166,7 @@ export async function voidSale(id: string): Promise<void> {
 
   await db.transaction("rw", db.sales, db.saleDetails, db.inventoryMovements, async () => {
     if (wasConfirmed) {
-      const details = await db.saleDetails.where("saleId").equals(id).toArray();
+      const details = await getActiveSaleDetails(id);
       const movements: InventoryMovement[] = details.map((d) => ({
         id: newId(),
         workspaceId: existing.workspaceId,

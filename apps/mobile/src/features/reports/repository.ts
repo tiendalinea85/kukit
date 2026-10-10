@@ -50,7 +50,7 @@ export async function dashboardSummary(): Promise<DashboardSummary> {
       : Promise.resolve(zero),
     enabled.has('expenses')
       ? q(`SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM expenses
-           WHERE deleted = 0 AND status != 'cancelado' AND workspace_id = ?`)
+           WHERE deleted = 0 AND status != 'anulado' AND workspace_id = ?`)
       : Promise.resolve(zero),
     enabled.has('purchases')
       ? q(`SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM purchases
@@ -105,7 +105,7 @@ export async function expensesSeries(days: number = 30): Promise<SeriesPoint[]> 
   const rows = await db.getAllAsync<{ date: string; value: number }>(
     `SELECT date, SUM(total_amount) as value
      FROM expenses
-     WHERE deleted = 0 AND status != 'cancelado' AND date >= date('now', '-${days - 1} days') AND workspace_id = ?
+     WHERE deleted = 0 AND status != 'anulado' AND date >= date('now', '-${days - 1} days') AND workspace_id = ?
      GROUP BY date ORDER BY date`,
     wsId
   );

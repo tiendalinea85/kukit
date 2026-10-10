@@ -21,13 +21,14 @@ async def push(req: PushRequest, user: AuthUser = Depends(get_current_user)) -> 
                 "sync.push",
                 "outbox",
                 "",
-                {"applied": len(applied)},
+                {"applied": len(applied), "total": len(req.changes)},
             )
         return PushResponse(applied_ids=applied)
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail="Servicio de sincronización no disponible") from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error aplicando cambios: {exc}") from exc
+        # Nunca revertir detalles internos de Postgres al cliente.
+        raise HTTPException(status_code=500, detail="Error aplicando cambios") from exc
 
 
 @router.post("/pull", response_model=PullResponse)
@@ -46,6 +47,6 @@ async def pull(req: PullRequest, user: AuthUser = Depends(get_current_user)) -> 
             )
         return PullResponse(changes=changes, server_time=server_time)
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail="Servicio de sincronización no disponible") from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error sincronizando: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Error sincronizando") from exc

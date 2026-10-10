@@ -7,6 +7,7 @@ import {
   PieChart as RPieChart, Pie, Cell, LineChart, Line,
 } from "recharts";
 import { useExpenses } from "@/features/expenses/hooks/useExpenses";
+import { isVoided } from "@/features/expenses/domain/expenseRules";
 import { useCategories } from "@/features/categories/hooks/useCategories";
 import { PERIODS as periods, getDateRange } from "@/features/reports/services/reportService";
 import { formatCurrency } from "@/utils/format";
@@ -25,6 +26,7 @@ export default function ReportsPage() {
   const [chartType, setChartType] = useState<"bar" | "pie" | "line">("bar");
 
   const filtered = useMemo(() => {
+    const active = (ex: Expense) => !isVoided(ex);
     if (period === "custom" && customStart && customEnd) {
       const s = new Date(customStart);
       const e = new Date(customEnd);
@@ -32,15 +34,15 @@ export default function ReportsPage() {
       return expenses.filter((ex) => {
         const [y, m, d2] = ex.date.split('-').map(Number);
         const d = new Date(y, m - 1, d2);
-        return d >= s && d <= e;
+        return active(ex) && d >= s && d <= e;
       });
     }
-    if (period === "custom") return expenses;
+    if (period === "custom") return expenses.filter(active);
     const { start, end } = getDateRange(period);
     return expenses.filter((ex) => {
       const [y, m, d2] = ex.date.split('-').map(Number);
       const d = new Date(y, m - 1, d2);
-      return d >= start && d <= end;
+      return active(ex) && d >= start && d <= end;
     });
   }, [expenses, period, customStart, customEnd]);
 

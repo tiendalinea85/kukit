@@ -4,7 +4,7 @@ import { canEditExpense, canVoidExpense, isVoided, EXPENSE_STATUSES, PAYMENT_MET
 
 describe('ciclo de vida del estado de gasto', () => {
   it('expone los estados canónicos', () => {
-    assert.deepEqual(EXPENSE_STATUSES, ['activo', 'pendiente', 'pagado', 'cancelado']);
+    assert.deepEqual(EXPENSE_STATUSES, ['pagado', 'pendiente', 'anulado']);
   });
 
   it('expone los métodos de pago canónicos', () => {
@@ -12,28 +12,25 @@ describe('ciclo de vida del estado de gasto', () => {
   });
 
   it('permite editar gastos no anulados', () => {
-    assert.equal(canEditExpense('activo'), true);
     assert.equal(canEditExpense('pendiente'), true);
     assert.equal(canEditExpense('pagado'), true);
   });
 
   it('prohíbe editar un gasto anulado', () => {
-    assert.equal(canEditExpense('cancelado'), false);
+    assert.equal(canEditExpense('anulado'), false);
   });
 
   it('permite anular gastos no anulados', () => {
-    assert.equal(canVoidExpense('activo'), true);
     assert.equal(canVoidExpense('pendiente'), true);
     assert.equal(canVoidExpense('pagado'), true);
   });
 
   it('prohíbe anular un gasto ya anulado', () => {
-    assert.equal(canVoidExpense('cancelado'), false);
+    assert.equal(canVoidExpense('anulado'), false);
   });
 
   it('detecta gastos anulados', () => {
-    assert.equal(isVoided('cancelado'), true);
-    assert.equal(isVoided('activo'), false);
+    assert.equal(isVoided('anulado'), true);
     assert.equal(isVoided('pagado'), false);
     assert.equal(isVoided('pendiente'), false);
   });

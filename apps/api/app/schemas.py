@@ -49,21 +49,21 @@ class AuditEventResponse(BaseModel):
 
 class ChangeItem(BaseModel):
     entity_type: str
-    entity_id: str
+    entity_id: str = Field(max_length=128)
     operation: str = Field(pattern="^(INSERT|UPDATE|DELETE)$")
     payload: dict
 
 
 class OutboxEntry(BaseModel):
     id: int
-    entity_type: str
-    entity_id: str
+    entity_type: str = Field(max_length=64)
+    entity_id: str = Field(max_length=128)
     operation: str = Field(pattern="^(INSERT|UPDATE|DELETE)$")
-    payload: str
+    payload: str = Field(max_length=1_000_000)
 
 
 class PushRequest(BaseModel):
-    changes: list[OutboxEntry]
+    changes: list[OutboxEntry] = Field(min_length=0, max_length=2000)
 
 
 class PushResponse(BaseModel):

@@ -38,6 +38,9 @@ __pycache__/
 # backups
 backups/
 
+# artefactos temporales locales (verificación, no versionables)
+AppsData/
+
 # IDE
 .vscode/
 .idea/

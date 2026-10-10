@@ -26,6 +26,13 @@ export interface OutboxOperation {
   op: SyncOp;
   payload: Record<string, unknown>;
   payloadHash: string;
+  /**
+   * Huella (hash de la fila completa) capturada al reclamar la operación. Es la
+   * base del compare-and-set de `completeOperation`: si la fila local cambia
+   * durante el push (los servicios solo marcan `syncStatus` y no encolan), la
+   * operación NO se marca `synced` sino que se refresca el payload y se re-encola.
+   */
+  claimedRowHash?: string | null;
   state: OutboxState;
   attempts: number;
   lastError: string | null;

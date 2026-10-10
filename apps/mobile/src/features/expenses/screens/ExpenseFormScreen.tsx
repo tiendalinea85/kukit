@@ -28,12 +28,9 @@ const PAYMENT_METHODS = [
 ];
 
 const STATUSES = [
-  { label: 'Activo', value: 'activo' },
-  { label: 'Pendiente', value: 'pendiente' },
   { label: 'Pagado', value: 'pagado' },
+  { label: 'Pendiente', value: 'pendiente' },
 ];
-
-const VOIDED_STATUS = 'cancelado';
 
 export function ExpenseFormScreen() {
   const navigation = useNavigation<Nav>();

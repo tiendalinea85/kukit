@@ -55,7 +55,7 @@ export interface Workspace {
   modules?: WorkspaceModule[];
 }
 
-export type ExpenseStatus = 'activo' | 'pendiente' | 'pagado' | 'cancelado';
+export type ExpenseStatus = 'pagado' | 'pendiente' | 'anulado';
 
 export type PurchaseStatus = 'pendiente' | 'recibida' | 'cancelada';
 

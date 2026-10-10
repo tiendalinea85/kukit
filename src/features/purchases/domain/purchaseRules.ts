@@ -57,6 +57,7 @@ export function buildPurchaseDetail(input: PurchaseDetailInput, purchaseId: stri
     unitPrice: input.unitPrice,
     subtotal: computeSubtotal(input.quantity, input.unitPrice),
     createdAt: now,
+    deleted: false,
     syncStatus: "pending",
   };
 }

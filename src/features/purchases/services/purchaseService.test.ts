@@ -223,8 +223,25 @@ describe("updatePurchase", () => {
       details: [makeDetail(product2.id)],
     });
     const details = await db.purchaseDetails.where("purchaseId").equals(purchase.id).toArray();
-    assert.equal(details.length, 1);
-    assert.equal(details[0].productId, product2.id);
+    assert.equal(details.filter((d) => !d.deleted).length, 1);
+    assert.equal(details.find((d) => !d.deleted)!.productId, product2.id);
+  });
+
+  it("marca los detalles reemplazados como deleted (soft delete)", async () => {
+    const product = await createProduct({ code: "PRD-001", name: "Tejido" });
+    const purchase = await createPurchase({
+      header,
+      details: [makeDetail(product.id)],
+    });
+    const product2 = await createProduct({ code: "PRD-002", name: "Seda" });
+    await updatePurchase(purchase.id, {
+      header,
+      details: [makeDetail(product2.id)],
+    });
+    const all = await db.purchaseDetails.where("purchaseId").equals(purchase.id).toArray();
+    const oldDetail = all.find((d) => d.productId === product.id);
+    assert.equal(oldDetail!.deleted, true);
+    assert.equal(oldDetail!.syncStatus, "pending");
   });
 
   it("lanza error cuando la compra no existe", async () => {

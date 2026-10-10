@@ -28,7 +28,7 @@ export default function EditSalePage() {
     db.sales.get(id).then((s) => {
       if (!s) return;
       setSale(s);
-      db.saleDetails.where("saleId").equals(id).toArray().then(setDetails);
+      db.saleDetails.where("saleId").equals(id).toArray().then((arr) => setDetails(arr.filter((d) => !d.deleted)));
     });
   }, [id]);
 

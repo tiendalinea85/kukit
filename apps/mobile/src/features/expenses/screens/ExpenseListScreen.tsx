@@ -19,17 +19,15 @@ type Nav = NativeStackNavigationProp<OpsStackParamList>;
 
 const STATUS_FILTERS = [
   { label: 'Todos', value: '' },
-  { label: 'Activos', value: 'activo' },
   { label: 'Pagados', value: 'pagado' },
   { label: 'Pendientes', value: 'pendiente' },
-  { label: 'Anulados', value: 'cancelado' },
+  { label: 'Anulados', value: 'anulado' },
 ];
 
 const STATUS_ICON: Record<string, string> = {
-  activo: '🔵',
   pagado: '✅',
   pendiente: '⏳',
-  cancelado: '🚫',
+  anulado: '🚫',
 };
 
 export function ExpenseListScreen() {

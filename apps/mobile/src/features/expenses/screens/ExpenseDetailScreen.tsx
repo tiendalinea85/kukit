@@ -15,10 +15,9 @@ type Nav = NativeStackNavigationProp<OpsStackParamList, 'ExpenseDetail'>;
 type Route = RouteProp<OpsStackParamList, 'ExpenseDetail'>;
 
 const STATUS_LABEL: Record<string, string> = {
-  activo: 'Activo',
   pendiente: 'Pendiente',
   pagado: 'Pagado',
-  cancelado: 'Anulado',
+  anulado: 'Anulado',
 };
 
 const PAYMENT_LABEL: Record<string, string> = {
@@ -42,7 +41,7 @@ export function ExpenseDetailScreen() {
   }
 
   const expense = data;
-  const voided = expense.status === 'cancelado';
+  const voided = expense.status === 'anulado';
 
   function confirmVoid() {
     Alert.alert('Anular gasto', '¿Anular este gasto? Esta acción no se puede deshacer.', [

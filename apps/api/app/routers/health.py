@@ -19,4 +19,5 @@ async def readiness() -> dict:
             await conn.fetchval("SELECT 1")
         return {"status": "ready", "database": "ok"}
     except Exception as exc:
-        return {"status": "error", "database": str(exc)}
+        # Sin detalles internos de conexión (hosts, credenciales, hints).
+        return {"status": "error", "database": type(exc).__name__}

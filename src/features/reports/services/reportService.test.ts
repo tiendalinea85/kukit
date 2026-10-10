@@ -94,4 +94,32 @@ describe("queryExpensesReport", () => {
     assert.equal(result.count, 1);
     assert.equal(result.totalAmount, 100);
   });
+
+  it("excluye los gastos anulados de conteo, total y promedio", async () => {
+    await db.expenses.bulkAdd([
+      makeExpense("a", "default", 100),
+      { ...makeExpense("b", "default", 50), status: "pendiente" },
+      { ...makeExpense("c", "default", 30), status: "anulado" },
+    ]);
+
+    const result = await queryExpensesReport(options);
+    assert.equal(result.count, 2);
+    assert.equal(result.totalAmount, 150);
+    assert.equal(result.average, 75);
+    assert.deepEqual(result.expenses.map((e) => e.id).sort(), ["a", "b"]);
+  });
+
+  it("excluye los anulados de las agrupaciones por categoría y por fecha", async () => {
+    await db.expenses.bulkAdd([
+      makeExpense("a", "default", 100),
+      { ...makeExpense("b", "default", 60), status: "pagado" },
+      { ...makeExpense("c", "default", 40), status: "anulado" },
+    ]);
+
+    const result = await queryExpensesReport(options);
+    const totalByCategory = result.byCategory.reduce((s, c) => s + c.value, 0);
+    assert.equal(totalByCategory, 160);
+    const totalByDate = result.byDate.reduce((s, d) => s + d.amount, 0);
+    assert.equal(totalByDate, 160);
+  });
 });

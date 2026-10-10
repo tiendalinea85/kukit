@@ -62,9 +62,9 @@ export async function searchExpenses(filters: ExpenseFilters = {}): Promise<Expe
     params.push(filters.dateTo);
   }
   if (filters.voided === true) {
-    conditions.push("e.status = 'cancelado'");
+    conditions.push("e.status = 'anulado'");
   } else if (filters.voided === false) {
-    conditions.push("e.status != 'cancelado'");
+    conditions.push("e.status != 'anulado'");
   }
 
   return db.getAllAsync<Expense>(
@@ -177,18 +177,18 @@ export async function deleteExpense(id: string): Promise<void> {
 }
 
 /**
- * Anula un gasto: marca status='cancelado' y registra voided_at.
+ * Anula un gasto: marca status='anulado' y registra voided_at.
  * No elimina físicamente el registro (las operaciones históricas se conservan).
  */
 export async function voidExpense(id: string): Promise<boolean> {
   const db = await getDb();
   const existing = await getExpense(id);
-  if (!existing || existing.status === 'cancelado') return false;
+  if (!existing || existing.status === 'anulado') return false;
 
   const now = nowIso();
   await db.withExclusiveTransactionAsync(async (txn) => {
     await txn.runAsync(
-      `UPDATE expenses SET status = 'cancelado', voided_at = ?, updated_at = ?, sync_status = 'pending'
+      `UPDATE expenses SET status = 'anulado', voided_at = ?, updated_at = ?, sync_status = 'pending'
        WHERE id = ?`,
       now, now, id
     );
@@ -196,14 +196,14 @@ export async function voidExpense(id: string): Promise<boolean> {
       entity_type: 'expense',
       entity_id: id,
       operation: 'UPDATE',
-      payload: { id, status: 'cancelado', voided_at: now, updated_at: now },
+      payload: { id, status: 'anulado', voided_at: now, updated_at: now },
     });
     await enqueueAudit(txn as unknown as DbLike, {
       action: 'void',
       entity_type: 'expense',
       entity_id: id,
       before: existing,
-      after: { ...existing, status: 'cancelado', voided_at: now, updated_at: now },
+      after: { ...existing, status: 'anulado', voided_at: now, updated_at: now },
     });
   });
   return true;
@@ -245,11 +245,11 @@ export async function expensesSummary(filters: ExpenseFilters = {}): Promise<Exp
 
   const totals = await db.getFirstAsync<{ total: number; count: number; paid: number; pending: number; voided: number }>(
     `SELECT
-       COALESCE(SUM(CASE WHEN status != 'cancelado' THEN total_amount END), 0) as total,
+       COALESCE(SUM(CASE WHEN status != 'anulado' THEN total_amount END), 0) as total,
        COUNT(*) as count,
        COALESCE(SUM(CASE WHEN status = 'pagado' THEN 1 END), 0) as paid,
        COALESCE(SUM(CASE WHEN status = 'pendiente' THEN 1 END), 0) as pending,
-       COALESCE(SUM(CASE WHEN status = 'cancelado' THEN 1 END), 0) as voided
+       COALESCE(SUM(CASE WHEN status = 'anulado' THEN 1 END), 0) as voided
      FROM expenses e
      WHERE ${where}`,
     ...params
@@ -258,7 +258,7 @@ export async function expensesSummary(filters: ExpenseFilters = {}): Promise<Exp
   const by_category = await db.getAllAsync<{ category: string; total: number; count: number }>(
     `SELECT COALESCE(c.name, 'Sin categoría') as category, SUM(e.total_amount) as total, COUNT(*) as count
      FROM expenses e LEFT JOIN categories c ON c.id = e.category_id
-     WHERE ${where} AND e.status != 'cancelado'
+     WHERE ${where} AND e.status != 'anulado'
      GROUP BY e.category_id ORDER BY total DESC`,
     ...params
   );
@@ -266,7 +266,7 @@ export async function expensesSummary(filters: ExpenseFilters = {}): Promise<Exp
   const by_payment = await db.getAllAsync<{ method: string; total: number; count: number }>(
     `SELECT e.payment_method as method, SUM(e.total_amount) as total, COUNT(*) as count
      FROM expenses e
-     WHERE ${where} AND e.status != 'cancelado'
+     WHERE ${where} AND e.status != 'anulado'
      GROUP BY e.payment_method ORDER BY total DESC`,
     ...params
   );
@@ -288,7 +288,8 @@ export async function expensesByCategory(): Promise<{ category: string; total: n
   return db.getAllAsync<{ category: string; total: number }>(
     `SELECT COALESCE(c.name, 'Sin categoría') as category, SUM(e.total_amount) as total
      FROM expenses e LEFT JOIN categories c ON c.id = e.category_id
-     WHERE e.deleted = 0 AND e.workspace_id = ? GROUP BY e.category_id ORDER BY total DESC`,
+     WHERE e.deleted = 0 AND e.workspace_id = ? AND e.status != 'anulado'
+     GROUP BY e.category_id ORDER BY total DESC`,
     wsId
   );
 }
@@ -300,7 +301,7 @@ export const defaultExpenseForm = (): ExpenseForm => ({
   category_id: null,
   type_id: null,
   payment_method: 'efectivo',
-  status: 'activo',
+  status: 'pagado',
   date: new Date().toISOString().slice(0, 10),
   time: new Date().toTimeString().slice(0, 8),
   notes: '',

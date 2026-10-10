@@ -98,6 +98,7 @@ function makeSaleDetail(id: string, workspaceId: string, saleId: string, product
     unitPrice: 100,
     subtotal: 200,
     createdAt: "2026-08-18T10:00:00.000Z",
+    deleted: false,
     syncStatus: "synced",
   };
 }
@@ -135,6 +136,7 @@ function makePurchaseDetail(id: string, workspaceId: string, purchaseId: string,
     unitPrice: 50,
     subtotal: 500,
     createdAt: "2026-08-18T10:00:00.000Z",
+    deleted: false,
     syncStatus: "synced",
   };
 }

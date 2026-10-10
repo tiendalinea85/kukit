@@ -71,7 +71,7 @@ export async function receivePurchase(id: string): Promise<Purchase> {
   const purchase = await getActivePurchase(id);
   if (purchase.status !== "pendiente") throw new Error("Solo las compras pendientes pueden recibirse");
 
-  const details = await db.purchaseDetails.where("purchaseId").equals(id).toArray();
+  const details = await getActivePurchaseDetails(id);
   if (details.length === 0) throw new Error("La compra no tiene detalle de productos");
 
   const received = { ...purchase, status: "recibida" as const, receivedAt: now(), updatedAt: now(), syncStatus: "pending" as const };
@@ -84,7 +84,7 @@ export async function receivePurchase(id: string): Promise<Purchase> {
 }
 
 async function applyInboundMovements(purchase: Purchase): Promise<void> {
-  const details = await db.purchaseDetails.where("purchaseId").equals(purchase.id).toArray();
+  const details = await getActivePurchaseDetails(purchase.id);
   const movements: InventoryMovement[] = details.map((d) => ({
     id: newId(),
     workspaceId: purchase.workspaceId,
@@ -117,7 +117,10 @@ export async function updatePurchase(id: string, data: PurchaseData): Promise<vo
       updatedAt,
       syncStatus: "pending" as const,
     });
-    await db.purchaseDetails.where("purchaseId").equals(id).delete();
+    await db.purchaseDetails
+      .where("purchaseId")
+      .equals(id)
+      .modify({ deleted: true as boolean, syncStatus: "pending" as const });
     await db.purchaseDetails.bulkAdd(
       data.details.map((d) => buildPurchaseDetail(d, id, updatedAt, existing.workspaceId)),
     );
@@ -135,7 +138,7 @@ export async function voidPurchase(id: string): Promise<void> {
 
   await db.transaction("rw", db.purchases, db.purchaseDetails, db.inventoryMovements, async () => {
     if (wasReceived) {
-      const details = await db.purchaseDetails.where("purchaseId").equals(id).toArray();
+      const details = await getActivePurchaseDetails(id);
       const movements: InventoryMovement[] = details.map((d) => ({
         id: newId(),
         workspaceId: existing.workspaceId,
@@ -168,9 +171,18 @@ export async function deletePurchase(id: string): Promise<void> {
   });
 }
 
+// Los detalles reemplazados en una edición quedan como tombstone (deleted:true)
+// dentro del mismo purchaseId: leerlos duplicaría movimientos de inventario.
+async function getActivePurchaseDetails(purchaseId: string): Promise<PurchaseDetail[]> {
+  const rows = await db.purchaseDetails.where("purchaseId").equals(purchaseId).toArray();
+  return rows.filter((d) => !d.deleted);
+}
+
 export async function listPurchaseDetailsByPurchase(): Promise<Record<string, PurchaseDetail[]>> {
   const details = await db.purchaseDetails.where("workspaceId").equals(getWorkspaceId()).toArray();
   const map: Record<string, PurchaseDetail[]> = {};
-  for (const d of details) (map[d.purchaseId] ??= []).push(d);
+  for (const d of details) {
+    if (!d.deleted) (map[d.purchaseId] ??= []).push(d);
+  }
   return map;
 }

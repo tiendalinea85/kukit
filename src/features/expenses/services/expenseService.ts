@@ -62,6 +62,9 @@ export async function updateExpense(
   data: ExpenseFormData,
   details: ExpenseDetailInput[] = []
 ): Promise<void> {
+  // Validación en runtime igual que en createExpense: evita que un estado
+  // legacy o desconocido entre a la base local por el camino de edición.
+  const parsed = expenseSchema.parse(data);
   const existing = await getActiveExpense(id);
   if (!canEditExpense(existing.status)) {
     throw new Error("Un gasto anulado no puede editarse");
@@ -83,11 +86,11 @@ export async function updateExpense(
 
   await db.transaction("rw", db.expenses, db.expenseDetails, async () => {
     await db.expenses.update(id, {
-      description: data.description.trim(),
+      description: parsed.description.trim(),
       amount,
       categoryId: data.categoryId,
       paymentMethod: data.paymentMethod,
-      status: data.status,
+      status: parsed.status,
       date: data.date,
       time: data.time,
       notes: data.notes || "",
@@ -130,6 +133,7 @@ export async function deleteExpense(id: string): Promise<void> {
       .modify({ deleted: true, syncStatus: "pending" as const });
     await db.expenses.update(id, {
       deleted: true,
+      updatedAt: new Date().toISOString(),
       syncStatus: "pending" as const,
     });
   });

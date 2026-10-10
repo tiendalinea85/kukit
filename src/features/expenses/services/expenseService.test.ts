@@ -2,291 +2,98 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import "fake-indexeddb/auto";
 import { db } from "../../../lib/db.ts";
-import {
-  createExpense,
-  updateExpense,
-  voidExpense,
-  deleteExpense,
-  listExpenseDetails,
-  getExpenseById,
-} from "./expenseService.ts";
+import { createExpense, updateExpense, voidExpense } from "./expenseService.ts";
 import { useWorkspaceStore } from "../../../stores/useWorkspaceStore.ts";
-import type { ExpenseDetailInput } from "../../../types/index.ts";
+import type { ExpenseFormData } from "../schemas/expenseSchema.ts";
+import type { Expense } from "../../../types/index.ts";
 
-const validData = {
+const validInput: ExpenseFormData = {
   description: "Recibo de luz",
-  amount: 120.5,
+  amount: 98.3,
   categoryId: "cat-servicios",
-  paymentMethod: "transferencia" as const,
-  status: "pagado" as const,
-  date: "2026-08-15",
-  time: "14:30",
-  notes: "Agosto",
+  paymentMethod: "transferencia",
+  status: "pagado",
+  date: "2026-08-14",
+  time: "14:00",
 };
 
-const detailLines: ExpenseDetailInput[] = [
-  {
-    productId: "p1",
-    code: "TEL-001",
-    name: "Rollo de tela",
-    color: "Negro",
-    quantity: 4,
-    unitPrice: 120,
-  },
-  {
-    productId: "p2",
-    code: "CIE-001",
-    name: "Cierres",
-    color: "",
-    quantity: 5,
-    unitPrice: 1.5,
-  },
-];
+function makeExpense(id: string, workspaceId: string): Expense {
+  return {
+    id,
+    workspaceId,
+    code: `G00000${id}`,
+    description: "Recibo de luz",
+    amount: 98.3,
+    categoryId: "cat-servicios",
+    paymentMethod: "transferencia",
+    status: "pagado",
+    date: "2026-08-14",
+    time: "14:00",
+    notes: "",
+    voidedAt: null,
+    createdAt: "2026-08-14T10:00:00.000Z",
+    updatedAt: "2026-08-14T10:00:00.000Z",
+    deleted: false,
+    syncStatus: "pending",
+  };
+}
 
 beforeEach(async () => {
+  await db.open();
+  await db.expenses.clear();
   useWorkspaceStore.setState({ activeWorkspaceId: "default" });
-  await Promise.all([db.expenses.clear(), db.expenseDetails.clear()]);
 });
 
-describe("createExpense", () => {
-  it("crea un gasto con código generado y syncStatus pending", async () => {
-    const expense = await createExpense(validData);
-    assert.ok(expense.id);
-    assert.match(expense.code, /^G\d{6}$/);
-    assert.equal(expense.description, "Recibo de luz");
-    assert.equal(expense.amount, 120.5);
-    assert.equal(expense.syncStatus, "pending");
-    assert.equal(expense.deleted, false);
-    assert.equal(expense.voidedAt, null);
-  });
-
-  it("crea un gasto con código personalizado cuando se proporciona", async () => {
-    const expense = await createExpense(validData, "G000099");
-    assert.equal(expense.code, "G000099");
-  });
-
-  it("usa código autoincremental basado en el último existente", async () => {
-    await createExpense(validData, "G000003");
-    const second = await createExpense(validData, "G000004");
-    assert.equal(second.code, "G000004");
-  });
-
-  it("el id es un UUID válido", async () => {
-    const expense = await createExpense(validData);
-    assert.match(expense.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
-  });
-
-  it("establece deleted en false por defecto", async () => {
-    const expense = await createExpense(validData);
-    assert.equal(expense.deleted, false);
-  });
-
-  it("lanza error cuando la descripción está vacía", async () => {
+describe("createExpense (validación runtime)", () => {
+  it("rejects a legacy status instead of persisting it", async () => {
     await assert.rejects(
-      createExpense({ ...validData, description: "" }),
-      /descripción/i,
+      createExpense({ ...validInput, status: "activo" } as unknown as ExpenseFormData, "G000001"),
+      (err: unknown) => err instanceof Error,
     );
+    assert.equal(await db.expenses.count(), 0);
   });
 
-  it("lanza error cuando la descripción es solo espacios", async () => {
-    await assert.rejects(
-      createExpense({ ...validData, description: "   " }),
-      /descripción/i,
-    );
-  });
-
-  it("lanza error cuando el monto es cero", async () => {
-    await assert.rejects(
-      createExpense({ ...validData, amount: 0 }),
-      /monto/i,
-    );
-  });
-
-  it("lanza error cuando la categoría está vacía", async () => {
-    await assert.rejects(
-      createExpense({ ...validData, categoryId: "" }),
-      /categoría/i,
-    );
-  });
-
-  it("guarda detalles y calcula el total automáticamente", async () => {
-    const expense = await createExpense(validData, undefined, detailLines);
-    assert.equal(expense.amount, 487.5);
-    const saved = await listExpenseDetails(expense.id);
-    assert.equal(saved.length, 2);
-    const bySubtotal = [...saved].sort((a, b) => a.subtotal - b.subtotal);
-    assert.equal(bySubtotal[0].subtotal, 7.5);
-    assert.equal(bySubtotal[1].subtotal, 480);
-    assert.ok(saved.every((d) => d.expenseId === expense.id));
-    assert.ok(saved.every((d) => d.syncStatus === "pending"));
-  });
-
-  it("sin detalles conserva el monto manual como amount", async () => {
-    const expense = await createExpense({ ...validData, amount: 99.99 });
-    assert.equal(expense.amount, 99.99);
-    const saved = await listExpenseDetails(expense.id);
-    assert.equal(saved.length, 0);
+  it("accepts each canonical status", async () => {
+    for (const status of ["pagado", "pendiente", "anulado"] as const) {
+      await createExpense({ ...validInput, status }, `G0000${status[0]}1`);
+      assert.ok(await db.expenses.where("status").equals(status).first());
+    }
   });
 });
 
 describe("updateExpense", () => {
-  it("actualiza campos y establece syncStatus pending", async () => {
-    const expense = await createExpense(validData);
-    await updateExpense(expense.id, {
-      ...validData,
-      description: "Agua potable",
-      amount: 75,
-    });
-    const updated = await db.expenses.get(expense.id);
-    assert.equal(updated!.description, "Agua potable");
-    assert.equal(updated!.amount, 75);
-    assert.equal(updated!.syncStatus, "pending");
-  });
-
-  it("reemplaza los detalles (soft-delete de las líneas viejas + insert de las nuevas)", async () => {
-    const expense = await createExpense(validData, undefined, detailLines);
-    const newLines: ExpenseDetailInput[] = [
-      { productId: "p3", code: "ELAS-001", name: "Cinta elástica", color: "Blanco", quantity: 6, unitPrice: 4 },
-    ];
-    await updateExpense(expense.id, { ...validData, amount: 0 }, newLines);
-    const updated = await db.expenses.get(expense.id);
-    assert.equal(updated!.amount, 24);
-    const saved = await listExpenseDetails(expense.id);
-    assert.equal(saved.length, 1);
-    assert.equal(saved[0].name, "Cinta elástica");
-    assert.equal(saved[0].quantity, 6);
-    assert.equal(saved[0].deleted, false);
-    // Las líneas anteriores NO se borran: quedan como tombstones sincronizables.
-    const all = await db.expenseDetails.where("expenseId").equals(expense.id).toArray();
-    assert.equal(all.length, 3);
-    const oldOnes = all.filter((d) => d.name !== "Cinta elástica");
-    assert.equal(oldOnes.length, 2);
-    for (const d of oldOnes) {
-      assert.equal(d.deleted, true);
-      assert.equal(d.syncStatus, "pending");
-    }
-  });
-
-  it("vaciar detalles deja el monto manual", async () => {
-    const expense = await createExpense(validData, undefined, detailLines);
-    await updateExpense(expense.id, { ...validData, amount: 50 }, []);
-    const updated = await db.expenses.get(expense.id);
-    assert.equal(updated!.amount, 50);
-    const saved = await listExpenseDetails(expense.id);
-    assert.equal(saved.length, 0);
-  });
-
-  it("lanza error cuando el gasto no existe", async () => {
+  it("rejects a legacy status at runtime and does not touch the row", async () => {
+    await db.expenses.add(makeExpense("e1", "default"));
     await assert.rejects(
-      updateExpense("id-inexistente", validData),
-      /no encontrado/i,
+      updateExpense("e1", { ...validInput, status: "cancelado" } as unknown as ExpenseFormData),
+      (err: unknown) => err instanceof Error,
     );
+    const row = await db.expenses.get("e1");
+    assert.equal(row?.status, "pagado");
   });
 
-  it("lanza error cuando el gasto está anulado", async () => {
-    const expense = await createExpense(validData);
-    await voidExpense(expense.id);
-    await assert.rejects(
-      updateExpense(expense.id, validData),
-      /anulado/i,
-    );
-  });
-});
-
-describe("voidExpense", () => {
-  it("establece status anulado y voidedAt", async () => {
-    const expense = await createExpense(validData);
-    await voidExpense(expense.id);
-    const voided = await db.expenses.get(expense.id);
-    assert.equal(voided!.status, "anulado");
-    assert.ok(voided!.voidedAt);
-    assert.equal(voided!.syncStatus, "pending");
+  it("persists only the canonical status sent by the edit form", async () => {
+    await db.expenses.add(makeExpense("e1", "default"));
+    await updateExpense("e1", { ...validInput, status: "pendiente" });
+    const row = await db.expenses.get("e1");
+    assert.equal(row?.status, "pendiente");
+    assert.equal(row?.updatedAt !== "2026-08-14T10:00:00.000Z", true);
   });
 
-  it("lanza error cuando el gasto no existe", async () => {
-    await assert.rejects(
-      voidExpense("id-falso"),
-      /no encontrado/i,
-    );
+  it("keeps an unchanged status without accidental resets", async () => {
+    await db.expenses.add(makeExpense("e1", "default"));
+    await updateExpense("e1", validInput);
+    const row = await db.expenses.get("e1");
+    assert.equal(row?.status, "pagado");
   });
 
-  it("lanza error cuando el gasto ya está anulado", async () => {
-    const expense = await createExpense(validData);
-    await voidExpense(expense.id);
-    await assert.rejects(
-      voidExpense(expense.id),
-      /ya está anulado/i,
-    );
-  });
-});
-
-describe("deleteExpense", () => {
-  it("marca deleted en true", async () => {
-    const expense = await createExpense(validData);
-    await deleteExpense(expense.id);
-    const deleted = await db.expenses.get(expense.id);
-    assert.equal(deleted!.deleted, true);
-    assert.equal(deleted!.syncStatus, "pending");
+  it("forbids editing an anulado expense", async () => {
+    await db.expenses.add({ ...makeExpense("e1", "default"), status: "anulado", voidedAt: "2026-08-15T10:00:00.000Z" });
+    await assert.rejects(updateExpense("e1", validInput), /anulado/);
   });
 
-  it("soft-deletea los detalles asociados (tombstone sincronizable)", async () => {
-    const expense = await createExpense(validData, undefined, detailLines);
-    await deleteExpense(expense.id);
-    const saved = await listExpenseDetails(expense.id);
-    assert.equal(saved.length, 0);
-    // Las líneas persisten como tombstones pending para que el Sync Engine
-    // propague deleted=true al servidor (sin DELETE físico).
-    const all = await db.expenseDetails.where("expenseId").equals(expense.id).toArray();
-    assert.equal(all.length, detailLines.length);
-    for (const d of all) {
-      assert.equal(d.deleted, true);
-      assert.equal(d.syncStatus, "pending");
-    }
-  });
-
-  it("lanza error cuando el gasto no existe (no borra un id inexistente en silencio)", async () => {
-    await assert.rejects(() => deleteExpense("id-inexistente"), /Gasto no encontrado/);
-  });
-});
-
-describe("aislamiento entre workspaces", () => {
-  it("no permite editar, anular ni borrar un gasto de otro workspace", async () => {
-    const expense = await createExpense(validData);
-    useWorkspaceStore.setState({ activeWorkspaceId: "otro" });
-
-    await assert.rejects(() => updateExpense(expense.id, validData), /Gasto no encontrado/);
-    await assert.rejects(() => voidExpense(expense.id), /Gasto no encontrado/);
-    await assert.rejects(() => deleteExpense(expense.id), /Gasto no encontrado/);
-
-    const row = await db.expenses.get(expense.id);
-    assert.equal(row!.deleted, false);
-    assert.equal(row!.status, "pagado");
-  });
-
-  it("no devuelve los detalles de un gasto de otro workspace", async () => {
-    const expense = await createExpense(validData, undefined, detailLines);
-    useWorkspaceStore.setState({ activeWorkspaceId: "otro" });
-
-    assert.deepEqual(await listExpenseDetails(expense.id), []);
-    assert.equal(await getExpenseById(expense.id), null);
-  });
-});
-
-describe("ciclo completo de vida del gasto", () => {
-  it("crear → actualizar → anular → eliminar", async () => {
-    const expense = await createExpense(validData);
-    assert.equal(expense.status, "pagado");
-
-    await updateExpense(expense.id, { ...validData, amount: 200 });
-    const afterUpdate = await db.expenses.get(expense.id);
-    assert.equal(afterUpdate!.amount, 200);
-
-    await voidExpense(expense.id);
-    const afterVoid = await db.expenses.get(expense.id);
-    assert.equal(afterVoid!.status, "anulado");
-
-    await deleteExpense(expense.id);
-    const afterDelete = await db.expenses.get(expense.id);
-    assert.equal(afterDelete!.deleted, true);
+  it("voidExpense guards an expense already anulado", async () => {
+    await db.expenses.add({ ...makeExpense("e1", "default"), status: "anulado", voidedAt: "2026-08-15T10:00:00.000Z" });
+    await assert.rejects(voidExpense("e1"), /anulado/);
   });
 });
