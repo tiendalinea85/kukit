@@ -21,13 +21,6 @@ import type { WriteResponseLike } from "./sync/errors.ts";
 import { db } from "./db.ts";
 import { hashPayload, isoNow } from "./sync/outbox.ts";
 
-// TEMPORAL DIAGNÓSTICO — ETAPA 1: captura del payload real antes de writeWith.
-// Se elimina al cerrar la etapa. NO registra tokens ni claves, solo datos del
-// dominio que el propio usuario guardó. Filtro: console.warn → grep [SYNC-DIAG].
-function diag(tag: string, data: unknown): void {
-  console.warn(`[SYNC-DIAG] ${tag}`, JSON.stringify(data));
-}
-
 // TRANSPORTE: refleja las tablas locales (Dexie) en Supabase.
 //
 // Cada entidad define cómo se convierte un payload local al esquema del
@@ -1181,18 +1174,6 @@ export function missingSchemaColumn(error: unknown): string | null {
 
 type WriteResponse = WriteResponseLike & { data?: unknown };
 
-function logWriteResponse(table: string, response: WriteResponse): void {
-  if (!response.error) return;
-  diag("writeWith.response", {
-    table,
-    error: {
-      message: String((response.error as { message?: unknown }).message ?? ""),
-      status: (response.error as { status?: unknown }).status ?? response.status ?? null,
-      code: (response.error as { code?: unknown }).code ?? null,
-    },
-  });
-}
-
 /**
  * Envía el payload y devuelve la respuesta cruda. El ACK lo decide siempre
  * `classifyWriteResponse` en el llamador: aquí solo se aplica la degradación de
@@ -1211,9 +1192,7 @@ async function writeWith(
   };
 
   const body = buildBody();
-  diag("writeWith.body", { table, body });
   let response = await send(body);
-  logWriteResponse(table, response);
 
   if (response.error) {
     const column = missingSchemaColumn(response.error);
@@ -1225,9 +1204,7 @@ async function writeWith(
       dropped.add(column);
       strippedColumnsByTable.set(table, dropped);
       const stripped = buildBody();
-      diag("writeWith.retry", { table, body: stripped, column });
       response = await send(stripped);
-      logWriteResponse(table, response);
     }
   }
   return response;
@@ -1311,7 +1288,6 @@ async function healDuplicateCode(spec: EntitySpec, op: OutboxOperation): Promise
   op.payload = updated;
   op.payloadHash = hashPayload(updated);
   op.claimedRowHash = null;
-  diag("pushOp.codeHealed", { entity: spec.name, entityId: op.entityId, from: current, to: newCode });
   return true;
 }
 
@@ -1410,23 +1386,6 @@ async function pushOp(spec: EntitySpec, op: OutboxOperation): Promise<SyncErrorI
   // (23505) se reasigna uno libre y se reenvía con el nuevo payload.
   for (let attempt = 0; attempt < 3; attempt++) {
     const payload = spec.toPayload(op.payload, userId);
-
-    // TEMPORAL DIAGNÓSTICO — payload final justo antes de writeWith (punto
-    // solicitado en la ETAPA 1). No se filtra nada excepto tokens/claves.
-    diag("pushOp.pre", {
-      entity: spec.name,
-      entityId: op.entityId,
-      workspaceId: op.workspaceId,
-      op: op.op,
-      payloadHash: op.payloadHash,
-      payload,
-    });
-    // TEMPORAL DIAGNÓSTICO — caso products: fila local cruda vs payload mapeado.
-    if (spec.name === "products") {
-      diag("products.productRow", op.payload);
-      diag("products.payloadFinal", payload);
-    }
-
     const result = await pushAttempt(spec, op, payload);
     if (!result.error) return null;
     if (result.duplicateCode && (await healDuplicateCode(spec, op))) continue;

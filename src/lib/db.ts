@@ -355,6 +355,38 @@ class ZaneDB extends Dexie {
       customIcons:
         "id, workspaceId, name, createdAt, updatedAt, deleted, syncStatus",
     });
+
+    // OUTBOX ÚNICO por (entidad, id): una sola operación por registro.
+    // Van en DOS versiones a propósito: Dexie crea los índices de cada versión
+    // ANTES de ejecutar su `upgrade()`, así que el `&` no puede convivir con la
+    // deduplicación en la misma versión (el índice único fallaría sobre datos
+    // duplicados). La 15 primero limpia duplicados históricos; la 16 añade el
+    // índice único. Los duplicados no deberían existir (enqueueOperation
+    // deduplica en transacción), pero es defensa en profundidad.
+    this.version(15).stores({
+      syncOutbox:
+        "id, [entity+entityId], entity, entityId, workspaceId, state, retryAt, createdAt, updatedAt, attempts",
+    }).upgrade(async (tx) => {
+      const table = tx.table("syncOutbox");
+      const all = (await table.toArray()) as Array<Record<string, unknown>>;
+      const seen = new Set<string>();
+      const toDrop: string[] = [];
+      // Se conserva la operación más reciente de cada (entidad, id).
+      const ordered = all
+        .filter((op) => typeof op.entity === "string" && typeof op.entityId === "string")
+        .sort((a, b) => String(b.updatedAt ?? "").localeCompare(String(a.updatedAt ?? "")));
+      for (const op of ordered) {
+        const key = `${op.entity}\u0000${op.entityId}`;
+        if (seen.has(key)) toDrop.push(String(op.id));
+        else seen.add(key);
+      }
+      if (toDrop.length) await table.bulkDelete(toDrop);
+    });
+
+    this.version(16).stores({
+      syncOutbox:
+        "id, &[entity+entityId], entity, entityId, workspaceId, state, retryAt, createdAt, updatedAt, attempts",
+    });
   }
 }
 

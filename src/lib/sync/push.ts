@@ -44,6 +44,18 @@ export async function runPush(
     const ops = await claimNextBatch(batchSize, now);
     if (!ops.length) break;
 
+    // Respeta el orden de las entidades definido por el transporte.
+    // Los registros padre deben procesarse antes que sus detalles.
+    const entityOrder = new Map(
+      transport.map((entity, index) => [entity.name, index]),
+    );
+
+    ops.sort(
+      (a, b) =>
+        (entityOrder.get(a.entity) ?? Number.MAX_SAFE_INTEGER) -
+        (entityOrder.get(b.entity) ?? Number.MAX_SAFE_INTEGER),
+    );
+
     for (const op of ops) {
       const entity = byName.get(op.entity);
 

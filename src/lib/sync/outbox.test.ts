@@ -89,6 +89,31 @@ describe("enqueueOperation", () => {
     assert.equal(op.payloadHash, hashPayload(op.payload), "el hash describe el payload final");
   });
 
+  it("el índice [entity+entityId] es único: un alta directa duplicada falla", async () => {
+    await seedOutbox("e-1", makeExpense("e-1"));
+    await assert.rejects(
+      db.syncOutbox.add({
+        id: "op-duplicada",
+        entity: "expenses",
+        entityId: "e-1",
+        workspaceId: "",
+        op: "upsert",
+        payload: makeExpense("e-1"),
+        payloadHash: "h",
+        claimedRowHash: null,
+        state: "pending",
+        attempts: 0,
+        lastError: null,
+        lastErrorType: null,
+        createdAt: T0,
+        updatedAt: T0,
+        lastAttemptAt: null,
+        retryAt: null,
+      }),
+    );
+    assert.equal(await db.syncOutbox.count(), 1);
+  });
+
   it("si está en syncing actualiza el payload y conserva syncing", async () => {
     await seedOutbox("e-1", makeExpense("e-1"));
     const claimed = await claimNextBatch(10, T0);

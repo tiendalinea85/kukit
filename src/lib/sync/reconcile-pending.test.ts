@@ -2,8 +2,8 @@ import "fake-indexeddb/auto";
 import { describe, beforeEach, it } from "node:test";
 import assert from "node:assert/strict";
 import { db } from "../db.ts";
-import { claimNextBatch, enqueueOperation, reconcilePendingEntities } from "./outbox.ts";
-import type { Sale, SaleDetail, Purchase, PurchaseDetail, Product, Category } from "../../types/index.ts";
+import { claimNextBatch, enqueueOperation, failOperation, reconcilePendingEntities } from "./outbox.ts";
+import type { Sale, SaleDetail, Purchase, PurchaseDetail, Product, Category, Expense } from "../../types/index.ts";
 
 const T0 = "2026-01-01T00:00:00.000Z";
 
@@ -158,5 +158,96 @@ describe("claimNextBatch ordena por dependencias FK (padre antes que hijo)", () 
 
     const claimed = await claimNextBatch(10, T0);
     assert.deepEqual(claimed.map((op) => op.entityId), ["e-1", "e-2"]);
+  });
+});
+
+describe("claimNextBatch: gate de dependencia FK (padre failed no arrastra al hijo)", () => {
+  beforeEach(async () => {
+    await Promise.all([
+      db.syncOutbox.clear(),
+      db.syncLog.clear(),
+      db.expenses.clear(),
+      db.expenseDetails.clear(),
+      db.products.clear(),
+    ]);
+  });
+
+  it("bloquea el detalle mientras el gasto padre está failed permanente", async () => {
+    const parent = await enqueueOperation({
+      entity: "expenses",
+      entityId: "e-1",
+      op: "upsert",
+      payload: { id: "e-1" },
+      now: T0,
+    });
+    await failOperation(parent, {
+      error: { type: "validation", message: "rechazado", retryable: false },
+      now: T0,
+    });
+    await enqueueOperation({
+      entity: "expenseDetails",
+      entityId: "d-1",
+      op: "upsert",
+      payload: { id: "d-1", expenseId: "e-1" },
+      now: T0,
+    });
+
+    const claimed = await claimNextBatch(10, T0);
+    assert.deepEqual(claimed.map((op) => op.entityId), []);
+  });
+
+  it("permite el detalle cuando el gasto padre ya está synced", async () => {
+    const parent = await enqueueOperation({
+      entity: "expenses",
+      entityId: "e-1",
+      op: "upsert",
+      payload: { id: "e-1" },
+      now: T0,
+    });
+    await db.syncOutbox.update(parent.id, { state: "synced" });
+    await enqueueOperation({
+      entity: "expenseDetails",
+      entityId: "d-1",
+      op: "upsert",
+      payload: { id: "d-1", expenseId: "e-1" },
+      now: T0,
+    });
+
+    const claimed = await claimNextBatch(10, T0);
+    assert.deepEqual(claimed.map((op) => op.entityId), ["d-1"]);
+  });
+
+  it("permite el detalle cuando el gasto padre sigue pending (mismo lote)", async () => {
+    await enqueueOperation({
+      entity: "expenses",
+      entityId: "e-1",
+      op: "upsert",
+      payload: { id: "e-1" },
+      now: T0,
+    });
+    await enqueueOperation({
+      entity: "expenseDetails",
+      entityId: "d-1",
+      op: "upsert",
+      payload: { id: "d-1", expenseId: "e-1" },
+      now: T0,
+    });
+
+    const claimed = await claimNextBatch(10, T0);
+    assert.deepEqual(claimed.map((op) => op.entityId), ["e-1", "d-1"]);
+  });
+
+  it("bloquea el detalle si la fila del padre no está sincronizada y no tiene operación", async () => {
+    await db.expenses.add(base({ id: "e-2" }) as unknown as Expense);
+    await enqueueOperation({
+      entity: "expenseDetails",
+      entityId: "d-2",
+      op: "upsert",
+      payload: { id: "d-2", expenseId: "e-2" },
+      now: T0,
+    });
+
+    const claimed = await claimNextBatch(10, T0);
+    assert.deepEqual(claimed.map((op) => op.entityId), []);
   });
 });

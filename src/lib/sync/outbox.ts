@@ -280,6 +280,11 @@ function pushRank(entity: string): number {
  * reclamaciones concurrentes. Ordena por dependencias de claves foráneas del
  * servidor (categorías/tipos/clientes/productos primero; cabeceras antes que
  * detalles) y, dentro del mismo nivel, por antigüedad.
+ *
+ * Además BLOQUEA al hijo cuya dependencia FK no esté en juego (`dependenciesReady`):
+ * empujar un detalle con la cabecera en `failed`/`conflict` solo produce un 23503
+ * reintentable sin fin. El hijo espera `pending` y se empuja cuando el padre se
+ * sincroniza.
  */
 export async function claimNextBatch(
   limit: number,
@@ -293,10 +298,17 @@ export async function claimNextBatch(
     "rw",
     [db.syncOutbox, ...SYNC_ENTITY_TABLES.map((entity) => db[entity])],
     async () => {
-      const pending = await db.syncOutbox.where("state").equals("pending").toArray();
-      const ready = pending.filter(
-        (op) => !op.retryAt || new Date(op.retryAt).getTime() <= new Date(now).getTime(),
-      );
+      const all = await db.syncOutbox.toArray();
+      const opByKey = new Map<string, OutboxOperation>();
+      for (const op of all) opByKey.set(`${op.entity}:${op.entityId}`, op);
+
+      const ready: OutboxOperation[] = [];
+      for (const op of all) {
+        if (op.state !== "pending") continue;
+        if (op.retryAt && new Date(op.retryAt).getTime() > new Date(now).getTime()) continue;
+        if (!(await dependenciesReady(op, opByKey, now))) continue;
+        ready.push(op);
+      }
       ready.sort((a, b) => {
         const rank = pushRank(a.entity) - pushRank(b.entity);
         if (rank !== 0) return rank;
@@ -583,14 +595,33 @@ export async function requeueOperation(id: string, now: string = isoNow()): Prom
  * Dependencias por clave foránea: antes de empujar un registro, su referencia
  * debe existir en el servidor, o el FK devolvería 23503 reintentable sin fin
  * (p. ej. un gasto cuya categoría por defecto quedó en `local` y nunca se
- * encoló). El orden de push ya pone las maestras delante; aquí solo se asegura
- * que la referencia local esté encolada.
+ * encoló).
+ *
+ * Cada dependencia tiene DOS usos:
+ *   - `enqueueDependencies` garantiza que la referencia local esté encolada.
+ *   - `claimNextBatch` bloquea al hijo mientras su referencia no esté en juego
+ *     (evita el bucle 23503 si el padre quedó `failed`).
+ *
+ * Los hijos declaran primero a su CABECERA (expenseId/saleId/purchaseId) y luego
+ * a las maestras; la cabecera es la FK con `ON DELETE CASCADE` de la migración.
  */
 const DEPENDENCIES: Partial<Record<SyncEntity, Array<{ entity: SyncEntity; field: string }>>> = {
+  products: [{ entity: "categories", field: "categoryId" }],
   expenses: [{ entity: "categories", field: "categoryId" }],
-  expenseDetails: [{ entity: "products", field: "productId" }],
-  saleDetails: [{ entity: "products", field: "productId" }],
-  purchaseDetails: [{ entity: "products", field: "productId" }],
+  expenseDetails: [
+    { entity: "expenses", field: "expenseId" },
+    { entity: "products", field: "productId" },
+  ],
+  sales: [{ entity: "customers", field: "customerId" }],
+  saleDetails: [
+    { entity: "sales", field: "saleId" },
+    { entity: "products", field: "productId" },
+  ],
+  purchaseDetails: [
+    { entity: "purchases", field: "purchaseId" },
+    { entity: "products", field: "productId" },
+  ],
+  inventoryMovements: [{ entity: "products", field: "productId" }],
   investments: [{ entity: "investmentCategories", field: "categoryId" }],
 };
 
@@ -627,6 +658,53 @@ async function enqueueDependencies(
       now,
     });
   }
+}
+
+/**
+ * ¿Están todas las referencias FK de `op` listas para empujar? Se evalúa al
+ * reclamar el lote para no empujar un hijo cuya cabecera no va a existir todavía
+ * en el servidor (23503 reintentable sin fin).
+ *
+ * Se permite cuando la referencia:
+ *   - tiene una operación `pending`/`syncing`/`synced` (sigue en juego; el rank
+ *     la coloca delante en el mismo lote), o `failed` con reintento ya vencido;
+ *   - no tiene operación pero su fila local ya está `synced` (existe remoto).
+ * Se bloquea cuando la referencia tiene `failed` (permanente o con backoff
+ * futuro), `conflict`, o una fila local presente que aún no esté `synced`.
+ */
+async function dependenciesReady(
+  op: OutboxOperation,
+  opByKey: Map<string, OutboxOperation>,
+  now: string,
+): Promise<boolean> {
+  const deps = DEPENDENCIES[op.entity as SyncEntity];
+  if (!deps) return true;
+  const nowMs = new Date(now).getTime();
+  for (const dep of deps) {
+    const depId = op.payload?.[dep.field];
+    if (typeof depId !== "string" || !depId) continue; // FK nullable o vacía
+    const depOp = opByKey.get(`${dep.entity}:${depId}`);
+    if (depOp) {
+      if (depOp.state === "pending" || depOp.state === "syncing" || depOp.state === "synced") {
+        continue;
+      }
+      // `failed` solo si tiene un reintento programado y ya vencido: un fallo
+      // permanente (`retryAt: null`) no se va a reintentar, así que el hijo
+      // esperaría un padre que no llega — se bloquea (evita el bucle 23503).
+      if (depOp.state === "failed" && depOp.retryAt && new Date(depOp.retryAt).getTime() <= nowMs) {
+        continue;
+      }
+      return false;
+    }
+    const depTable = db[dep.entity] as unknown as
+      | { get(id: string): Promise<{ syncStatus?: string } | undefined> }
+      | undefined;
+    const depRow = depTable ? await depTable.get(depId) : undefined;
+    // Referencia local sin sincronizar: todavía no está en el servidor. Si la
+    // fila no existe en absoluto no se bloquea (no hay nada que esperar).
+    if (depRow && depRow.syncStatus !== "synced") return false;
+  }
+  return true;
 }
 
 /**

@@ -27,9 +27,35 @@ let lastCheck = 0;
 
 const MIN_CHECK_INTERVAL = 60_000; // evita actualizaciones/loops infinitos
 
+// En desarrollo Next sirve varios chunks SIN hash (app/layout.js, app/page.js,
+// app-pages-internals.js...) que cambian de contenido al reiniciar el servidor.
+// El Service Worker los sirve cache-first, así que devolvería un bundle viejo
+// que referencia IDs de chunk ya inexistentes: la app arranca y se queda en
+// blanco. Se desregistra el SW y se limpian las cachés "zane-*" al arrancar dev.
+async function clearDevServiceWorker(): Promise<void> {
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((reg) => reg.unregister()));
+    if (typeof caches !== "undefined") {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((key) => key.startsWith("zane-"))
+          .map((key) => caches.delete(key))
+      );
+    }
+  } catch {
+    /* el navegador puede bloquear el acceso a SW/cachés: no es crítico */
+  }
+}
+
 export function registerPWA(onNewVersion: (apply: () => void) => void): void {
-  if (registered) return;
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+  if (process.env.NODE_ENV !== "production") {
+    void clearDevServiceWorker();
+    return;
+  }
+  if (registered) return;
   registered = true;
 
   let acceptedUpdate = false;

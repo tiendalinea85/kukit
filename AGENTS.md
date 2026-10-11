@@ -5,8 +5,11 @@ Aplicación de control de gastos **offline-first** y multi-workspace. Monorepo c
 | Pieza | Tecnología | Ruta |
 |-------|------------|------|
 | **PWA** (raíz) | Next.js 15 App Router, React 19, Dexie/IndexedDB, Supabase, Tailwind 4 | `.` |
-| **App móvil** (producto oficial, Android) | Expo SDK 57 + expo-sqlite + zustand | `apps/mobile` |
+| **App móvil** (producto oficial, Android) | Expo SDK 57, React Native 0.86, expo-sqlite, zustand, zod 4 | `apps/mobile` |
 | **API de sync** | FastAPI + asyncpg + PyJWT | `apps/api` |
+
+`apps/mobile` tiene su propio `apps/mobile/AGENTS.md`: lee los docs versionados
+de Expo v57 antes de tocar código móvil.
 
 Documentos canónicos: `docs/architecture.md`, `docs/workspaces-architecture.md`,
 `docs/foundation.md`, `docs/audit.md`, `docs/ops.md`. Léelos antes de tocar sync,
@@ -35,15 +38,18 @@ src/
   app/        Rutas App Router (una carpeta por dominio) + /api/{voice,ai}
   components/ UI compartida: ui/, layout/, auth/, sync/, voice/
   features/   Módulos de dominio, layout uniforme por feature:
-              components/ · domain/ · hooks/ · schemas/ · services/ · *.test.ts
+              expenses, sales, purchases, investments, invoice, tailoring,
+              categories, reports, dashboard, agriculture, autoparts, breeding,
+              workspaces, settings
   lib/        db.ts (Dexie), supabase.ts, seed.ts, sync/ (motor), voice/, ai/
-  stores/     zustand (useAppStore, useWorkspaceStore)
+  stores/     zustand (useAppStore, useWorkspaceStore) + tests de aislamiento
   types/      index.ts (dominio) · sync.ts · modules.ts (catálogo)
   utils/      code.ts (códigos correlativos), formato
-  __tests__/  tests de utils y aislamiento
-supabase/migrations/   SQL versionado (00001→00019, aplicar EN ORDEN)
-scripts/              backup/restore/health-check, validador de migración móvil
+  __tests__/  tests de utils, recuperación y aislamiento
+supabase/migrations/   SQL versionado (00001→00021, aplicar EN ORDEN)
+scripts/              backup/restore/health-check, rollout, validador de migración móvil
 docs/                 arquitectura y operación
+monitoring/           notas de monitorización
 ```
 
 Dentro de una `feature`, la dependencia va siempre hacia adentro:
@@ -101,8 +107,9 @@ Dentro de una `feature`, la dependencia va siempre hacia adentro:
   pura + `describe` de reglas, sin renderizar React.
 - **Al crear un test nuevo hay que añadir su carpeta al glob de `npm test` y
   `npm run test:ci` en `package.json`** (el script lista rutas explícitas; hoy
-  cubre expenses, investments, sales, purchases, invoice, tailoring, stores,
-  lib/sync y `__tests__`). Un test no listado no se ejecuta.
+  cubre categories, expenses, investments, sales, purchases, reports, invoice,
+  tailoring, stores, lib/sync, `lib/sync-supabase.test.ts` y `__tests__`). Un
+  test no listado no se ejecuta.
 - Mock de tiempo por parámetro: las reglas puras reciben `now: string` en vez de
   llamar a `new Date()`.
 
@@ -115,7 +122,7 @@ Dentro de una `feature`, la dependencia va siempre hacia adentro:
   `GEMINI_API_KEY` (opcional, parseo de voz).
 - Migraciones nuevas: numeración consecutiva, **idempotentes**
   (`IF NOT EXISTS`, `DROP/CREATE`), aplicadas en orden sobre `supabase/`.
-  Actualiza también la tabla de migraciones del `README.md`.
+  Actualiza también la tabla de migraciones del `README.md` (hoy 00001→00021).
 
 ## Seguridad
 
