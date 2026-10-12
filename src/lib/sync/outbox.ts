@@ -543,6 +543,59 @@ export async function recoverStaleOps(opts: {
   return recovered;
 }
 
+// Mensaje histórico de las operaciones que fallaron por falta de sesión antes
+// de que existiera el tipo `session`. Se usa solo para recuperar esas filas ya
+// atascadas; las nuevas usan `lastErrorType: "session"`.
+const NO_SESSION_RE = /sin sesi[oó]n/i;
+
+/**
+ * Recupera las operaciones que fallaron por falta de sesión. A diferencia de
+ * `auth` (rechazo real del servidor: RLS, credenciales), la ausencia de sesión
+ * es transitoria: el token puede renovarse o el usuario puede volver a entrar.
+ * Se devuelven a `pending` (y su fila a `pending`) para reintentar en cuanto
+ * haya sesión, en vez de quedar atascadas en rojo para siempre.
+ *
+ * No toca `auth` de RLS ni `validation`/`conflict`, que sí requieren
+ * intervención; solo el tipo `session` y las operaciones antiguas que quedaron
+ * como `auth` con el mensaje "Sin sesión activa".
+ */
+export async function recoverSessionFailures(now: string = isoNow()): Promise<number> {
+  const tx = db.transaction("rw", db.syncOutbox, async () => {
+    const failed = await db.syncOutbox.where("state").equals("failed").toArray();
+    const recovered: OutboxOperation[] = [];
+    for (const op of failed) {
+      const isSession =
+        op.lastErrorType === "session" ||
+        (op.lastErrorType === "auth" && NO_SESSION_RE.test(op.lastError ?? ""));
+      if (!isSession) continue;
+      await db.syncOutbox.update(op.id, {
+        state: "pending",
+        attempts: 0,
+        lastError: null,
+        lastErrorType: null,
+        retryAt: null,
+        updatedAt: now,
+      });
+      recovered.push(op);
+    }
+    return recovered;
+  });
+
+  const recovered = await tx;
+  if (recovered.length > 0) {
+    for (const op of recovered) {
+      const table = entityTable(op.entity);
+      if (table) await table.update(op.entityId, { syncStatus: "pending" });
+    }
+    await logSyncEvent({
+      level: "warn",
+      event: "recovered_stale",
+      message: `${recovered.length} operaciones sin sesión recuperadas`,
+    }, now);
+  }
+  return recovered.length;
+}
+
 export interface OutboxCounts {
   pending: number;
   syncing: number;

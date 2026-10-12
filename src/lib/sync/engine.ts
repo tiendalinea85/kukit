@@ -3,7 +3,7 @@ import type {
   SyncTransportEntity,
 } from "../../types/sync.ts";
 import type { ConnectionMonitor } from "./connection.ts";
-import { countOutbox, isoNow, logSyncEvent, recoverStaleOps, requeueOperation, listFailedOps, reconcilePendingEntities } from "./outbox.ts";
+import { countOutbox, isoNow, logSyncEvent, recoverStaleOps, recoverSessionFailures, requeueOperation, listFailedOps, reconcilePendingEntities } from "./outbox.ts";
 import { runPush, type PushRunResult } from "./push.ts";
 import { runPull, type PullRunResult } from "./pull.ts";
 import { setLastSyncAt } from "./state.ts";
@@ -130,6 +130,10 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
         );
         await recoverStaleOps({ now: startedAt });
         await reconcilePendingEntities(startedAt);
+        // Reencola lo que falló por falta de sesión: si el token ya se renovó o
+        // el usuario volvió a entrar, se empuja en esta misma pasada; si no, se
+        // reintenta con backoff en vez de quedar atascado en rojo.
+        await recoverSessionFailures(startedAt);
 
         if (!deps.connection.getState().online) {
           publish({ status: "offline", lastError: "Sin conexión a internet" });

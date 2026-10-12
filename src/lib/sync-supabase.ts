@@ -1380,7 +1380,10 @@ async function pushAttempt(
 
 async function pushOp(spec: EntitySpec, op: OutboxOperation): Promise<SyncErrorInfo | null> {
   const userId = await currentUserId();
-  if (!userId) return { type: "auth", message: "Sin sesión activa", retryable: false };
+  // Sin sesión NO es un rechazo del servidor: el token puede renovarse o el
+  // usuario volver a entrar. Se marca `session` (retryable) para reintentar con
+  // backoff; antes quedaba como `auth` permanente y atascaba la cola en rojo.
+  if (!userId) return { type: "session", message: "Sin sesión activa", retryable: true };
 
   // Hasta 3 intentos: si el servidor rechaza por código correlativo duplicado
   // (23505) se reasigna uno libre y se reenvía con el nuevo payload.

@@ -50,6 +50,13 @@ export type SyncErrorType =
   | "validation"
   | "conflict"
   | "auth"
+  /**
+   * Falta de sesión local (todavía no hay usuario resuelto, token sin renovar).
+   * A diferencia de `auth` —rechazo REAL del servidor (RLS, credenciales
+   * inválidas)→ es transitoria: se reintenta con backoff y se recupera cuando
+   * la sesión vuelve, en lugar de quedar atascada permanentemente.
+   */
+  | "session"
   | "unknown";
 
 export interface SyncErrorInfo {

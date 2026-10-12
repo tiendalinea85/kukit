@@ -179,6 +179,63 @@ describe("engine: error de servidor y reintento (red intermitente)", () => {
   });
 });
 
+describe("engine: falta de sesión se autocura cuando la sesión vuelve", () => {
+  beforeEach(async () => {
+    await Promise.all([db.syncOutbox.clear(), db.syncLog.clear(), db.syncState.clear(), db.expenses.clear()]);
+  });
+
+  it("un fallo de sesión queda con reintento programado y el siguiente ciclo lo recupera", async () => {
+    const server = new FakeServer();
+    server.queue.push({ type: "session", message: "Sin sesión activa", retryable: true });
+    const { engine } = buildEngine(server);
+
+    await addExpense("e-1");
+    await seedExpense("e-1");
+    await engine.runSync();
+
+    let snap = engine.getSnapshot();
+    assert.equal(snap.status, "error", "sin sesión aún → error temporal");
+    let op = (await db.syncOutbox.where("entityId").equals("e-1").first())!;
+    assert.equal(op.state, "failed");
+    assert.equal(op.lastErrorType, "session");
+    assert.ok(op.retryAt, "se programa reintento (no queda permanente)");
+
+    // La sesión vuelve (el servidor ahora acepta): el siguiente ciclo recupera
+    // la operación y la envía sin intervención manual.
+    await engine.runSync();
+
+    snap = engine.getSnapshot();
+    assert.equal(snap.status, "synced");
+    assert.equal(snap.failedCount, 0);
+    assert.equal(server.rows.get("e-1")?.id, "e-1");
+    op = (await db.syncOutbox.where("entityId").equals("e-1").first())!;
+    assert.equal(op.state, "synced");
+    assert.equal((await db.expenses.get("e-1"))!.syncStatus, "synced");
+  });
+
+  it("las operaciones ya atascadas (auth 'Sin sesión activa') se recuperan al sincronizar", async () => {
+    const server = new FakeServer();
+    const { engine } = buildEngine(server);
+
+    await addExpense("e-1", { syncStatus: "failed" });
+    const op = await seedExpense("e-1");
+    // Estado previo al fix: fallo permanente de sesión (auth, retryAt null).
+    await db.syncOutbox.update(op.id, {
+      state: "failed",
+      lastError: "Sin sesión activa",
+      lastErrorType: "auth",
+      retryAt: null,
+    });
+
+    await engine.runSync();
+
+    assert.equal(engine.getSnapshot().failedCount, 0);
+    assert.equal(server.rows.size, 1, "la operación atascada se envía");
+    assert.equal((await db.syncOutbox.get(op.id))!.state, "synced");
+    assert.equal((await db.expenses.get("e-1"))!.syncStatus, "synced");
+  });
+});
+
 describe("engine: sin duplicados en reintentos", () => {
   beforeEach(async () => {
     await Promise.all([db.syncOutbox.clear(), db.syncLog.clear(), db.syncState.clear(), db.expenses.clear()]);

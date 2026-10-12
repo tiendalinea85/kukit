@@ -67,7 +67,16 @@ export async function getCurrentUser(): Promise<User | null> {
 
   try {
     const { data } = await withTimeout(sb.auth.getUser());
-    _currentUser = data?.user ?? null;
+    if (data?.user) {
+      _currentUser = data.user;
+    } else {
+      // `getUser()` resolvió SIN usuario (no lanzó): puede ser un fallo
+      // transitorio al renovar el token, no una sesión perdida. Se cae a la
+      // sesión cacheada antes de darla por ausente; si no se hace, una
+      // renovación fallida deja `_currentUser=null` y TODOS los push fallan.
+      const local = await sb.auth.getSession();
+      _currentUser = local.data.session?.user ?? null;
+    }
   } catch {
     // Red lenta / "online" reportado pero sin internet real: no colgar la UI,
     // usar la sesión local cacheada como fallback.

@@ -11,6 +11,7 @@ import {
   failOperation,
   hashPayload,
   recoverStaleOps,
+  recoverSessionFailures,
   reconcilePendingEntities,
   requeueOperation,
   trimSyncLog,
@@ -723,6 +724,82 @@ describe("requeueOperation: failed vs conflict (TEST 8)", () => {
 
     const claimed = await claimNextBatch(10, T0);
     assert.equal(claimed.length, 2, "ambas quedan reclamables para el siguiente push");
+  });
+});
+
+describe("recoverSessionFailures: autocuración de fallos por falta de sesión", () => {
+  beforeEach(async () => {
+    await Promise.all([db.syncOutbox.clear(), db.syncLog.clear(), db.expenses.clear()]);
+  });
+
+  it("reencola operaciones failed por falta de sesión y resetea el backoff", async () => {
+    await db.expenses.add(makeExpense("e-1", { syncStatus: "failed" }) as never);
+    const op = await seedOutbox("e-1", makeExpense("e-1", { syncStatus: "failed" }));
+    await db.syncOutbox.update(op.id, {
+      state: "failed",
+      attempts: 7,
+      lastError: "Sin sesión activa",
+      lastErrorType: "session",
+      retryAt: null,
+      lastAttemptAt: T0,
+    });
+
+    const recovered = await recoverSessionFailures("2026-01-01T00:10:00.000Z");
+
+    assert.equal(recovered, 1);
+    const after = (await db.syncOutbox.get(op.id))!;
+    assert.equal(after.state, "pending");
+    assert.equal(after.attempts, 0, "intentos reseteados");
+    assert.equal(after.lastError, null);
+    assert.equal(after.lastErrorType, null);
+    assert.equal(after.retryAt, null);
+    assert.equal((await db.expenses.get("e-1"))!.syncStatus, "pending", "la fila vuelve a pending");
+  });
+
+  it("recupera las operaciones antiguas clasificadas como auth con 'Sin sesión activa'", async () => {
+    const op = await seedOutbox("e-1", makeExpense("e-1"));
+    await db.syncOutbox.update(op.id, {
+      state: "failed",
+      lastError: "Sin sesión activa",
+      lastErrorType: "auth",
+      retryAt: null,
+    });
+
+    const recovered = await recoverSessionFailures("2026-01-01T00:10:00.000Z");
+
+    assert.equal(recovered, 1);
+    assert.equal((await db.syncOutbox.get(op.id))!.state, "pending");
+  });
+
+  it("NO toca fallos auth reales (RLS), validation ni conflict", async () => {
+    const rls = await seedOutbox("e-rls", makeExpense("e-rls"));
+    const schema = await seedOutbox("e-schema", makeExpense("e-schema"));
+    const conflict = await seedOutbox("e-conflict", makeExpense("e-conflict"));
+    await db.syncOutbox.update(rls.id, {
+      state: "failed",
+      lastError: "Sin permisos sobre la tabla (RLS): acceso denegado",
+      lastErrorType: "auth",
+      retryAt: null,
+    });
+    await db.syncOutbox.update(schema.id, {
+      state: "failed",
+      lastError: "Columna ausente en el esquema del servidor",
+      lastErrorType: "validation",
+      retryAt: null,
+    });
+    await db.syncOutbox.update(conflict.id, {
+      state: "conflict",
+      lastError: "versión remota más nueva",
+      lastErrorType: "conflict",
+      retryAt: null,
+    });
+
+    const recovered = await recoverSessionFailures("2026-01-01T00:10:00.000Z");
+
+    assert.equal(recovered, 0);
+    assert.equal((await db.syncOutbox.get(rls.id))!.state, "failed");
+    assert.equal((await db.syncOutbox.get(schema.id))!.state, "failed");
+    assert.equal((await db.syncOutbox.get(conflict.id))!.state, "conflict");
   });
 });
 

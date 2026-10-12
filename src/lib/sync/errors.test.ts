@@ -128,10 +128,15 @@ describe("isPermanentError", () => {
     assert.ok(isPermanentError("validation"));
     assert.ok(isPermanentError("conflict"));
     assert.ok(isPermanentError("auth"));
+    assert.ok(!isPermanentError("session"), "falta de sesión es transitoria");
     assert.ok(!isPermanentError("network"));
     assert.ok(!isPermanentError("timeout"));
     assert.ok(!isPermanentError("server"));
     assert.ok(!isPermanentError("unknown"));
+  });
+
+  it("isRetryableError acepta un fallo de sesión explícitamente retryable", () => {
+    assert.ok(isRetryableError({ type: "session", message: "Sin sesión activa", retryable: true }));
   });
 });
 

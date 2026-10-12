@@ -1,6 +1,8 @@
 import { buildSupabaseTransport } from "../sync-supabase.ts";
+import { onAuthStateChange } from "../supabase.ts";
 import { createConnectionMonitor } from "./connection.ts";
 import { createSyncEngine, type SyncEngine } from "./engine.ts";
+import { countOutbox, listFailedOps } from "./outbox.ts";
 import { useSyncStore } from "./store.ts";
 
 // API pública de sincronización.
@@ -15,6 +17,7 @@ export type { SyncEngineState } from "../../types/sync";
 
 let engine: SyncEngine | null = null;
 let started = false;
+let authUnsub: (() => void) | null = null;
 
 function getSupabaseUrl(): string {
   return process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -56,10 +59,21 @@ export function startSyncEngine(): void {
   if (started) return;
   started = true;
   ensureEngine().start();
+
+  // Con sesión disponible (login o renovación del token) se empuja de inmediato:
+  // las operaciones que quedaron esperando por falta de sesión se recuperan sin
+  // esperar al siguiente ciclo automático.
+  authUnsub = onAuthStateChange((user) => {
+    if (user) void ensureEngine().runSync({ reason: "auth-change" });
+  });
 }
 
 export function stopSyncEngine(): void {
   if (engine) engine.stop();
+  if (authUnsub) {
+    authUnsub();
+    authUnsub = null;
+  }
 }
 
 /** Push + pull en una sola pasada (guard antirreentrada). */
@@ -80,4 +94,14 @@ export function runManualSync(): Promise<void> {
 /** Reintenta las operaciones fallidas/en conflicto ahora. */
 export function runRetryNow(): Promise<void> {
   return ensureEngine().retryFailedNow();
+}
+
+// Diagnóstico solo en desarrollo: permite inspeccionar el outbox desde la
+// consola del navegador (`await __syncDebug.failed()`, `await __syncDebug.counts()`)
+// para ver POR QUÉ una operación quedó en rojo, ya que la UI solo muestra el conteo.
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+  (window as unknown as { __syncDebug?: unknown }).__syncDebug = {
+    failed: listFailedOps,
+    counts: countOutbox,
+  };
 }
