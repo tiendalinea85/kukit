@@ -18,7 +18,7 @@ const ROW = {
   name: "Camisa",
   color: "rojo",
   categoryId: "cat-1",
-  workspaceId: "ws-1",
+  workspaceId: "7c9f1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b",
   deleted: false,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-02-01T00:00:00.000Z",
@@ -74,11 +74,18 @@ describe("Payload de products hacia Supabase", () => {
 describe("Payload con workspace_id", () => {
   it("envía el workspace local para que el servidor pueda aislar por workspace", () => {
     const payload = productToPayload(ROW, "user-1");
-    assert.equal(payload.workspace_id, "ws-1");
+    assert.equal(payload.workspace_id, "7c9f1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b");
   });
 
   it("envía null si la fila local no tiene workspace", () => {
     const payload = productToPayload({ ...ROW, workspaceId: "" }, "user-1");
+    assert.equal(payload.workspace_id, null);
+  });
+
+  // Regresión: el workspace interno "default" (no UUID) reventaba el upsert
+  // con 22P02 → 400 permanente. Esas filas viajan con NULL.
+  it("envía null si el workspace local no es un UUID válido (ej: \"default\")", () => {
+    const payload = productToPayload({ ...ROW, workspaceId: "default" }, "user-1");
     assert.equal(payload.workspace_id, null);
   });
 });

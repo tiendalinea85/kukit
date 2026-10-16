@@ -56,6 +56,14 @@ const asNum = (v: unknown, fallback = 0): number => {
 };
 const asBool = (v: unknown, fallback = false): boolean => (typeof v === "boolean" ? v : fallback);
 
+// `workspace_id` es uuid en el servidor. El workspace interno "default" (y
+// cualquier string no-UUID heredado) reventaría el upsert con 22P02 → 400
+// permanente. Esas filas se envían con NULL: el aislamiento del servidor es
+// por user_id (RLS) y el pull conserva el workspace local (withWorkspace).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const asUuidOrNull = (v: unknown): string | null =>
+  typeof v === "string" && UUID_RE.test(v) ? v : null;
+
 function normalizeStatus<T extends string>(
   v: unknown,
   map: Record<string, T>,
@@ -73,7 +81,7 @@ function expenseToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
-    workspace_id: asStr(row.workspaceId) || null,
+    workspace_id: asUuidOrNull(row.workspaceId),
     code: asStr(row.code),
     description: asStr(row.description),
     amount: asNum(row.amount),
@@ -98,7 +106,7 @@ function expenseDetailToPayload(row: Record<string, unknown>, userId: string) {
     // El hijo hereda el workspace de su gasto: sin esto la fila remota queda
     // con NULL y el detalle queda fuera del aislamiento por workspace. El pull
     // ya lo lee (`expenseDetailFromRow`) y `withWorkspace` protege los NULL viejos.
-    workspace_id: asStr(row.workspaceId) || null,
+    workspace_id: asUuidOrNull(row.workspaceId),
     expense_id: asStr(row.expenseId),
     product_id: asStr(row.productId) || null,
     code: asStr(row.code),
@@ -117,7 +125,7 @@ function customIconToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
-    workspace_id: asStr(row.workspaceId),
+    workspace_id: asUuidOrNull(row.workspaceId),
     name: asStr(row.name),
     data_url: asStr(row.dataUrl),
     deleted: asBool(row.deleted),
@@ -131,7 +139,7 @@ function categoryToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
-    workspace_id: asStr(row.workspaceId) || null,
+    workspace_id: asUuidOrNull(row.workspaceId),
     name: asStr(row.name),
     color: asStr(row.color, "#8b5cf6"),
     icon: asStr(row.icon, "📦"),
@@ -143,7 +151,7 @@ function typeToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
-    workspace_id: asStr(row.workspaceId) || null,
+    workspace_id: asUuidOrNull(row.workspaceId),
     name: asStr(row.name),
     created_at: asStr(row.createdAt),
   };
@@ -153,7 +161,7 @@ function investmentToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
-    workspace_id: asStr(row.workspaceId) || null,
+    workspace_id: asUuidOrNull(row.workspaceId),
     name: asStr(row.name),
     value: asNum(row.value),
     category_id: asStr(row.categoryId) || null,
@@ -174,7 +182,7 @@ function investmentCategoryToPayload(row: Record<string, unknown>, userId: strin
   return {
     id: asStr(row.id),
     user_id: userId,
-    workspace_id: asStr(row.workspaceId) || null,
+    workspace_id: asUuidOrNull(row.workspaceId),
     name: asStr(row.name),
     color: asStr(row.color, "#6366f1"),
     icon: asStr(row.icon, "📦"),
@@ -186,7 +194,7 @@ function customerToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
-    workspace_id: asStr(row.workspaceId) || null,
+    workspace_id: asUuidOrNull(row.workspaceId),
     name: asStr(row.name),
     phone: asStr(row.phone),
     address: asStr(row.address),
@@ -202,7 +210,7 @@ export function productToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
-    workspace_id: asStr(row.workspaceId) || null,
+    workspace_id: asUuidOrNull(row.workspaceId),
     code: asStr(row.code),
     name: asStr(row.name),
     color: asStr(row.color),
@@ -224,7 +232,7 @@ function movementToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
-    workspace_id: asStr(row.workspaceId) || null,
+    workspace_id: asUuidOrNull(row.workspaceId),
     product_id: asStr(row.productId),
     type: asStr(row.type),
     quantity: asNum(row.quantity),
@@ -239,7 +247,7 @@ function saleToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
-    workspace_id: asStr(row.workspaceId) || null,
+    workspace_id: asUuidOrNull(row.workspaceId),
     code: asStr(row.code),
     customer_id: asStr(row.customerId) || null,
     date: asStr(row.date),
@@ -260,7 +268,7 @@ function saleDetailToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
-    workspace_id: asStr(row.workspaceId) || null,
+    workspace_id: asUuidOrNull(row.workspaceId),
     sale_id: asStr(row.saleId),
     product_id: asStr(row.productId) || null,
     code: asStr(row.code),
@@ -279,7 +287,7 @@ function purchaseToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
-    workspace_id: asStr(row.workspaceId) || null,
+    workspace_id: asUuidOrNull(row.workspaceId),
     code: asStr(row.code),
     supplier: asStr(row.supplier),
     date: asStr(row.date),
@@ -300,7 +308,7 @@ function purchaseDetailToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
-    workspace_id: asStr(row.workspaceId) || null,
+    workspace_id: asUuidOrNull(row.workspaceId),
     purchase_id: asStr(row.purchaseId),
     product_id: asStr(row.productId) || null,
     code: asStr(row.code),
