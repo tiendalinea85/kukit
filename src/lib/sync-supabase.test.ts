@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   productToPayload,
+  movementToPayload,
   expenseFromRow,
   buildSupabaseTransport,
   missingSchemaColumn,
@@ -87,6 +88,63 @@ describe("Payload con workspace_id", () => {
   it("envía null si el workspace local no es un UUID válido (ej: \"default\")", () => {
     const payload = productToPayload({ ...ROW, workspaceId: "default" }, "user-1");
     assert.equal(payload.workspace_id, null);
+  });
+});
+
+// `adjustStock` (features/sales/services/productService.ts) crea movimientos de
+// inventario con type y reference_type "ajuste" y quantity FIRMADO (puede ser
+// negativo). Esos valores solo son válidos desde la migración 00008, que relaja
+// los CHECK de `inventory_movements`. Este test fija el payload del push para
+// que no regrese a un esquema que los rechace con 23514 (validación no
+// reintentable → el movimiento nunca sincroniza).
+const MOVEMENT = {
+  id: "m1",
+  workspaceId: "7c9f1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b",
+  productId: "p1",
+  type: "ajuste",
+  quantity: -3,
+  referenceType: "ajuste",
+  referenceId: "p1",
+  notes: "Merma",
+  createdAt: "2026-01-01T00:00:00.000Z",
+};
+
+describe("Payload de inventory_movements hacia Supabase", () => {
+  it("envía type \"ajuste\" para un ajuste manual de stock", () => {
+    assert.equal(movementToPayload(MOVEMENT, "user-1").type, "ajuste");
+  });
+
+  it("conserva el quantity firmado (negativo) de una salida por ajuste", () => {
+    assert.equal(movementToPayload(MOVEMENT, "user-1").quantity, -3);
+  });
+
+  it("envía reference_type \"ajuste\"", () => {
+    assert.equal(movementToPayload(MOVEMENT, "user-1").reference_type, "ajuste");
+  });
+
+  it("envía solo columnas que existen en public.inventory_movements", () => {
+    assert.deepEqual(Object.keys(movementToPayload(MOVEMENT, "user-1")).sort(), [
+      "created_at",
+      "id",
+      "notes",
+      "product_id",
+      "quantity",
+      "reference_id",
+      "reference_type",
+      "type",
+      "user_id",
+      "workspace_id",
+    ]);
+  });
+
+  it("envía el workspace local para aislar el movimiento por workspace", () => {
+    assert.equal(movementToPayload(MOVEMENT, "user-1").workspace_id, "7c9f1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b");
+  });
+
+  // Regresión: el workspace interno "default" (no UUID) reventaba el upsert
+  // con 22P02 → 400 permanente. Esas filas viajan con NULL.
+  it("envía null si el workspace local no es un UUID válido (ej: \"default\")", () => {
+    assert.equal(movementToPayload({ ...MOVEMENT, workspaceId: "default" }, "user-1").workspace_id, null);
   });
 });
 

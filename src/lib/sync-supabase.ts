@@ -228,7 +228,7 @@ export function productToPayload(row: Record<string, unknown>, userId: string) {
   };
 }
 
-function movementToPayload(row: Record<string, unknown>, userId: string) {
+export function movementToPayload(row: Record<string, unknown>, userId: string) {
   return {
     id: asStr(row.id),
     user_id: userId,
