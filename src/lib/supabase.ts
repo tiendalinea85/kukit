@@ -5,10 +5,13 @@ import { parseAuthCallback } from "./recoveryGuard";
 
 let _supabase: SupabaseClient | null = null;
 let _currentUser: User | null = null;
-// Distingue "todavía no he resuelto quién es el usuario" de "no hay sesión":
-// sin esta bandera, onAuthStateChange notificaba un null síncrono al suscribirse
-// y AuthProvider expulsaba a /auth en cada carga antes de resolver la sesión.
+// Distingue "todav��a no he resuelto quiǸn es el usuario" de "no hay sesi��n":
+// sin esta bandera, onAuthStateChange notificaba un null s��ncrono al suscribirse
+// y AuthProvider expulsaba a /auth en cada carga antes de resolver la sesi��n.
 let _userResolved = false;
+// Promesa compartida para deduplicar llamadas concurrentes a getCurrentUser()
+// mientras la primera resoluci��n a��n estǭ en vuelo.
+let _getUserPromise: Promise<User | null> | null = null;
 let _authListeners: Array<(user: User | null, event?: string) => void> = [];
 let _authUnsub: (() => void) | null = null;
 
@@ -49,44 +52,49 @@ export function getSupabase(): SupabaseClient | null {
 
 export async function getCurrentUser(): Promise<User | null> {
   if (_userResolved) return _currentUser;
-  const sb = getSupabase();
-  if (!sb) {
-    _userResolved = true;
-    return null;
-  }
+  if (_getUserPromise) return _getUserPromise;
 
-  // Offline-First: si no hay red, usar la sesión cacheada localmente
-  // (persistSession) SIN llamadas de red. Si no hay sesión local, devuelve
-  // null y AuthProvider cae al fallback (mock local), nunca a un spinner.
-  if (isOffline()) {
-    const { data } = await sb.auth.getSession();
-    _currentUser = data.session?.user ?? null;
+  const promise = (async (): Promise<User | null> => {
+    const sb = getSupabase();
+    if (!sb) {
+      _userResolved = true;
+      return null;
+    }
+
+    if (isOffline()) {
+      const { data } = await sb.auth.getSession();
+      _currentUser = data.session?.user ?? null;
+      _userResolved = true;
+      return _currentUser;
+    }
+
+    try {
+      const { data } = await withTimeout(sb.auth.getUser());
+      if (data?.user) {
+        _currentUser = data.user;
+      } else {
+        const local = await sb.auth.getSession();
+        _currentUser = local.data.session?.user ?? null;
+      }
+    } catch {
+      try {
+        const { data } = await sb.auth.getSession();
+        _currentUser = data.session?.user ?? null;
+      } catch {
+        _userResolved = false;
+        return _currentUser;
+      }
+    }
     _userResolved = true;
     return _currentUser;
-  }
+  })();
 
-  try {
-    const { data } = await withTimeout(sb.auth.getUser());
-    if (data?.user) {
-      _currentUser = data.user;
-    } else {
-      // `getUser()` resolvió SIN usuario (no lanzó): puede ser un fallo
-      // transitorio al renovar el token, no una sesión perdida. Se cae a la
-      // sesión cacheada antes de darla por ausente; si no se hace, una
-      // renovación fallida deja `_currentUser=null` y TODOS los push fallan.
-      const local = await sb.auth.getSession();
-      _currentUser = local.data.session?.user ?? null;
-    }
-  } catch {
-    // Red lenta / "online" reportado pero sin internet real: no colgar la UI,
-    // usar la sesión local cacheada como fallback.
-    const { data } = await sb.auth.getSession();
-    _currentUser = data.session?.user ?? null;
-  }
-  _userResolved = true;
-  return _currentUser;
+  _getUserPromise = promise.finally(() => {
+    _getUserPromise = null;
+  });
+
+  return _getUserPromise;
 }
-
 export function onAuthStateChange(
   callback: (user: User | null, event?: string) => void
 ): () => void {
