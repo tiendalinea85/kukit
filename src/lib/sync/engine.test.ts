@@ -255,6 +255,25 @@ describe("engine: sin duplicados en reintentos", () => {
     assert.equal(server.pushCalls, 1);
     assert.equal((await countOutbox()).pending, 0);
   });
+
+  it("reintentar dos veces a la vez (doble clic en el botón) no duplica", async () => {
+    const server = new FakeServer();
+    server.queue.push({ type: "server", message: "error 500", retryable: true });
+    const { engine } = buildEngine(server);
+
+    await addExpense("e-1");
+    await seedExpense("e-1");
+    await engine.runSync();
+    assert.equal(server.rows.size, 0, "el primer intento falla");
+
+    // El usuario pulsa dos veces seguidas: dos retryFailedNow concurrentes.
+    await Promise.all([engine.retryFailedNow(), engine.retryFailedNow()]);
+
+    assert.equal(server.rows.size, 1, "una sola fila pese al doble clic");
+    const op = (await db.syncOutbox.where("entityId").equals("e-1").first())!;
+    assert.equal(op.state, "synced");
+    assert.equal((await countOutbox()).pending, 0);
+  });
 });
 
 describe("engine: reconciliación de pendientes", () => {

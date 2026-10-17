@@ -10,7 +10,7 @@ import { RefreshCw } from "lucide-react";
 //   - Sincronizado (synced)
 
 export function SyncStatusBadge() {
-  const { online, status, pendingCount, failedCount, conflictCount, lastError } = useSyncStore();
+  const { online, status, pendingCount, failedCount, conflictCount, lastError, retryNow } = useSyncStore();
 
   if (!online) {
     return (
@@ -33,13 +33,15 @@ export function SyncStatusBadge() {
   if (status === "error" || failedCount > 0 || conflictCount > 0) {
     const total = failedCount + conflictCount;
     return (
-      <span
-        title={lastError ?? undefined}
-        className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-red-600/15 text-red-400 border border-red-600/20"
+      <button
+        type="button"
+        onClick={() => void retryNow()}
+        title={lastError ?? "Reintentar sincronización"}
+        className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-red-600/15 text-red-400 border border-red-600/20 hover:bg-red-600/25 transition-colors"
       >
         <span className="w-2 h-2 rounded-full bg-red-400" />
-        {total} con error
-      </span>
+        {total} con error • Reintentar
+      </button>
     );
   }
 
