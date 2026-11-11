@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # Orígenes permitidos para CORS. La app móvil nativa no necesita CORS;
     # si algún cliente web consume la API, lista aquí sus orígenes exactos.
     cors_origins: list[str] = []
+    # Supabase Admin API para crear usuarios desde la app
+    supabase_url: str | None = None
+    supabase_service_role_key: str | None = None
 
     model_config = {"env_file": ".env"}
 

@@ -19,23 +19,37 @@ export async function generatePurchaseCode(): Promise<string> {
   return `C${String(lastNum + 1).padStart(6, "0")}`;
 }
 
-// Taller de confección
+// Taller de confección.
+// El correlativo es por workspace: dos organizaciones pueden tener PT000001 a
+// la vez sin colisionar (antes se tomaba el último global, contaminando el
+// contador de otros espacios).
+
+function nextSequentialCode(codes: string[], prefix: string): string {
+  let max = 0;
+  for (const code of codes) {
+    if (typeof code !== "string" || !code.startsWith(prefix)) continue;
+    const n = Number.parseInt(code.slice(prefix.length), 10);
+    if (Number.isInteger(n) && n > max) max = n;
+  }
+  return `${prefix}${String(max + 1).padStart(6, "0")}`;
+}
+
 export async function generateGarmentCode(): Promise<string> {
-  const last = await db.garments.orderBy("code").last();
-  const lastNum = last ? parseInt(last.code.replace("PT", ""), 10) : 0;
-  return `PT${String(lastNum + 1).padStart(6, "0")}`;
+  const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? "default";
+  const rows = await db.garments.where("workspaceId").equals(workspaceId).toArray();
+  return nextSequentialCode(rows.map((r) => r.code), "PT");
 }
 
 export async function generateMaterialCode(): Promise<string> {
-  const last = await db.materials.orderBy("code").last();
-  const lastNum = last ? parseInt(last.code.replace("MT", ""), 10) : 0;
-  return `MT${String(lastNum + 1).padStart(6, "0")}`;
+  const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? "default";
+  const rows = await db.materials.where("workspaceId").equals(workspaceId).toArray();
+  return nextSequentialCode(rows.map((r) => r.code), "MT");
 }
 
 export async function generateProductionCode(): Promise<string> {
-  const last = await db.productionOrders.orderBy("code").last();
-  const lastNum = last ? parseInt(last.code.replace("PR", ""), 10) : 0;
-  return `PR${String(lastNum + 1).padStart(6, "0")}`;
+  const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? "default";
+  const rows = await db.productionOrders.where("workspaceId").equals(workspaceId).toArray();
+  return nextSequentialCode(rows.map((r) => r.code), "PR");
 }
 
 // Agricultura

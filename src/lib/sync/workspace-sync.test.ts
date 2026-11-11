@@ -544,10 +544,10 @@ describe("Conflict resolution: LWW", () => {
 });
 
 describe("Append-only entities", () => {
-  it("inventoryMovements is append-only", () => {
+  it("only inventoryMovements and partCompatibilities are append-only", () => {
     assert.equal(isAppendOnly("inventoryMovements"), true);
-    assert.equal(isAppendOnly("productionMaterials"), true);
     assert.equal(isAppendOnly("partCompatibilities"), true);
+    assert.equal(isAppendOnly("productionMaterials"), false);
     assert.equal(isAppendOnly("expenses"), false);
   });
 

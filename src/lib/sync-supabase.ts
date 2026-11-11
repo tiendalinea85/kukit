@@ -662,7 +662,9 @@ function productionMaterialToPayload(row: Record<string, unknown>, userId: strin
     production_order_id: asStr(row.productionOrderId),
     material_id: asStr(row.materialId), material_name: asStr(row.materialName),
     quantity: asNum(row.quantity), unit_cost: asNum(row.unitCost),
-    total_cost: asNum(row.totalCost), created_at: asStr(row.createdAt),
+    total_cost: asNum(row.totalCost), deleted: asBool(row.deleted),
+    created_at: asStr(row.createdAt), updated_at: asStr(row.updatedAt),
+    revision: asNum(row.revision, 1),
   };
 }
 
@@ -906,7 +908,9 @@ function productionMaterialFromRow(row: Record<string, unknown>): Record<string,
     materialId: asStr(row.material_id), materialName: asStr(row.material_name),
     quantity: asNum(row.quantity), unitCost: asNum(row.unit_cost),
     totalCost: asNum(row.total_cost), createdAt: asStr(row.created_at),
+    updatedAt: asStr(row.updated_at), deleted: asBool(row.deleted),
     syncStatus: "synced" as const, workspaceId: asStr(row.workspace_id),
+    revision: asNum(row.revision, 1),
   };
 }
 
@@ -1121,7 +1125,7 @@ const ENTITY_SPECS: EntitySpec[] = [
   { name: "garmentColors", serverTable: "garment_colors", order: 15, mode: "master", toPayload: garmentColorToPayload, fromRow: garmentColorFromRow },
   { name: "materials", serverTable: "materials", order: 16, mode: "master", toPayload: materialToPayload, fromRow: materialFromRow },
   { name: "productionOrders", serverTable: "production_orders", order: 17, mode: "guarded", toPayload: productionOrderToPayload, fromRow: productionOrderFromRow },
-  { name: "productionMaterials", serverTable: "production_materials", order: 18, mode: "append", orderColumn: "created_at", toPayload: productionMaterialToPayload, fromRow: productionMaterialFromRow },
+  { name: "productionMaterials", serverTable: "production_materials", order: 18, mode: "guarded", toPayload: productionMaterialToPayload, fromRow: productionMaterialFromRow },
 
   // Agricultura
   { name: "crops", serverTable: "crops", order: 19, mode: "guarded", toPayload: cropToPayload, fromRow: cropFromRow },

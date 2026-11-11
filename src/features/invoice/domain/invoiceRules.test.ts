@@ -7,6 +7,7 @@ import {
   ocrResultToPurchaseDetails,
   ocrResultToExpenseData,
   ocrTotalComputed,
+  matchOcrItemsToProducts,
 } from "./invoiceRules.ts";
 import type { InvoiceDraft } from "./types.ts";
 import type { OcrResult } from "../schemas/ocrSchema.ts";
@@ -132,6 +133,61 @@ describe("ocrResultToExpenseData", () => {
     const expense = ocrResultToExpenseData(ocrNoDate);
     const today = new Date().toISOString().split("T")[0];
     assert.equal(expense.date, today);
+  });
+});
+
+describe("matchOcrItemsToProducts", () => {
+  const products = [
+    { id: "p1", code: "TOR-001", name: "Tornillo 1/4", color: "plata" },
+    { id: "p2", code: "CLA-002", name: "Clavo 2\"", color: "acero" },
+  ];
+
+  it("empareja por nombre y usa el precio del OCR", () => {
+    const { details, unmatched } = matchOcrItemsToProducts(sampleOcr.items, products);
+    assert.equal(unmatched.length, 0);
+    assert.equal(details.length, 2);
+    assert.deepEqual(details[0], {
+      productId: "p1",
+      code: "TOR-001",
+      name: "Tornillo 1/4",
+      color: "plata",
+      quantity: 10,
+      unitPrice: 0.5,
+    });
+  });
+
+  it("empareja por código aunque la descripción no coincida", () => {
+    const items = [{ description: "tor-001", quantity: 3, unitPrice: 1 }];
+    const { details } = matchOcrItemsToProducts(items, products);
+    assert.equal(details[0]?.productId, "p1");
+    assert.equal(details[0]?.quantity, 3);
+  });
+
+  it("agrupa ítems repetidos del mismo producto sumando cantidades", () => {
+    const items = [
+      { description: "Tornillo 1/4", quantity: 2, unitPrice: 0.5 },
+      { description: "TORNILLO 1/4", quantity: 4, unitPrice: 0.6 },
+    ];
+    const { details } = matchOcrItemsToProducts(items, products);
+    assert.equal(details.length, 1);
+    assert.equal(details[0].quantity, 6);
+  });
+
+  it("devuelve como unmatched las descripciones sin producto", () => {
+    const items = [
+      { description: "Tornillo 1/4", quantity: 2, unitPrice: 0.5 },
+      { description: "Cemento gris", quantity: 1, unitPrice: 9 },
+    ];
+    const { details, unmatched } = matchOcrItemsToProducts(items, products);
+    assert.equal(details.length, 1);
+    assert.deepEqual(unmatched, ["Cemento gris"]);
+  });
+
+  it("ignora descripciones vacías", () => {
+    const items = [{ description: "   ", quantity: 1, unitPrice: 1 }];
+    const { details, unmatched } = matchOcrItemsToProducts(items, products);
+    assert.equal(details.length, 0);
+    assert.equal(unmatched.length, 0);
   });
 });
 

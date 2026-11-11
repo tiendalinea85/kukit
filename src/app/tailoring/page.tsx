@@ -12,10 +12,23 @@ import {
   Edit2,
   Trash2,
   Ban,
+  Play,
+  CheckCircle2,
 } from "lucide-react";
 import { useGarments, useProductionOrders } from "@/features/tailoring/hooks/useTailoring";
-import { filterProductionOrders, canVoidProduction } from "@/features/tailoring/domain/tailoringRules";
-import { deleteGarment, voidProductionOrder, deleteProductionOrder } from "@/features/tailoring/services/tailoringService";
+import {
+  filterProductionOrders,
+  canVoidProduction,
+  canStartProduction,
+  canCompleteProduction,
+} from "@/features/tailoring/domain/tailoringRules";
+import {
+  deleteGarment,
+  voidProductionOrder,
+  deleteProductionOrder,
+  startProductionOrder,
+  completeProductionOrder,
+} from "@/features/tailoring/services/tailoringService";
 import { SizeManager } from "@/features/tailoring/components/SizeManager";
 import { ColorManager } from "@/features/tailoring/components/ColorManager";
 import { MaterialList } from "@/features/tailoring/components/MaterialList";
@@ -108,6 +121,24 @@ export default function TailoringPage() {
     await deleteProductionOrder(deleteOrderTarget.id);
     toast.success("Orden eliminada");
     setDeleteOrderTarget(null);
+  };
+
+  const handleStartOrder = async (id: string) => {
+    try {
+      await startProductionOrder(id);
+      toast.success("Orden iniciada");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo iniciar");
+    }
+  };
+
+  const handleCompleteOrder = async (id: string) => {
+    try {
+      await completeProductionOrder(id);
+      toast.success("Orden completada");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo completar");
+    }
   };
 
   return (
@@ -288,13 +319,33 @@ export default function TailoringPage() {
                 </div>
 
                 <div className="flex items-center gap-1 mt-3">
+                  {canStartProduction(order) && (
+                    <button
+                      onClick={() => void handleStartOrder(order.id)}
+                      title="Iniciar producción"
+                      className="p-1.5 rounded-lg bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 transition-colors"
+                    >
+                      <Play size={14} />
+                    </button>
+                  )}
+                  {canCompleteProduction(order) && (
+                    <button
+                      onClick={() => void handleCompleteOrder(order.id)}
+                      title="Completar orden"
+                      className="p-1.5 rounded-lg bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600/20 transition-colors"
+                    >
+                      <CheckCircle2 size={14} />
+                    </button>
+                  )}
                   <div className="flex-1" />
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Link href={`/tailoring/production/edit/${order.id}`}>
-                      <button className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300">
-                        <Edit2 size={14} />
-                      </button>
-                    </Link>
+                    {canVoidProduction(order) && (
+                      <Link href={`/tailoring/production/edit/${order.id}`}>
+                        <button className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300">
+                          <Edit2 size={14} />
+                        </button>
+                      </Link>
+                    )}
                     {canVoidProduction(order) && (
                       <button
                         onClick={() => setVoidTarget({ id: order.id, code: order.code })}

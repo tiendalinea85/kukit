@@ -1,12 +1,13 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Trash2, Plus } from "lucide-react";
+import { Search, Trash2, Plus, Edit2 } from "lucide-react";
 import { useMaterials } from "../hooks/useTailoring";
 import { deleteMaterial } from "../services/tailoringService";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { formatCurrency } from "@/utils/format";
+import Link from "next/link";
 import toast from "react-hot-toast";
 
 interface Props {
@@ -34,11 +35,18 @@ export function MaterialList({ onAdd }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold">Materiales</h2>
-        {onAdd && (
+        {onAdd ? (
           <Button size="sm" onClick={onAdd}>
             <Plus size={16} />
             Nuevo
           </Button>
+        ) : (
+          <Link href="/tailoring/materials/new">
+            <Button size="sm">
+              <Plus size={16} />
+              Nuevo
+            </Button>
+          </Link>
         )}
       </div>
 
@@ -102,6 +110,12 @@ export function MaterialList({ onAdd }: Props) {
               </div>
 
               <div className="flex items-center justify-end gap-1 mt-2">
+                <Link
+                  href={`/tailoring/materials/edit/${material.id}`}
+                  className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Edit2 size={14} />
+                </Link>
                 <button
                   onClick={() => setDeleteTarget({ id: material.id, name: material.name })}
                   className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"

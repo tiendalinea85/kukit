@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Lock } from "lucide-react";
 import { ProductionOrderForm } from "@/features/tailoring/components/ProductionOrderForm";
 import { updateProductionOrder } from "@/features/tailoring/services/tailoringService";
-import { canVoidProduction } from "@/features/tailoring/domain/tailoringRules";
+import { canVoidProduction, type ProductionMaterialInput } from "@/features/tailoring/domain/tailoringRules";
 import { db } from "@/lib/db";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
@@ -26,17 +26,21 @@ export default function EditProductionOrderPage() {
         db.productionMaterials
           .where("productionOrderId")
           .equals(o.id)
+          .and((m) => !m.deleted)
           .toArray()
           .then(setOrderMaterials);
       }
     });
   }, [id]);
 
-  const handleSubmit = async (data: ProductionOrderFormData) => {
+  const handleSubmit = async (
+    data: ProductionOrderFormData,
+    materials: ProductionMaterialInput[]
+  ) => {
     if (!order) return;
     setLoading(true);
     try {
-      await updateProductionOrder(order.id, data);
+      await updateProductionOrder(order.id, data, materials);
       toast.success("Orden actualizada");
       router.push("/tailoring");
     } catch (err) {

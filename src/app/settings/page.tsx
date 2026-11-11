@@ -15,6 +15,7 @@ import { useCategories } from "@/features/categories/hooks/useCategories";
 import { listCategories } from "@/features/categories/services/categoryService";
 import { QuickCategoryModal } from "@/features/categories/components/QuickCategoryModal";
 import { iconText } from "@/features/categories/domain/customIconRules";
+import { WorkspaceMembers } from "@/features/workspaces/components/WorkspaceMembers";
 
 export default function SettingsPage() {
   const { theme, setTheme, language, setLanguage, online } = useAppStore();
@@ -309,6 +310,8 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+
+      <WorkspaceMembers />
 
       {sections.map((section) => (
         <div key={section.title}>

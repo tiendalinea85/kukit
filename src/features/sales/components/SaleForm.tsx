@@ -1,15 +1,17 @@
 "use client";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useMemo, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Trash2, ShoppingBag } from "lucide-react";
+import { Plus, Trash2, ShoppingBag, UserPlus, PackagePlus } from "lucide-react";
 import { saleSchema, type SaleFormData } from "../schemas/saleSchema";
 import { computeSubtotal, computeSaleTotal } from "../domain/saleRules";
 import type { SaleDetailInput } from "../domain/saleRules";
-import type { Customer, PaymentMethod } from "@/types";
+import type { Customer, PaymentMethod, Product } from "@/types";
 import type { ProductWithStock } from "../services/productService";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { QuickCustomerModal } from "./QuickCustomerModal";
+import { QuickProductModal } from "./QuickProductModal";
 import { PAYMENT_METHODS } from "../../expenses/domain/expenseRules";
 import { formatCurrency } from "@/utils/format";
 
@@ -33,7 +35,7 @@ const PAYMENT_LABELS: Record<PaymentMethod, string> = {
 };
 
 export function SaleForm({ customers, products, defaultHeader, defaultDetails, loading, onSave }: Props) {
-  const { register, handleSubmit, getValues, formState: { errors } } = useForm<SaleFormData>({
+  const { register, control, handleSubmit, getValues, setValue, formState: { errors } } = useForm<SaleFormData>({
     resolver: zodResolver(saleSchema),
     defaultValues: defaultHeader || {
       customerId: "",
@@ -48,12 +50,40 @@ export function SaleForm({ customers, products, defaultHeader, defaultDetails, l
   const [quantity, setQuantity] = useState("1");
   const [unitPrice, setUnitPrice] = useState("");
   const [lineError, setLineError] = useState("");
+  const [customerModal, setCustomerModal] = useState(false);
+  const [productModal, setProductModal] = useState(false);
+
+  // Los creados desde el propio formulario se muestran al instante: la lista en
+  // vivo de Dexie llega en el siguiente tick y el `select` ya debe tener la
+  // opción para poder seleccionarla.
+  const [extraCustomers, setExtraCustomers] = useState<Customer[]>([]);
+  const [extraProducts, setExtraProducts] = useState<ProductWithStock[]>([]);
+
+  const customerList = useMemo(() => {
+    const ids = new Set(customers.map((c) => c.id));
+    return [...customers, ...extraCustomers.filter((c) => !ids.has(c.id))];
+  }, [customers, extraCustomers]);
+
+  const productList = useMemo(() => {
+    const ids = new Set(products.map((p) => p.id));
+    return [...products, ...extraProducts.filter((p) => !ids.has(p.id))];
+  }, [products, extraProducts]);
 
   const total = computeSaleTotal(details);
 
+  const handleCustomerCreated = (customer: Customer) => {
+    setExtraCustomers((prev) => [...prev, customer]);
+    setValue("customerId", customer.id, { shouldValidate: true });
+  };
+
+  const handleProductCreated = (product: Product) => {
+    setExtraProducts((prev) => [...prev, { ...product, stock: 0 }]);
+    setProductId(product.id);
+  };
+
   const addLine = () => {
     setLineError("");
-    const product = products.find((p) => p.id === productId);
+    const product = productList.find((p) => p.id === productId);
     if (!product) {
       setLineError("Selecciona un producto");
       return;
@@ -104,18 +134,35 @@ export function SaleForm({ customers, products, defaultHeader, defaultDetails, l
   };
 
   return (
+    <>
     <form onSubmit={handleSubmit((data) => onSave(data, details, false))} className="space-y-4">
       <div>
-        <label className="text-sm font-medium text-zinc-400">Cliente</label>
-        <select
-          {...register("customerId")}
-          className="w-full rounded-xl bg-zinc-800/60 border border-zinc-700/50 px-4 py-2.5 text-zinc-100 placeholder-zinc-500 outline-none transition-all focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50"
-        >
-          <option value="">Selecciona un cliente</option>
-          {customers.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-zinc-400">Cliente</label>
+          <button
+            type="button"
+            onClick={() => setCustomerModal(true)}
+            className="inline-flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+          >
+            <UserPlus size={12} /> Nuevo cliente
+          </button>
+        </div>
+        <Controller
+          control={control}
+          name="customerId"
+          render={({ field }) => (
+            <select
+              {...field}
+              value={field.value ?? ""}
+              className="w-full rounded-xl bg-zinc-800/60 border border-zinc-700/50 px-4 py-2.5 text-zinc-100 placeholder-zinc-500 outline-none transition-all focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50"
+            >
+              <option value="">Selecciona un cliente</option>
+              {customerList.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          )}
+        />
         {errors.customerId && <p className="text-xs text-red-400 mt-1">{errors.customerId.message}</p>}
       </div>
 
@@ -138,7 +185,16 @@ export function SaleForm({ customers, products, defaultHeader, defaultDetails, l
       <Input label="Observaciones" {...register("notes")} error={errors.notes?.message} placeholder="Opcional" />
 
       <div className="rounded-2xl bg-zinc-800/40 border border-zinc-800 p-4 space-y-3">
-        <p className="text-sm font-semibold text-zinc-300">Detalle de la venta</p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-zinc-300">Detalle de la venta</p>
+          <button
+            type="button"
+            onClick={() => setProductModal(true)}
+            className="inline-flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+          >
+            <PackagePlus size={12} /> Nuevo producto
+          </button>
+        </div>
 
         <div className="grid grid-cols-3 gap-2">
           <select
@@ -147,7 +203,7 @@ export function SaleForm({ customers, products, defaultHeader, defaultDetails, l
             className="col-span-3 rounded-xl bg-zinc-800/60 border border-zinc-700/50 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-purple-500"
           >
             <option value="">Producto</option>
-            {products.map((p) => (
+            {productList.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.code} - {p.name} ({p.color || "sin color"}) · stock {p.stock}
               </option>
@@ -218,5 +274,18 @@ export function SaleForm({ customers, products, defaultHeader, defaultDetails, l
         </Button>
       </div>
     </form>
+
+    {/* Fuera del `<form>`: cada modal tiene su propio formulario. */}
+    <QuickCustomerModal
+      open={customerModal}
+      onClose={() => setCustomerModal(false)}
+      onCreated={handleCustomerCreated}
+    />
+    <QuickProductModal
+      open={productModal}
+      onClose={() => setProductModal(false)}
+      onCreated={handleProductCreated}
+    />
+    </>
   );
 }

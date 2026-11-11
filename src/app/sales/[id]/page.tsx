@@ -6,12 +6,14 @@ import { ArrowLeft, Edit2, Trash2, Ban, ReceiptText, CheckCircle2 } from "lucide
 import { formatCurrency, formatDate } from "@/utils/format";
 import { voidSale, deleteSale, getSaleById, listSaleDetails } from "@/features/sales/services/saleService";
 import { getCustomerById } from "@/features/sales/services/customerService";
+import { getSaleProfit } from "@/features/sales/services/profitService";
 import { canEditSale, canVoidSale, isConfirmed, isVoided } from "@/features/sales/domain/saleRules";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import type { Sale, SaleDetail, Customer, PaymentMethod } from "@/types";
+import type { SaleProfitData } from "@/features/sales/services/profitService";
 
 const paymentMethodLabels: Record<PaymentMethod, string> = {
   efectivo: "Efectivo",
@@ -35,6 +37,7 @@ export default function SaleDetailPage() {
   const [sale, setSale] = useState<Sale | null>(null);
   const [details, setDetails] = useState<SaleDetail[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [profit, setProfit] = useState<SaleProfitData | null>(null);
   const [voidOpen, setVoidOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -45,6 +48,7 @@ export default function SaleDetailPage() {
       getCustomerById(s.customerId).then((c) => c && !c.deleted && setCustomer(c));
     });
     listSaleDetails(id).then(setDetails);
+    getSaleProfit(id).then(setProfit);
   };
 
   useEffect(() => {
@@ -59,6 +63,9 @@ export default function SaleDetailPage() {
       </div>
     );
   }
+
+  const profitLineById = new Map((profit?.lines ?? []).map((line) => [line.id, line]));
+  const marginLabel = `${((profit?.margin ?? 0) * 100).toFixed(1)}%`;
 
   const handleVoid = async () => {
     try {
@@ -160,20 +167,59 @@ export default function SaleDetailPage() {
 
       <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800/60 p-4 space-y-2">
         <p className="text-sm font-semibold text-zinc-300">Detalle de productos</p>
-        {details.map((d) => (
-          <div key={d.id} className="flex items-center justify-between rounded-xl bg-zinc-800/40 border border-zinc-800 p-3 text-sm">
-            <div className="min-w-0">
-              <p className="font-medium text-zinc-200 truncate">{d.name} <span className="text-zinc-500">({d.code})</span></p>
-              <p className="text-xs text-zinc-500">{d.color || "Sin color"} · {d.quantity} × {formatCurrency(d.unitPrice)}</p>
+        {details.map((d) => {
+          const line = profitLineById.get(d.id);
+          return (
+            <div key={d.id} className="flex items-center justify-between rounded-xl bg-zinc-800/40 border border-zinc-800 p-3 text-sm">
+              <div className="min-w-0">
+                <p className="font-medium text-zinc-200 truncate">{d.name} <span className="text-zinc-500">({d.code})</span></p>
+                <p className="text-xs text-zinc-500">{d.color || "Sin color"} · {d.quantity} × {formatCurrency(d.unitPrice)}</p>
+                {line && (
+                  <p className="text-[11px] text-zinc-500 mt-0.5">
+                    Costo {formatCurrency(line.cost)} · Utilidad{" "}
+                    <span className={line.profit >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                      {formatCurrency(line.profit)}
+                    </span>
+                    {line.missingCost && " (sin costo de compra)"}
+                  </p>
+                )}
+              </div>
+              <span className="font-semibold text-zinc-200 ml-3">{formatCurrency(d.subtotal)}</span>
             </div>
-            <span className="font-semibold text-zinc-200 ml-3">{formatCurrency(d.subtotal)}</span>
-          </div>
-        ))}
+          );
+        })}
         <div className="flex items-center justify-between pt-2 border-t border-zinc-800">
           <span className="text-sm text-zinc-400">Total</span>
           <span className="text-lg font-bold text-purple-400">{formatCurrency(sale.total)}</span>
         </div>
       </div>
+
+      {profit && (
+        <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800/60 p-4 space-y-2">
+          <p className="text-sm font-semibold text-zinc-300">Ingresos y utilidad</p>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-zinc-400">Ingresos por venta</span>
+            <span className="text-zinc-200">{formatCurrency(profit.revenue)}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-zinc-400">Costo de productos</span>
+            <span className="text-zinc-200">{formatCurrency(profit.cost)}</span>
+          </div>
+          <div className="flex items-center justify-between pt-2 border-t border-zinc-800">
+            <span className="text-sm font-semibold text-zinc-300">Utilidad</span>
+            <span className={`text-lg font-bold ${profit.profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+              {formatCurrency(profit.profit)}
+            </span>
+          </div>
+          <p className="text-xs text-zinc-500">Margen {marginLabel} · costo promedio de compras recibidas</p>
+          {profit.missingCostCount > 0 && (
+            <p className="text-xs text-amber-400">
+              {profit.missingCostCount} producto{profit.missingCostCount === 1 ? "" : "s"} sin compra registrada:
+              su costo se tomó como 0 y la utilidad puede estar sobreestimada.
+            </p>
+          )}
+        </div>
+      )}
 
       {isVoided(sale) && (
         <div className="rounded-xl bg-red-600/10 border border-red-600/30 p-3 text-sm text-red-400">

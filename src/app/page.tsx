@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   TrendingUp, Wallet, Truck, Briefcase, Package, PackageX, ShoppingBag, Plus,
+  PiggyBank, Calculator, Camera,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -34,6 +35,27 @@ export default function HomePage() {
       color: "from-emerald-600/15 to-emerald-900/10",
       iconColor: "text-emerald-400",
       href: "/sales",
+    },
+    {
+      label: "Utilidad semanal",
+      value: formatCurrency(data.weekProfit),
+      sub:
+        data.weekMissingCostCount > 0
+          ? `${(data.weekMargin * 100).toFixed(1)}% margen · ${data.weekMissingCostCount} sin costo`
+          : `${(data.weekMargin * 100).toFixed(1)}% margen`,
+      icon: PiggyBank,
+      color: data.weekProfit >= 0 ? "from-emerald-600/15 to-emerald-900/10" : "from-rose-600/15 to-rose-900/10",
+      iconColor: data.weekProfit >= 0 ? "text-emerald-400" : "text-rose-400",
+      href: "/reports",
+    },
+    {
+      label: "Costo de ventas",
+      value: formatCurrency(data.weekCostOfGoods),
+      sub: "compras recibidas · semana",
+      icon: Calculator,
+      color: "from-amber-600/15 to-amber-900/10",
+      iconColor: "text-amber-400",
+      href: "/reports",
     },
     {
       label: "Compras",
@@ -93,6 +115,13 @@ export default function HomePage() {
         </div>
         <div className="flex items-center gap-2">
           <SyncStatusBadge />
+          <Link
+            href="/scan"
+            aria-label="Escanear comprobante"
+            className="w-10 h-10 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-700 shrink-0"
+          >
+            <Camera size={18} />
+          </Link>
           <Link href="/sales/new" className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-600/30 shrink-0">
             <Plus size={20} className="text-white" />
           </Link>

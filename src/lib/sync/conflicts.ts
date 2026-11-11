@@ -92,7 +92,7 @@ export function resolveConflict(
  * fue idempotente y el movimiento local se considera aplicado tal cual.
  */
 export function isAppendOnly(entity: string): boolean {
-  return entity === "inventoryMovements" || entity === "productionMaterials" || entity === "partCompatibilities";
+  return entity === "inventoryMovements" || entity === "partCompatibilities";
 }
 
 export function isRegisteredOperation(entity: string): boolean {

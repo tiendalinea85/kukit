@@ -1,3 +1,7 @@
+import secrets
+import string
+
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import auth as auth_mod
@@ -8,9 +12,12 @@ from ..auth import (
     require_workspace_member,
     require_workspace_role,
 )
+from ..config import get_settings
 from ..db import get_pool
 from ..schemas import (
     AuditEventResponse,
+    MemberCreate,
+    MemberCreatedResponse,
     MemberRoleUpdate,
     MembersResponse,
     ProfileResponse,
@@ -204,3 +211,109 @@ async def remove_member(
             )
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail="Base de datos no disponible") from exc
+
+
+@router.post("/workspaces/members/create", response_model=MemberCreatedResponse)
+async def create_member(
+    body: MemberCreate,
+    _: None = Depends(require_workspace_role("OWNER", "ADMIN")),
+    workspace_id: str = Query(...),
+    user: AuthUser = Depends(get_current_user),
+) -> MemberCreatedResponse:
+    """Crea un usuario desde la app, lo asigna al workspace con el rol indicado
+    y devuelve las credenciales para compartir."""
+    settings = get_settings()
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Supabase Admin API no configurado (SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY)",
+        )
+
+    temp_password = body.password
+    if not temp_password:
+        alphabet = string.ascii_letters + string.digits
+        temp_password = "".join(secrets.choice(alphabet) for _ in range(12))
+
+    admin_url = settings.supabase_url.rstrip("/") + "/auth/v1/admin/users"
+    headers = {
+        "apikey": settings.supabase_service_role_key,
+        "Authorization": f"Bearer {settings.supabase_service_role_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "email": str(body.email),
+        "password": temp_password,
+        "email_confirm": True,
+        "user_metadata": {"full_name": body.full_name},
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(admin_url, headers=headers, json=payload)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="Error al conectar con Supabase Auth") from exc
+
+    if resp.status_code >= 400:
+        try:
+            err = resp.json()
+            msg = err.get("msg") or err.get("message") or str(err)
+        except Exception:
+            msg = resp.text
+        raise HTTPException(status_code=400, detail=msg)
+
+    try:
+        data = resp.json()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Respuesta inválida de Supabase Auth") from exc
+
+    user_id = data.get("id") or (data.get("user") or {}).get("id")
+    if not user_id:
+        raise HTTPException(status_code=502, detail="No se pudo obtener el ID del usuario creado")
+
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO profiles (id, email, full_name, updated_at)
+                VALUES ($1, $2, $3, now())
+                ON CONFLICT (id) DO UPDATE
+                  SET email = excluded.email,
+                      full_name = excluded.full_name,
+                      updated_at = now()
+                """,
+                user_id,
+                str(body.email),
+                body.full_name,
+            )
+            await conn.execute(
+                """
+                INSERT INTO workspace_members (workspace_id, user_id, role)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (workspace_id, user_id) DO UPDATE
+                  SET role = excluded.role
+                """,
+                workspace_id,
+                user_id,
+                body.role,
+            )
+            await write_audit(
+                conn,
+                user.id,
+                "workspace.member.create",
+                "workspace_member",
+                f"{workspace_id}:{user_id}",
+                {"role": body.role, "email": str(body.email)},
+            )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Base de datos no disponible") from exc
+
+    return MemberCreatedResponse(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        email=str(body.email),
+        full_name=body.full_name,
+        role=body.role,
+        password=temp_password,
+        created=True,
+    )

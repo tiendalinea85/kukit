@@ -46,7 +46,7 @@ src/
   types/      index.ts (dominio) · sync.ts · modules.ts (catálogo)
   utils/      code.ts (códigos correlativos), formato
   __tests__/  tests de utils, recuperación y aislamiento
-supabase/migrations/   SQL versionado (00001→00021, aplicar EN ORDEN)
+supabase/migrations/   SQL versionado (00001→00022, aplicar EN ORDEN)
 scripts/              backup/restore/health-check, rollout, validador de migración móvil
 docs/                 arquitectura y operación
 monitoring/           notas de monitorización
@@ -122,7 +122,7 @@ Dentro de una `feature`, la dependencia va siempre hacia adentro:
   `GEMINI_API_KEY` (opcional, parseo de voz).
 - Migraciones nuevas: numeración consecutiva, **idempotentes**
   (`IF NOT EXISTS`, `DROP/CREATE`), aplicadas en orden sobre `supabase/`.
-  Actualiza también la tabla de migraciones del `README.md` (hoy 00001→00021).
+  Actualiza también la tabla de migraciones del `README.md` (hoy 00001→00022).
 
 ## Seguridad
 

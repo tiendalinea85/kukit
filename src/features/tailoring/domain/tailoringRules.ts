@@ -168,10 +168,11 @@ export function buildProductionMaterial(input: {
     unitCost: number;
     totalCost: number;
   };
+  id?: string;
   now: string;
 }): ProductionMaterial {
   return {
-    id: newId(),
+    id: input.id ?? newId(),
     productionOrderId: input.data.productionOrderId,
     materialId: input.data.materialId,
     materialName: input.data.materialName,
@@ -179,9 +180,21 @@ export function buildProductionMaterial(input: {
     unitCost: input.data.unitCost,
     totalCost: input.data.totalCost,
     createdAt: input.now,
+    updatedAt: input.now,
+    deleted: false,
     syncStatus: "pending",
     workspaceId: "",
   };
+}
+
+/** Línea de material tal como la edita el formulario de orden de producción. */
+export interface ProductionMaterialInput {
+  id: string;
+  materialId: string;
+  materialName: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
 }
 
 export function canEditGarment(_garment: Pick<Garment, "deleted">): boolean {
@@ -190,6 +203,20 @@ export function canEditGarment(_garment: Pick<Garment, "deleted">): boolean {
 
 export function canVoidProduction(order: Pick<ProductionOrder, "status" | "deleted">): boolean {
   return !order.deleted && order.status !== "anulada";
+}
+
+/** Una orden pendiente (no anulada) puede iniciarse. */
+export function canStartProduction(
+  order: Pick<ProductionOrder, "status" | "deleted">,
+): boolean {
+  return !order.deleted && order.status === "pendiente";
+}
+
+/** Solo una orden en proceso puede completarse. */
+export function canCompleteProduction(
+  order: Pick<ProductionOrder, "status" | "deleted">,
+): boolean {
+  return !order.deleted && order.status === "en_proceso";
 }
 
 export function computeProductionTotal(

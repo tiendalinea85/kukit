@@ -22,6 +22,21 @@ const defaultTypes = [
   "Ahorro",
 ];
 
+// Taller de confección: catálogos base para poder crear una orden sin tener que
+// dar de alta tallas y colores a mano. Se siembran por workspace (una sola vez).
+const defaultSizes = ["XS", "S", "M", "L", "XL", "XXL"];
+
+const defaultColors = [
+  { name: "Negro", hex: "#000000" },
+  { name: "Blanco", hex: "#ffffff" },
+  { name: "Gris", hex: "#71717a" },
+  { name: "Rojo", hex: "#ef4444" },
+  { name: "Azul", hex: "#3b82f6" },
+  { name: "Verde", hex: "#22c55e" },
+  { name: "Beige", hex: "#d6c7a1" },
+  { name: "Rosado", hex: "#ec4899" },
+];
+
 function daysAgo(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -81,6 +96,43 @@ export async function seedForWorkspace(workspaceId: string, withSamples = false)
   } else {
     const invCats = await db.investmentCategories.where("workspaceId").equals(workspaceId).toArray();
     invCatIds = invCats.map((c) => c.id);
+  }
+
+  // Tallas y colores van en "pending" (no en "local" como los datos de
+  // ejemplo): son catálogo real que el workspace necesita en todos sus
+  // dispositivos, igual que seedCategoriesIfEmpty.
+  const sizeCount = await db.sizes.where("workspaceId").equals(workspaceId).count();
+  if (sizeCount === 0) {
+    const now = new Date().toISOString();
+    await db.sizes.bulkAdd(
+      defaultSizes.map((name, i) => ({
+        id: newId(),
+        workspaceId,
+        name,
+        sortOrder: i,
+        createdAt: now,
+        updatedAt: now,
+        deleted: false,
+        syncStatus: "pending" as const,
+      })),
+    );
+  }
+
+  const colorCount = await db.garmentColors.where("workspaceId").equals(workspaceId).count();
+  if (colorCount === 0) {
+    const now = new Date().toISOString();
+    await db.garmentColors.bulkAdd(
+      defaultColors.map((c) => ({
+        id: newId(),
+        workspaceId,
+        name: c.name,
+        hex: c.hex,
+        createdAt: now,
+        updatedAt: now,
+        deleted: false,
+        syncStatus: "pending" as const,
+      })),
+    );
   }
 
   if (!withSamples) return;

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 ROLE_PATTERN = "^(OWNER|ADMIN|USER|READ_ONLY)$"
 
@@ -29,6 +29,23 @@ class RoleResponse(BaseModel):
 
 class MemberRoleUpdate(BaseModel):
     role: str = Field(pattern=ROLE_PATTERN)
+
+
+class MemberCreate(BaseModel):
+    email: EmailStr
+    full_name: str = Field(min_length=1, max_length=120)
+    role: str = Field(pattern=ROLE_PATTERN)
+    password: Optional[str] = Field(default=None, min_length=8, max_length=128)
+
+
+class MemberCreatedResponse(BaseModel):
+    workspace_id: str
+    user_id: str
+    email: str
+    full_name: str
+    role: str
+    password: Optional[str] = None
+    created: bool = True
 
 
 class MembersResponse(BaseModel):

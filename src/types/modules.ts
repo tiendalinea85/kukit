@@ -93,8 +93,11 @@ export interface ProductionMaterial {
   unitCost: number;
   totalCost: number;
   createdAt: string;
+  updatedAt: string;
+  deleted: boolean;
   syncStatus: SyncStatus;
   workspaceId: string;
+  revision?: number;
 }
 
 // ─── AGRICULTURA ─────────────────────────────────────────────────────────────

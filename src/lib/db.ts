@@ -387,6 +387,21 @@ class ZaneDB extends Dexie {
       syncOutbox:
         "id, &[entity+entityId], entity, entityId, workspaceId, state, retryAt, createdAt, updatedAt, attempts",
     });
+
+    // SOFT DELETE DE MATERIALES DE PRODUCCIÓN (migración 00022): las líneas
+    // heredadas no tienen `updatedAt` ni `deleted` y el push en modo guarded
+    // exige ambos (sin updatedAt se enviaría "" y el servidor rechazaría la fila).
+    this.version(17).stores({
+      productionMaterials:
+        "id, productionOrderId, materialId, workspaceId, syncStatus",
+    }).upgrade(async (tx) => {
+      await tx.table("productionMaterials").toCollection().modify((row: Record<string, unknown>) => {
+        if (typeof row.updatedAt !== "string") {
+          row.updatedAt = typeof row.createdAt === "string" ? row.createdAt : new Date().toISOString();
+        }
+        if (typeof row.deleted !== "boolean") row.deleted = false;
+      });
+    });
   }
 }
 

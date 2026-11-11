@@ -3,7 +3,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X, Home, PlusCircle, List, Briefcase, Tag, Type, BarChart3, Settings, Trash2, ReceiptText, Users, Package, ShoppingBag, Truck, Scissors, Wheat, Car, Egg, ChevronDown, Building2, Plus } from "lucide-react";
+import { X, Home, PlusCircle, List, Briefcase, Tag, Type, BarChart3, Settings, Trash2, ReceiptText, Users, Package, ShoppingBag, Truck, Scissors, Wheat, Car, Egg, ChevronDown, Building2, Plus, Camera } from "lucide-react";
 import { useAppStore } from "@/stores/useAppStore";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { QuickCategoryModal } from "@/features/categories/components/QuickCategoryModal";
@@ -29,6 +29,7 @@ const links = [
   { href: "/customers", label: "Clientes", icon: Users },
   { href: "/products", label: "Productos e Inventario", icon: Package },
   { href: "/expenses/new", label: "Registrar Gasto", icon: PlusCircle },
+  { href: "/scan", label: "Escanear comprobante", icon: Camera },
   { href: "/expenses", label: "Lista de Gastos", icon: List },
   { href: "/purchases", label: "Compras", icon: Truck },
   { href: "/investments/new", label: "Registrar Inversión", icon: PlusCircle },

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useCallback } from "react";
+import { getSupabase } from "@/lib/supabase";
 import type { OcrResult } from "../schemas/ocrSchema";
 
 interface UseOCRState {
@@ -19,9 +20,14 @@ export function useOCR() {
     async (base64: string): Promise<OcrResult | null> => {
       setState({ extracting: true, error: null, result: null });
       try {
+        const sb = getSupabase();
+        const token = sb ? (await sb.auth.getSession()).data.session?.access_token : undefined;
         const res = await fetch("/api/ai/ocr", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({ imageBase64: base64 }),
         });
         if (!res.ok) {

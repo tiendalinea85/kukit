@@ -13,6 +13,11 @@ import {
   buildProductionMaterial,
   canEditGarment,
   canVoidProduction,
+  canStartProduction,
+  canCompleteProduction,
+  computeProductionTotal,
+  computeMaterialTotal,
+  type ProductionMaterialInput,
 } from "../domain/tailoringRules";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import type { Garment, Size, Color, Material, ProductionOrder, ProductionMaterial } from "@/types/modules";
@@ -103,6 +108,7 @@ export async function deleteGarment(id: string): Promise<void> {
   await getActiveGarment(id);
   await db.garments.update(id, {
     deleted: true,
+    updatedAt: new Date().toISOString(),
     syncStatus: "pending" as const,
   });
 }
@@ -111,6 +117,7 @@ export async function voidGarment(id: string): Promise<void> {
   await getActiveGarment(id);
   await db.garments.update(id, {
     deleted: true,
+    updatedAt: new Date().toISOString(),
     syncStatus: "pending" as const,
   });
 }
@@ -130,6 +137,7 @@ export async function updateSize(id: string, data: SizeFormData): Promise<void> 
   await db.sizes.update(id, {
     name: data.name.trim(),
     sortOrder: data.sortOrder,
+    updatedAt: new Date().toISOString(),
     syncStatus: "pending" as const,
   });
 }
@@ -138,6 +146,7 @@ export async function deleteSize(id: string): Promise<void> {
   await getActiveSize(id);
   await db.sizes.update(id, {
     deleted: true,
+    updatedAt: new Date().toISOString(),
     syncStatus: "pending" as const,
   });
 }
@@ -157,6 +166,7 @@ export async function updateColor(id: string, data: ColorFormData): Promise<void
   await db.garmentColors.update(id, {
     name: data.name.trim(),
     hex: data.hex,
+    updatedAt: new Date().toISOString(),
     syncStatus: "pending" as const,
   });
 }
@@ -165,6 +175,7 @@ export async function deleteColor(id: string): Promise<void> {
   await getActiveColor(id);
   await db.garmentColors.update(id, {
     deleted: true,
+    updatedAt: new Date().toISOString(),
     syncStatus: "pending" as const,
   });
 }
@@ -197,6 +208,7 @@ export async function deleteMaterial(id: string): Promise<void> {
   await getActiveMaterial(id);
   await db.materials.update(id, {
     deleted: true,
+    updatedAt: new Date().toISOString(),
     syncStatus: "pending" as const,
   });
 }
@@ -225,43 +237,128 @@ export async function createProductionOrder(
   return order;
 }
 
-export async function updateProductionOrder(id: string, data: ProductionOrderFormData): Promise<void> {
+export async function updateProductionOrder(
+  id: string,
+  data: ProductionOrderFormData,
+  materials: ProductionMaterialInput[] = []
+): Promise<void> {
   const existing = await getActiveProductionOrder(id);
   if (!canVoidProduction(existing)) throw new Error("No se puede editar esta orden");
 
-  const totalCost = Math.round(data.quantity * data.unitCost * 100) / 100;
+  const workspaceId = getWorkspaceId();
+  const totalCost = computeProductionTotal(data.quantity, data.unitCost);
+  const now = new Date().toISOString();
 
-  await db.productionOrders.update(id, {
-    garmentId: data.garmentId,
-    sizeId: data.sizeId,
-    colorId: data.colorId,
-    quantity: data.quantity,
-    unitCost: data.unitCost,
-    totalCost,
-    startDate: data.startDate,
-    dueDate: data.dueDate,
-    notes: data.notes || "",
-    updatedAt: new Date().toISOString(),
-    syncStatus: "pending" as const,
+  // El snapshot de nombres se recalcula desde los ids: antes se editaba la
+  // orden pero la tarjeta seguía mostrando la prenda/talla/color antiguos.
+  const [garment, size, color] = await Promise.all([
+    db.garments.get(data.garmentId),
+    db.sizes.get(data.sizeId),
+    db.garmentColors.get(data.colorId),
+  ]);
+  const garmentName = garment?.workspaceId === workspaceId ? garment.name : existing.garmentName;
+  const sizeName = size?.workspaceId === workspaceId ? size.name : existing.sizeName;
+  const colorName = color?.workspaceId === workspaceId ? color.name : existing.colorName;
+
+  await db.transaction("rw", db.productionOrders, db.productionMaterials, async () => {
+    await db.productionOrders.update(id, {
+      garmentId: data.garmentId,
+      garmentName,
+      sizeId: data.sizeId,
+      sizeName,
+      colorId: data.colorId,
+      colorName,
+      quantity: data.quantity,
+      unitCost: data.unitCost,
+      totalCost,
+      startDate: data.startDate,
+      dueDate: data.dueDate,
+      notes: data.notes || "",
+      updatedAt: now,
+      syncStatus: "pending" as const,
+    });
+
+    // Reemplazo de líneas por diff: las que ya existían se actualizan, las
+    // nuevas se insertan con el id generado por el formulario y las quitadas se
+    // marcan `deleted` (soft delete) en vez de borrarse físicamente.
+    const existingMaterials = await db.productionMaterials
+      .where("productionOrderId")
+      .equals(id)
+      .toArray();
+    const existingById = new Map(existingMaterials.map((m) => [m.id, m]));
+    const keptIds = new Set<string>();
+
+    for (const row of materials) {
+      if (!row.materialId) continue;
+      const prev = existingById.get(row.id);
+      if (prev) {
+        keptIds.add(row.id);
+        await db.productionMaterials.update(row.id, {
+          materialId: row.materialId,
+          materialName: row.materialName,
+          quantity: row.quantity,
+          unitCost: row.unitCost,
+          totalCost: row.totalCost,
+          deleted: false,
+          updatedAt: now,
+          syncStatus: "pending" as const,
+        });
+      } else {
+        const pm = buildProductionMaterial({
+          id: row.id,
+          data: {
+            productionOrderId: id,
+            materialId: row.materialId,
+            materialName: row.materialName,
+            quantity: row.quantity,
+            unitCost: row.unitCost,
+            totalCost: row.totalCost,
+          },
+          now,
+        });
+        pm.workspaceId = workspaceId;
+        await db.productionMaterials.add(pm);
+      }
+    }
+
+    for (const mat of existingMaterials) {
+      if (!keptIds.has(mat.id) && !mat.deleted) {
+        await db.productionMaterials.update(mat.id, {
+          deleted: true,
+          updatedAt: now,
+          syncStatus: "pending" as const,
+        });
+      }
+    }
   });
 }
 
 export async function deleteProductionOrder(id: string): Promise<void> {
   await getActiveProductionOrder(id);
-  const materials = await db.productionMaterials
-    .where("productionOrderId")
-    .equals(id)
-    .toArray();
-  for (const mat of materials) {
-    await db.productionMaterials.update(mat.id, {
+  const now = new Date().toISOString();
+
+  // Soft delete en cascada: la orden y sus materiales se marcan `deleted` para
+  // que el tombstone viaje al servidor. El borrado físico local haría resucitar
+  // las líneas en otros dispositivos (invariante 2).
+  await db.transaction("rw", db.productionOrders, db.productionMaterials, async () => {
+    const materials = await db.productionMaterials
+      .where("productionOrderId")
+      .equals(id)
+      .toArray();
+    for (const mat of materials) {
+      if (mat.deleted) continue;
+      await db.productionMaterials.update(mat.id, {
+        deleted: true,
+        updatedAt: now,
+        syncStatus: "pending" as const,
+      });
+    }
+
+    await db.productionOrders.update(id, {
+      deleted: true,
+      updatedAt: now,
       syncStatus: "pending" as const,
     });
-    await db.productionMaterials.delete(mat.id);
-  }
-
-  await db.productionOrders.update(id, {
-    deleted: true,
-    syncStatus: "pending" as const,
   });
 }
 
@@ -273,6 +370,32 @@ export async function voidProductionOrder(id: string): Promise<void> {
     status: "anulada" as const,
     voidedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    syncStatus: "pending" as const,
+  });
+}
+
+/** pendiente → en_proceso. */
+export async function startProductionOrder(id: string): Promise<void> {
+  const existing = await getActiveProductionOrder(id);
+  if (!canStartProduction(existing)) throw new Error("La orden no se puede iniciar");
+
+  await db.productionOrders.update(id, {
+    status: "en_proceso" as const,
+    updatedAt: new Date().toISOString(),
+    syncStatus: "pending" as const,
+  });
+}
+
+/** en_proceso → completada (fija completedAt). */
+export async function completeProductionOrder(id: string): Promise<void> {
+  const existing = await getActiveProductionOrder(id);
+  if (!canCompleteProduction(existing)) throw new Error("La orden no se puede completar");
+
+  const now = new Date().toISOString();
+  await db.productionOrders.update(id, {
+    status: "completada" as const,
+    completedAt: now,
+    updatedAt: now,
     syncStatus: "pending" as const,
   });
 }
@@ -291,7 +414,7 @@ export async function addProductionMaterial(data: {
 
   const now = new Date().toISOString();
   const workspaceId = getWorkspaceId();
-  const totalCost = Math.round(data.quantity * data.unitCost * 100) / 100;
+  const totalCost = computeMaterialTotal(data.quantity, data.unitCost);
   const pm = buildProductionMaterial({
     data: { ...data, totalCost },
     now,
@@ -303,5 +426,9 @@ export async function addProductionMaterial(data: {
 
 export async function removeProductionMaterial(id: string): Promise<void> {
   await getActiveProductionMaterial(id);
-  await db.productionMaterials.delete(id);
+  await db.productionMaterials.update(id, {
+    deleted: true,
+    updatedAt: new Date().toISOString(),
+    syncStatus: "pending" as const,
+  });
 }

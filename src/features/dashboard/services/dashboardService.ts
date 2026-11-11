@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { format, startOfWeek, subDays } from "date-fns";
 import { computeStockById } from "@/features/sales/domain/stockRules";
+import { buildProfitSummary, computeSaleProfit, computeWeightedCosts } from "@/features/sales/domain/saleProfit";
 import { listCategories } from "@/features/categories/services/categoryService";
 import type { Product, Category, Sale, SaleDetail } from "@/types";
 
@@ -42,6 +43,11 @@ export interface DashboardData {
   salesCountToday: number;
   salesWeek: number;
   salesCountWeek: number;
+  weekCostOfGoods: number;
+  weekExpenses: number;
+  weekProfit: number;
+  weekMargin: number;
+  weekMissingCostCount: number;
   unitsSold: number;
   purchasesTotal: number;
   purchasesCount: number;
@@ -106,6 +112,7 @@ export async function loadDashboard(workspaceId?: string): Promise<DashboardData
     confirmedWeek,
     weekSales,
     purchases,
+    purchaseDetails,
     expenses,
     investments,
     products,
@@ -117,6 +124,7 @@ export async function loadDashboard(workspaceId?: string): Promise<DashboardData
     queryConfirmedSales(weekStartKey, todayKey, workspaceId),
     queryConfirmedSales(windowStartKey, todayKey, workspaceId),
     filterByWorkspace(await db.purchases.toArray()),
+    filterByWorkspace(await db.purchaseDetails.toArray()),
     filterByWorkspace(await db.expenses.toArray()),
     filterByWorkspace(await db.investments.toArray()),
     filterByWorkspace(await db.products.toArray()),
@@ -160,6 +168,28 @@ export async function loadDashboard(workspaceId?: string): Promise<DashboardData
 
   const unitsSold = confirmedDetails.reduce((s, d) => s + d.quantity, 0);
 
+  // Utilidad de la semana: ventas confirmadas − costo de compras recibidas −
+  // gastos operativos del mismo rango. Se separa del acumulado histórico que
+  // muestran las demás tarjetas.
+  const weekIds = new Set(validSales(confirmedWeek).map((s) => s.id));
+  const weekDetails = confirmedDetails.filter((d) => weekIds.has(d.saleId));
+  const receivedPurchaseIds = new Set(
+    purchases.filter((p) => !p.deleted && p.status === "recibida").map((p) => p.id),
+  );
+  const costs = computeWeightedCosts(
+    purchaseDetails
+      .filter((d) => !d.deleted && receivedPurchaseIds.has(d.purchaseId))
+      .map((d) => ({ productId: d.productId, quantity: d.quantity, unitPrice: d.unitPrice })),
+  );
+  const weekExpenses = expenses
+    .filter((e) => !e.deleted && e.status !== "anulado" && e.date >= weekStartKey && e.date <= todayKey)
+    .reduce((sum, e) => sum + e.amount, 0);
+  const weekSummary = buildProfitSummary(
+    computeSaleProfit(weekDetails, costs),
+    weekExpenses,
+    validSales(confirmedWeek).length,
+  );
+
   const categoryMap = new Map<string, Category>(categories.map((c) => [c.id, c]));
   const productById = new Map<string, Product>(activeProducts.map((p) => [p.id, p]));
 
@@ -202,6 +232,11 @@ export async function loadDashboard(workspaceId?: string): Promise<DashboardData
     salesCountToday: validSales(confirmedToday).length,
     salesWeek,
     salesCountWeek: validSales(confirmedWeek).length,
+    weekCostOfGoods: weekSummary.costOfGoods,
+    weekExpenses: weekSummary.operatingExpenses,
+    weekProfit: weekSummary.profit,
+    weekMargin: weekSummary.margin,
+    weekMissingCostCount: weekSummary.missingCostCount,
     unitsSold,
     purchasesTotal: validPurchases.reduce((s, p) => s + p.total, 0),
     purchasesCount: validPurchases.length,

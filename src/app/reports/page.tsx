@@ -9,6 +9,7 @@ import {
 import { useExpenses } from "@/features/expenses/hooks/useExpenses";
 import { isVoided } from "@/features/expenses/domain/expenseRules";
 import { useCategories } from "@/features/categories/hooks/useCategories";
+import { useProfitSummary } from "@/features/sales/hooks/useProfitSummary";
 import { PERIODS as periods, getDateRange } from "@/features/reports/services/reportService";
 import { formatCurrency } from "@/utils/format";
 import { Button } from "@/components/ui/Button";
@@ -24,6 +25,20 @@ export default function ReportsPage() {
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [chartType, setChartType] = useState<"bar" | "pie" | "line">("bar");
+
+  const profitRange = useMemo(() => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const toKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    if (period === "custom") {
+      return customStart && customEnd
+        ? { from: customStart, to: customEnd }
+        : { from: "", to: "" };
+    }
+    const { start, end } = getDateRange(period);
+    return { from: toKey(start), to: toKey(end) };
+  }, [period, customStart, customEnd]);
+
+  const { data: profit } = useProfitSummary(profitRange.from, profitRange.to);
 
   const filtered = useMemo(() => {
     const active = (ex: Expense) => !isVoided(ex);
@@ -104,6 +119,10 @@ export default function ReportsPage() {
     const lines: string[] = [];
     lines.push(`Reporte de Gastos - ${periodLabel} (${rangeText})`);
     lines.push(`Total: ${formatCurrency(totalAmount)} | Registros: ${count}`);
+    if (profit) {
+      lines.push(`Ingresos: ${formatCurrency(profit.revenue)} | Costo de ventas: ${formatCurrency(profit.costOfGoods)}`);
+      lines.push(`Gastos: ${formatCurrency(profit.operatingExpenses)} | Utilidad: ${formatCurrency(profit.profit)} (${(profit.margin * 100).toFixed(1)}%)`);
+    }
     lines.push("--------------------------------");
     filtered.forEach((ex) => {
       lines.push(`${ex.date} ${ex.code} - ${ex.description} (${categoryName(ex.categoryId)})`);
@@ -211,6 +230,48 @@ export default function ReportsPage() {
           <p className="text-sm font-semibold text-zinc-100">Reporte {periodLabel}</p>
           <p className="text-xs text-zinc-500">{rangeText}</p>
         </div>
+
+        {profit && (
+          <div className="rounded-2xl bg-zinc-900/50 border border-zinc-800 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-zinc-100">Ingresos y utilidad</p>
+              <span className="text-xs text-zinc-500">
+                {profit.salesCount} venta{profit.salesCount === 1 ? "" : "s"} confirmada{profit.salesCount === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-emerald-600/10 border border-emerald-600/20 p-3">
+                <p className="text-xs text-zinc-500">Ingresos</p>
+                <p className="text-sm font-semibold text-emerald-400 mt-1 truncate">{formatCurrency(profit.revenue)}</p>
+              </div>
+              <div className="rounded-xl bg-amber-600/10 border border-amber-600/20 p-3">
+                <p className="text-xs text-zinc-500">Costo de ventas</p>
+                <p className="text-sm font-semibold text-amber-400 mt-1 truncate">{formatCurrency(profit.costOfGoods)}</p>
+              </div>
+              <div className="rounded-xl bg-rose-600/10 border border-rose-600/20 p-3">
+                <p className="text-xs text-zinc-500">Gastos</p>
+                <p className="text-sm font-semibold text-rose-400 mt-1 truncate">{formatCurrency(profit.operatingExpenses)}</p>
+              </div>
+              <div className={`rounded-xl border p-3 ${
+                profit.profit >= 0 ? "bg-emerald-600/10 border-emerald-600/20" : "bg-rose-600/10 border-rose-600/20"
+              }`}>
+                <p className="text-xs text-zinc-500">Utilidad</p>
+                <p className={`text-sm font-semibold mt-1 truncate ${
+                  profit.profit >= 0 ? "text-emerald-400" : "text-rose-400"
+                }`}>{formatCurrency(profit.profit)}</p>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-500">
+              Utilidad = ingresos − costo de ventas − gastos · margen {(profit.margin * 100).toFixed(1)}%
+            </p>
+            {profit.missingCostCount > 0 && (
+              <p className="text-xs text-amber-400">
+                {profit.missingCostCount} producto{profit.missingCostCount === 1 ? "" : "s"} vendido
+                {profit.missingCostCount === 1 ? "" : "s"} sin compra registrada: la utilidad puede estar sobreestimada.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-3">
           {[

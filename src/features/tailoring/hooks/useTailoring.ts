@@ -128,7 +128,7 @@ export function useProductionOrders() {
   return { orders, loading };
 }
 
-export function useProductionMaterials(orderId: string | null) {
+export function useProductionMaterials(orderId: string | null, includeDeleted = false) {
   const [materials, setMaterials] = useState<ProductionMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const workspaceId = useWorkspaceId();
@@ -137,11 +137,12 @@ export function useProductionMaterials(orderId: string | null) {
     if (!orderId || !workspaceId) { setMaterials([]); setLoading(false); return; }
 
     const observable = liveQuery(async () => {
-      return db.productionMaterials
+      const data = await db.productionMaterials
         .where("productionOrderId")
         .equals(orderId)
         .filter((m) => m.workspaceId === workspaceId)
         .toArray();
+      return includeDeleted ? data : data.filter((m) => m.deleted !== true);
     });
 
     const sub = observable.subscribe({
@@ -150,7 +151,7 @@ export function useProductionMaterials(orderId: string | null) {
     });
 
     return () => sub.unsubscribe();
-  }, [orderId, workspaceId]);
+  }, [orderId, workspaceId, includeDeleted]);
 
   return { materials, loading };
 }

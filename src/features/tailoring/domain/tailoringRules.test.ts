@@ -9,6 +9,8 @@ import {
   buildProductionMaterial,
   canEditGarment,
   canVoidProduction,
+  canStartProduction,
+  canCompleteProduction,
   computeProductionTotal,
   computeMaterialTotal,
   filterProductionOrders,
@@ -163,6 +165,25 @@ describe("buildProductionMaterial", () => {
     assert.equal(pm.unitCost, 3.5);
     assert.equal(pm.totalCost, 17.5);
     assert.equal(pm.syncStatus, "pending");
+    assert.equal(pm.updatedAt, now);
+    assert.equal(pm.deleted, false);
+    assert.equal(pm.id.length > 0, true);
+  });
+
+  it("reutiliza el id recibido para editar una línea existente", () => {
+    const pm = buildProductionMaterial({
+      id: "pm-existente",
+      data: {
+        productionOrderId: "ord-1",
+        materialId: "m-1",
+        materialName: "Algodón",
+        quantity: 5,
+        unitCost: 3.5,
+        totalCost: 17.5,
+      },
+      now,
+    });
+    assert.equal(pm.id, "pm-existente");
   });
 });
 
@@ -191,6 +212,37 @@ describe("canVoidProduction", () => {
 
   it("retorna false cuando está eliminado", () => {
     assert.equal(canVoidProduction({ status: "pendiente", deleted: true }), false);
+  });
+});
+
+describe("canStartProduction", () => {
+  it("permite iniciar una orden pendiente", () => {
+    assert.equal(canStartProduction({ status: "pendiente", deleted: false }), true);
+  });
+
+  it("no permite iniciar una orden ya en proceso", () => {
+    assert.equal(canStartProduction({ status: "en_proceso", deleted: false }), false);
+  });
+
+  it("no permite iniciar una orden completada, anulada o eliminada", () => {
+    assert.equal(canStartProduction({ status: "completada", deleted: false }), false);
+    assert.equal(canStartProduction({ status: "anulada", deleted: false }), false);
+    assert.equal(canStartProduction({ status: "pendiente", deleted: true }), false);
+  });
+});
+
+describe("canCompleteProduction", () => {
+  it("permite completar una orden en proceso", () => {
+    assert.equal(canCompleteProduction({ status: "en_proceso", deleted: false }), true);
+  });
+
+  it("no permite completar una orden pendiente (debe iniciarse antes)", () => {
+    assert.equal(canCompleteProduction({ status: "pendiente", deleted: false }), false);
+  });
+
+  it("no permite completar una orden anulada o eliminada", () => {
+    assert.equal(canCompleteProduction({ status: "anulada", deleted: false }), false);
+    assert.equal(canCompleteProduction({ status: "en_proceso", deleted: true }), false);
   });
 });
 

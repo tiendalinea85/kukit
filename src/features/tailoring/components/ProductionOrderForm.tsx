@@ -8,13 +8,16 @@ import {
   type ProductionOrderFormData,
 } from "../schemas/tailoringSchema";
 import { computeMaterialTotal } from "../domain/tailoringRules";
+import { createSize, createColor } from "../services/tailoringService";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { Modal } from "@/components/ui/Modal";
 import { db } from "@/lib/db";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { Plus, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/utils/format";
+import toast from "react-hot-toast";
 import type { Garment, Size, Color, Material, ProductionMaterial } from "@/types/modules";
 
 interface MaterialRow {
@@ -50,24 +53,31 @@ export function ProductionOrderForm({
   const [materials, setMaterials] = useState<Material[]>([]);
   const [materialRows, setMaterialRows] = useState<MaterialRow[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [quickAdd, setQuickAdd] = useState<"size" | "color" | null>(null);
+  const [quickName, setQuickName] = useState("");
+  const [quickHex, setQuickHex] = useState("#8b5cf6");
+  const [quickLoading, setQuickLoading] = useState(false);
   const workspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   useEffect(() => { setMounted(true); }, []);
 
-  useEffect(() => {
+  const loadMasterData = useCallback(async () => {
     if (!workspaceId) return;
-    Promise.all([
+    const [g, s, c, m] = await Promise.all([
       db.garments.where("workspaceId").equals(workspaceId).and((g) => !g.deleted).toArray(),
       db.sizes.where("workspaceId").equals(workspaceId).and((s) => !s.deleted).toArray(),
       db.garmentColors.where("workspaceId").equals(workspaceId).and((c) => !c.deleted).toArray(),
       db.materials.where("workspaceId").equals(workspaceId).and((m) => !m.deleted).toArray(),
-    ]).then(([g, s, c, m]) => {
-      setGarments(g);
-      setSizes(s);
-      setColors(c);
-      setMaterials(m);
-    });
+    ]);
+    setGarments(g);
+    setSizes(s);
+    setColors(c);
+    setMaterials(m);
   }, [workspaceId]);
+
+  useEffect(() => {
+    void loadMasterData();
+  }, [loadMasterData]);
 
   useEffect(() => {
     if (defaultMaterials && defaultMaterials.length > 0) {
@@ -86,7 +96,7 @@ export function ProductionOrderForm({
 
   const defaultDate = new Date().toISOString().split("T")[0];
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<ProductionOrderFormData>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<ProductionOrderFormData>({
     resolver: zodResolver(productionOrderSchema) as Resolver<ProductionOrderFormData>,
     defaultValues: {
       garmentId: defaultValues?.garmentId || "",
@@ -149,10 +159,43 @@ export function ProductionOrderForm({
     await onSubmit(data, materialRows);
   };
 
+  // Alta rápida de talla/color sin salir de la orden: antes había que ir a las
+  // pestañas Tallas/Colores para poder siquiera crear una orden.
+  const handleQuickSave = async () => {
+    const name = quickName.trim();
+    if (!name || !quickAdd) return;
+    setQuickLoading(true);
+    try {
+      if (quickAdd === "size") {
+        const created = await createSize({ name, sortOrder: sizes.length });
+        await loadMasterData();
+        setValue("sizeId", created.id, { shouldValidate: true, shouldDirty: true });
+        toast.success(`Talla "${name}" creada`);
+      } else {
+        const created = await createColor({ name, hex: quickHex });
+        await loadMasterData();
+        setValue("colorId", created.id, { shouldValidate: true, shouldDirty: true });
+        toast.success(`Color "${name}" creado`);
+      }
+      setQuickAdd(null);
+      setQuickName("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo crear");
+    } finally {
+      setQuickLoading(false);
+    }
+  };
+
+  const openQuickAdd = (kind: "size" | "color") => {
+    setQuickName("");
+    setQuickAdd(kind);
+  };
+
   if (!mounted) return null;
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+    <>
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       {code && (
         <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-800/40 border border-zinc-700/50">
           <span className="text-xs text-zinc-500">Código:</span>
@@ -175,6 +218,8 @@ export function ProductionOrderForm({
           error={errors.sizeId?.message}
           placeholder="Seleccionar"
           options={sizes.map((s) => ({ value: s.id, label: s.name }))}
+          onNew={() => openQuickAdd("size")}
+          newLabel="Nueva talla"
         />
         <Select
           label="Color"
@@ -182,6 +227,8 @@ export function ProductionOrderForm({
           error={errors.colorId?.message}
           placeholder="Seleccionar"
           options={colors.map((c) => ({ value: c.id, label: c.name }))}
+          onNew={() => openQuickAdd("color")}
+          newLabel="Nuevo color"
         />
       </div>
 
@@ -285,6 +332,74 @@ export function ProductionOrderForm({
       <Button type="submit" loading={loading} className="w-full">
         Guardar Orden
       </Button>
-    </form>
+      </form>
+
+      <Modal
+        open={quickAdd === "size"}
+        onClose={() => setQuickAdd(null)}
+        title="Nueva talla"
+      >
+        <div className="space-y-3">
+          <Input
+            label="Nombre"
+            value={quickName}
+            onChange={(e) => setQuickName(e.target.value)}
+            placeholder="Ej. 38, XS, Única"
+            autoFocus
+          />
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="flex-1"
+              onClick={() => setQuickAdd(null)}
+            >
+              Cancelar
+            </Button>
+            <Button type="button" className="flex-1" loading={quickLoading} onClick={handleQuickSave}>
+              Guardar
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={quickAdd === "color"}
+        onClose={() => setQuickAdd(null)}
+        title="Nuevo color"
+      >
+        <div className="space-y-3">
+          <Input
+            label="Nombre"
+            value={quickName}
+            onChange={(e) => setQuickName(e.target.value)}
+            placeholder="Ej. Burdeos"
+            autoFocus
+          />
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-zinc-400">Muestra</label>
+            <input
+              type="color"
+              value={quickHex}
+              onChange={(e) => setQuickHex(e.target.value)}
+              className="h-10 w-full cursor-pointer rounded-xl bg-zinc-800/60 border border-zinc-700/50 p-1"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="flex-1"
+              onClick={() => setQuickAdd(null)}
+            >
+              Cancelar
+            </Button>
+            <Button type="button" className="flex-1" loading={quickLoading} onClick={handleQuickSave}>
+              Guardar
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 }
